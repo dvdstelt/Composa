@@ -236,7 +236,7 @@ public sealed partial class MainWindow : Window
 
     private Control BuildToolRail()
     {
-        var rail = new StackPanel { Spacing = 6, Margin = new Thickness(0, 12, 0, 12), HorizontalAlignment = HorizontalAlignment.Center };
+        var rail = new StackPanel { Spacing = 2, Margin = new Thickness(0, 8, 0, 8), HorizontalAlignment = HorizontalAlignment.Center };
         foreach (var (tool, icon, tip) in ToolList)
         {
             var button = new ToggleButton { Classes = { "tool" }, Content = Icons.Create(icon, 19) };
@@ -254,7 +254,7 @@ public sealed partial class MainWindow : Window
         backgroundSwatch.Margin = new Thickness(14, 14, 0, 0);
         foregroundSwatch.HorizontalAlignment = backgroundSwatch.HorizontalAlignment = HorizontalAlignment.Left;
         foregroundSwatch.VerticalAlignment = backgroundSwatch.VerticalAlignment = VerticalAlignment.Top;
-        var swatches = new Panel { Width = 42, Height = 42, Margin = new Thickness(0, 12, 0, 0), Children = { backgroundSwatch, foregroundSwatch } };
+        var swatches = new Panel { Width = 42, Height = 42, Margin = new Thickness(0, 8, 0, 0), Children = { backgroundSwatch, foregroundSwatch } };
         rail.Children.Add(swatches);
         var swap = Ui.IconButton(Icons.Swap, "Swap colors (X) · D resets to black and white", () => { session?.SwapColors(); UpdateColors(); }, 14);
         swap.HorizontalAlignment = HorizontalAlignment.Center;
@@ -290,6 +290,21 @@ public sealed partial class MainWindow : Window
         var buttons = Ui.Row(10, Ui.TextButton("New Canvas…", () => _ = NewCanvas(), accent: true), Ui.TextButton("Open…", () => _ = Open()));
         buttons.HorizontalAlignment = HorizontalAlignment.Center;
         var box = Ui.Column(14, title, subtitle, buttons);
+        var recent = settings.RecentFiles.Where(p => File.Exists(p) || Directory.Exists(p)).Take(6).ToList();
+        if (recent.Count > 0)
+        {
+            var heading = Ui.Label("Recent", Palette.Secondary);
+            heading.HorizontalAlignment = HorizontalAlignment.Center;
+            heading.Margin = new Thickness(0, 18, 0, 0);
+            box.Children.Add(heading);
+            foreach (var path in recent)
+            {
+                var link = new Button { Classes = { "flat" }, Content = Ui.Label(Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)), Palette.Accent), HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(8, 3) };
+                ToolTip.SetTip(link, path);
+                link.Click += (_, _) => OpenPaths([path]);
+                box.Children.Add(link);
+            }
+        }
         box.VerticalAlignment = VerticalAlignment.Center;
         return new Panel { Children = { box } };
     }

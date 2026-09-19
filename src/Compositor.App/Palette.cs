@@ -38,7 +38,7 @@ public static class Palette
             Setters =
             {
                 new Setter(TemplatedControl.BackgroundProperty, Brushes.Transparent), new Setter(TemplatedControl.BorderThicknessProperty, new Thickness(0)),
-                new Setter(Layoutable.WidthProperty, 36.0), new Setter(Layoutable.HeightProperty, 36.0), new Setter(TemplatedControl.PaddingProperty, new Thickness(0)),
+                new Setter(Layoutable.WidthProperty, 36.0), new Setter(Layoutable.HeightProperty, 33.0), new Setter(TemplatedControl.PaddingProperty, new Thickness(0)),
                 new Setter(TemplatedControl.CornerRadiusProperty, new CornerRadius(7)),
                 new Setter(ContentControl.HorizontalContentAlignmentProperty, HorizontalAlignment.Center), new Setter(ContentControl.VerticalContentAlignmentProperty, VerticalAlignment.Center)
             }
