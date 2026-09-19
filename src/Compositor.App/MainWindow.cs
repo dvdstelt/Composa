@@ -405,7 +405,7 @@ public sealed partial class MainWindow : Window
         Tool.SpotHealing => "Drag over blemishes to heal · [ ] size",
         Tool.CloneStamp => "Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity",
         Tool.Smear => "Drag to " + (s.SmearMode == SmearMode.Liquify ? "push pixels" : s.SmearMode.ToString().ToLowerInvariant()) + " · [ ] size · 1–0 strength",
-        Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Shift snaps to 45°",
+        Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels",
         Tool.Shape => "Drag to draw a shape on a new layer · Shift square · Alt from center",
         Tool.Text => "Click to add text · Click existing text to edit it · Scale it with the Move tool and it stays sharp",
         Tool.Eyedropper => "Click to pick the foreground color · Alt-click for the background",

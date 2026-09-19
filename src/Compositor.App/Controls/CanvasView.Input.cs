@@ -33,6 +33,21 @@ public sealed partial class CanvasView
     private readonly List<(SKPoint From, SKPoint To)> guides = [];
     private Layer? gradientLayer;
     private SKBitmap? gradientOriginal;
+    // A drawn gradient stays adjustable (drag either end) until Enter, Escape, or another action settles it.
+    private SKPoint gradientFrom, gradientTo;
+    private bool gradientPending, gradientMovesStart;
+
+    /// <summary>The gradient is still open only while the session's edit is; any other command will have committed it.</summary>
+    private bool HasPendingGradient => gradientPending && session is { IsInteracting: true } && gradientLayer != null && gradientOriginal != null;
+
+    private void SettleGradient(bool keep)
+    {
+        if (HasPendingGradient) { if (keep) session!.Commit(); else session!.Cancel(); }
+        gradientPending = false;
+        gradientOriginal = null;
+        gradientLayer = null;
+        InvalidateVisual();
+    }
 
     public bool HasCrop => cropRect != null;
     public SKRect? CropRect => cropRect;
@@ -55,8 +70,9 @@ public sealed partial class CanvasView
             case Drag.Stroke: session.CancelStroke(); break;
             case Drag.Transform: session.CancelTransform(); break;
             case Drag.MovePixels: session.EndMovePixels(keep: false); break;
-            case Drag.Gradient: session.Cancel(); gradientOriginal = null; break;
+            case Drag.Gradient: gradientPending = true; SettleGradient(keep: false); break;
         }
+        if (drag != Drag.Gradient) SettleGradient(keep: true);
         drag = Drag.None;
         polygon.Clear();
         guides.Clear();
@@ -165,7 +181,20 @@ public sealed partial class CanvasView
                 else if (problem != null) Problem?.Invoke(problem);
                 break;
             case Tool.Gradient:
+                if (HasPendingGradient)
+                {
+                    var nearStart = Distance(ToScreen(gradientFrom), point.Position) <= 10;
+                    if (nearStart || Distance(ToScreen(gradientTo), point.Position) <= 10)
+                    {
+                        gradientMovesStart = nearStart;
+                        drag = Drag.Gradient;
+                        break;
+                    }
+                }
+                SettleGradient(keep: true);
                 if (session.EditableLayer is not { } target) { Problem?.Invoke("Select a pixel layer or a mask to draw a gradient on."); break; }
+                gradientMovesStart = false;
+                gradientFrom = gradientTo = pressDocument;
                 session.Begin("Gradient");
                 if (!session.IsEditingMask) session.EnsureCoversCanvas(target);
                 gradientLayer = target;
@@ -222,7 +251,10 @@ public sealed partial class CanvasView
                 break;
             case Drag.Transform: DragTransform(shift, alt, e.KeyModifiers.HasFlag(KeyModifiers.Control)); break;
             case Drag.Gradient:
-                if (gradientLayer != null && gradientOriginal != null) session.DrawGradient(gradientLayer, gradientOriginal, pressDocument, ConstrainAngle(currentDocument, shift));
+                if (gradientLayer == null || gradientOriginal == null) break;
+                if (gradientMovesStart) gradientFrom = ConstrainAngle(gradientTo, currentDocument, shift);
+                else gradientTo = ConstrainAngle(gradientFrom, currentDocument, shift);
+                session.DrawGradient(gradientLayer, gradientOriginal, gradientFrom, gradientTo);
                 break;
             case Drag.Eyedropper: PickColor(alt && session.Tool == Tool.Eyedropper); break;
             case Drag.ZoomScrub:
@@ -282,9 +314,10 @@ public sealed partial class CanvasView
                 if (moved) session.CommitTransform(); else session.CancelTransform();
                 break;
             case Drag.Gradient:
-                if (moved) session.Commit(); else session.Cancel();
-                gradientOriginal = null;
-                gradientLayer = null;
+                // Released: the gradient stays open for adjustment. A click that drew nothing is dropped.
+                if (moved || gradientPending) gradientPending = true;
+                else { gradientPending = true; SettleGradient(keep: false); }
+                ToolStateChanged?.Invoke();
                 break;
             case Drag.Shape:
                 if (moved) session.AddShape(MarqueeRect(shift, alt));
@@ -637,6 +670,13 @@ public sealed partial class CanvasView
     {
         if (session == null) return false;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        if (HasPendingGradient && drag == Drag.None)
+        {
+            // Undo while a gradient is still adjustable takes the gradient back, as it would once applied.
+            if (e.Key == Key.Z && e.KeyModifiers == KeyModifiers.Control) { SettleGradient(keep: false); return true; }
+            if (e.Key == Key.Escape) { SettleGradient(keep: false); return true; }
+            if (e.Key == Key.Enter) { SettleGradient(keep: true); return true; }
+        }
         // Mid-drag only Escape (cancel) and Space (pan) mean anything; everything else waits for the drag to end.
         if (IsDragging && e.Key is not (Key.Escape or Key.Space)) return true;
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return false;

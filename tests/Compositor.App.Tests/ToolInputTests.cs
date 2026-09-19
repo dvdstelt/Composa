@@ -89,6 +89,16 @@ public class ToolInputTests
         session.Background = SKColors.Blue;
         window.SelectTool(Tool.Gradient);
         Drag(new SKPoint(0, 200), new SKPoint(600, 200));
+        Assert.True(session.IsInteracting); // Still adjustable.
+        Assert.True(session.Composite().GetPixel(300, 200).Red is > 100 and < 160);
+        Drag(new SKPoint(600, 200), new SKPoint(300, 200)); // Pull the end in: everything right of it is now pure blue.
+        Assert.True(session.Composite().GetPixel(320, 200).Blue > 240);
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control); // Undo takes the open gradient back.
+        Assert.False(session.CanUndo);
+        Assert.Equal(255, session.Composite().GetPixel(20, 200).Green);
+        Drag(new SKPoint(0, 200), new SKPoint(600, 200));
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.False(session.IsInteracting);
         Assert.Equal("Gradient", session.History.UndoName);
         Assert.True(session.Composite().GetPixel(20, 200).Red > 200);
         Assert.True(session.Composite().GetPixel(580, 200).Blue > 200);

@@ -34,7 +34,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Spot Healing Brush (content-aware)
 - Clone Stamp, aligned or not, sampling one layer or all of them
 - Smear tool: Liquify (push), Blur, Smudge, Dodge and Burn
-- Gradient tool (linear or radial, to background or to transparent)
+- Gradient tool (linear or radial, to background or to transparent) that stays adjustable: drag either end, Enter applies
 - Text tool with live, re-editable text layers that stay sharp when scaled (not in the macOS app)
 - Eyedropper and a full color picker
 - Pen pressure varies the brush size on graphics tablets
@@ -63,7 +63,6 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
 - Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries pixels across, keeping their position.
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
-- The Gradient tool applies when you release the drag, rather than staying adjustable until Enter.
 - There is no auto-update.
 
 Beyond the macOS app, this version adds a Text tool, more blend modes (Soft Light, Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery.

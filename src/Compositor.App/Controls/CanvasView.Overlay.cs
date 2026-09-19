@@ -62,9 +62,9 @@ public sealed partial class CanvasView
             });
         }
 
-        if (drag == Drag.Gradient)
+        if (drag == Drag.Gradient || HasPendingGradient)
         {
-            SKPoint from = view.MapPoint(pressDocument), to = view.MapPoint(ConstrainAngle(currentDocument, dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift)));
+            SKPoint from = view.MapPoint(gradientFrom), to = view.MapPoint(gradientTo);
             steps.Add(canvas =>
             {
                 using var dark = new SKPaint { Color = SKColors.Black, StrokeWidth = 3 * hair, IsAntialias = true, Style = SKPaintStyle.Stroke };
