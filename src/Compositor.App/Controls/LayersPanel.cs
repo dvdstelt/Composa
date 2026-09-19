@@ -104,6 +104,16 @@ public sealed class LayersPanel : UserControl
         footer.Margin = new Thickness(0, 4);
 
         var list = new Panel();
+        rows.AddHandler(PointerMovedEvent, (_, e) =>
+        {
+            if (eyeSwipe is not { } show || session == null) return;
+            if (!e.GetCurrentPoint(rows).Properties.IsLeftButtonPressed) { eyeSwipe = null; return; }
+            var position = e.GetPosition(rows);
+            if (position.X > 40) return;
+            var row = rows.Children.OfType<Border>().FirstOrDefault(r => position.Y >= r.Bounds.Top && position.Y < r.Bounds.Bottom);
+            if (row?.Tag is Layer under && under.Visible != show) session.SetVisible(under, show);
+        }, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
+        rows.AddHandler(PointerReleasedEvent, (_, _) => eyeSwipe = null, Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
         list.Children.Add(rows);
         list.Children.Add(dropLine);
         var scroll = new ScrollViewer { Content = list, HorizontalScrollBarVisibility = Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled };
@@ -192,15 +202,13 @@ public sealed class LayersPanel : UserControl
                 e.Handled = true;
                 return;
             }
+            // Swiping down the eye column shows or hides every layer passed over. The pointer is released from the eye
+            // (whose row is about to be rebuilt) and the list itself follows the drag from here.
             eyeSwipe = !layer.Visible;
+            e.Pointer.Capture(null);
             current.SetVisible(layer, eyeSwipe.Value);
             e.Handled = true;
         }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        eye.PointerEntered += (_, e) =>
-        {
-            if (eyeSwipe is { } show && e.GetCurrentPoint(null).Properties.IsLeftButtonPressed) current.SetVisible(layer, show);
-            else eyeSwipe = null;
-        };
 
         var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(depth * 14, 0, 0, 0), Opacity = dim ? 0.45 : 1 };
         if (layer.Clipped) content.Children.Add(Icons.Create(Icons.ClipArrow, 13, Palette.Secondary));
