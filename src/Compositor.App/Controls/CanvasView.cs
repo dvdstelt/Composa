@@ -58,6 +58,8 @@ public sealed partial class CanvasView : Control
     public event Action<string>? Problem;
     /// <summary>Raised when a tool changed session state the chrome displays (colors, brush size, crop presence).</summary>
     public event Action? ToolStateChanged;
+    /// <summary>The document pixel under the pointer, or null once it leaves the canvas.</summary>
+    public event Action<SKPointI?>? PointerAt;
     /// <summary>Raised by the Text tool: where to put new text, or the text layer that was clicked.</summary>
     public event Action<SKPoint, Layer?>? TextRequested;
 

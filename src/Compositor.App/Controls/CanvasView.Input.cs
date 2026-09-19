@@ -200,6 +200,7 @@ public sealed partial class CanvasView
         cursorInside = true;
         if (session == null) return;
         currentDocument = ToDocument(position);
+        PointerAt?.Invoke(new SKPointI((int)Math.Floor(currentDocument.X), (int)Math.Floor(currentDocument.Y)));
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
 
@@ -312,6 +313,7 @@ public sealed partial class CanvasView
     {
         base.OnPointerExited(e);
         cursorInside = false;
+        PointerAt?.Invoke(null);
         InvalidateVisual();
     }
 

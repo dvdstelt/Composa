@@ -21,6 +21,7 @@ public sealed partial class MainWindow : Window
     private readonly Dictionary<Tool, ToggleButton> toolButtons = [];
     private readonly TextBlock zoomText = new() { Width = 56, Foreground = Palette.Secondary };
     private readonly TextBlock sizeText = new() { Foreground = Palette.Secondary };
+    private readonly TextBlock positionText = new() { Foreground = Palette.Secondary, Width = 96 };
     private readonly TextBlock hintText = new() { Foreground = Palette.Secondary, TextTrimming = TextTrimming.CharacterEllipsis };
     private readonly Border foregroundSwatch = new() { Width = 26, Height = 26, BorderBrush = Brushes.White, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(3) };
     private readonly Border backgroundSwatch = new() { Width = 26, Height = 26, BorderBrush = Brushes.White, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(3) };
@@ -63,6 +64,7 @@ public sealed partial class MainWindow : Window
         Content = root;
 
         canvas.ViewChanged += UpdateStatus;
+        canvas.PointerAt += point => positionText.Text = point is { } p ? $"{p.X}, {p.Y}" : "";
         canvas.Problem += message => { problem = message; UpdateStatus(); };
         canvas.ToolStateChanged += () => { refreshOptions?.Invoke(); UpdateColors(); };
         canvas.TextRequested += (at, existing) => _ = EditText(at, existing);
@@ -306,15 +308,16 @@ public sealed partial class MainWindow : Window
 
     private Control BuildStatusBar()
     {
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,*"), Height = 28, Background = Palette.Panel };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto,Auto,*"), Height = 28, Background = Palette.Panel };
         zoomText.Margin = new Thickness(14, 0, 8, 0);
         sizeText.Margin = new Thickness(0, 0, 24, 0);
         hintText.HorizontalAlignment = HorizontalAlignment.Right;
         hintText.Margin = new Thickness(0, 0, 14, 0);
         grid.Children.Add(zoomText);
         AddAt(grid, sizeText, 1);
-        AddAt(grid, hintText, 2);
-        foreach (var text in new[] { zoomText, sizeText, hintText }) text.FontSize = 11.5;
+        AddAt(grid, positionText, 2);
+        AddAt(grid, hintText, 3);
+        foreach (var text in new[] { zoomText, sizeText, positionText, hintText }) text.FontSize = 11.5;
         return grid;
     }
 
