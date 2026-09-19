@@ -67,8 +67,20 @@ public static class MacProject
         // The manifest lists layers bottom to top, each group directly after its contents.
         foreach (var layer in order)
         {
-            if (parents.TryGetValue(layer.Id, out var parentId) && layers.TryGetValue(parentId, out var parentLayer) && parentLayer.IsGroup) parentLayer.Children.Add(layer);
+            if (parents.TryGetValue(layer.Id, out var parentId) && layers.TryGetValue(parentId, out var parentLayer) && parentLayer.IsGroup
+                && ReachesRoot(parentId)) parentLayer.Children.Add(layer);
             else document.Layers.Add(layer);
+        }
+
+        // A damaged manifest can make folders contain each other; such layers are kept at the top level instead of vanishing.
+        bool ReachesRoot(Guid id)
+        {
+            for (var depth = 0; depth < 64; depth++)
+            {
+                if (!parents.TryGetValue(id, out var next)) return true;
+                id = next;
+            }
+            return false;
         }
         // macOS links a clipped layer to its base by ID; here a clipped layer follows the sibling below it.
         foreach (var (id, _) in clipSources)
@@ -105,10 +117,12 @@ public static class MacProject
         for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)
             target[(long)y * mask.RowBytes + x] = source[(long)y * decoded.RowBytes + x * 4];
-        if (layer.Pixels != null && (width != layer.Pixels.Width || height != layer.Pixels.Height))
+        // Masks share their layer's pixel grid here; folder and adjustment masks share the document's.
+        int wantWidth = layer.Pixels?.Width ?? document.Width, wantHeight = layer.Pixels?.Height ?? document.Height;
+        if (width != wantWidth || height != wantHeight)
         {
             using var unscaled = mask;
-            return Editing.EditorSession.Resample(unscaled, layer.Pixels.Width, layer.Pixels.Height);
+            return Editing.EditorSession.Resample(unscaled, wantWidth, wantHeight);
         }
         return mask;
     }

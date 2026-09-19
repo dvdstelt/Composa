@@ -37,6 +37,8 @@ public sealed class LayersPanel : UserControl
     private bool dragging;
     private (Layer Target, LayerDrop Drop)? dropTarget;
     private bool? eyeSwipe;
+    private bool? thumbnailTarget;
+    private bool rebuilding, rebuildAgain;
 
     public event Action<Layer>? EditAdjustmentRequested;
     public event Action<Layer>? EditTextRequested;
@@ -162,6 +164,23 @@ public sealed class LayersPanel : UserControl
 
     private void Rebuild()
     {
+        // Clearing the rows detaches a rename box, whose lost-focus handler commits the name and asks for another
+        // rebuild. That request is honoured after this one finishes instead of interleaving with it.
+        if (rebuilding) { rebuildAgain = true; return; }
+        rebuilding = true;
+        try
+        {
+            do
+            {
+                rebuildAgain = false;
+                RebuildRows();
+            } while (rebuildAgain);
+        }
+        finally { rebuilding = false; }
+    }
+
+    private void RebuildRows()
+    {
         rows.Children.Clear();
         rowFor.Clear();
         updating = true;
@@ -220,20 +239,18 @@ public sealed class LayersPanel : UserControl
             content.Children.Add(Icons.Create(Icons.Folder, 18));
         }
         else if (layer.IsAdjustment) content.Children.Add(Thumb(Icons.Create(Icons.Adjust, 18), selected && !current.IsEditingMask));
-        else if (layer.Pixels != null) content.Children.Add(Thumb(new Image { Source = Thumbnail(layer.Pixels), Stretch = Stretch.Uniform }, selected && layer.Id == current.ActiveLayer?.Id && !current.IsEditingMask, () =>
+        else if (layer.Pixels != null)
         {
-            current.EditingMask = false;
-            current.NotifyLayersChanged();
-        }));
+            var pixelThumb = Thumb(new Image { Source = Thumbnail(layer.Pixels), Stretch = Stretch.Uniform }, selected && layer.Id == current.ActiveLayer?.Id && !current.IsEditingMask);
+            // The row's own press handler (which bubbles next) selects the layer and then applies this target.
+            pixelThumb.PointerPressed += (_, _) => thumbnailTarget = false;
+            content.Children.Add(pixelThumb);
+        }
         if (layer.Mask != null)
         {
             var maskThumb = Thumb(new Image { Source = Thumbnail(layer.Mask), Stretch = Stretch.Uniform, Opacity = layer.MaskEnabled ? 1 : 0.35 },
-                layer.Id == current.ActiveLayer?.Id && current.IsEditingMask, () =>
-                {
-                    current.SelectLayer(layer.Id);
-                    current.EditingMask = true;
-                    current.NotifyLayersChanged();
-                });
+                layer.Id == current.ActiveLayer?.Id && current.IsEditingMask);
+            maskThumb.PointerPressed += (_, _) => thumbnailTarget = true;
             ToolTip.SetTip(maskThumb, "Layer mask: click to paint on it, Shift-click to disable, Ctrl-click to load as selection");
             maskThumb.AddHandler(PointerPressedEvent, (_, e) =>
             {
@@ -282,6 +299,7 @@ public sealed class LayersPanel : UserControl
         row.PointerPressed += (_, e) => RowPressed(layer, row, e);
         row.PointerMoved += (_, e) => RowMoved(e);
         row.PointerReleased += (_, e) => RowReleased(e);
+        row.PointerCaptureLost += (_, _) => { if (dragging) EndRowDrag(); };
         row.ContextMenu = BuildMenu(layer);
         return row;
     }
@@ -293,7 +311,7 @@ public sealed class LayersPanel : UserControl
             Width = 34, Height = 34, Child = child, Background = new SolidColorBrush(Color.Parse("#4A4A4A")), ClipToBounds = true,
             BorderBrush = highlighted ? Brushes.White : new SolidColorBrush(Color.Parse("#161616")), BorderThickness = new Thickness(highlighted ? 2 : 1)
         };
-        if (click != null) border.Tapped += (_, _) => click();
+        _ = click;
         return border;
     }
 
@@ -390,13 +408,23 @@ public sealed class LayersPanel : UserControl
         pressed = layer;
         pressPoint = e.GetPosition(rows);
         dragging = false;
+        var target = thumbnailTarget;
+        thumbnailTarget = null;
         if (extend || range || !session.Document.SelectedLayerIds.Contains(layer.Id)) session.SelectLayer(layer.Id, extend, range);
+        if (target is { } mask && !extend && !range)
+        {
+            // Clicking a thumbnail chooses what painting affects: the layer's pixels or its mask.
+            if (session.Document.ActiveLayerId != layer.Id) session.SelectLayer(layer.Id);
+            session.EditingMask = mask && layer.Mask != null;
+            session.NotifyLayersChanged();
+        }
         if (rowFor.TryGetValue(layer.Id, out var rebuilt)) e.Pointer.Capture(rebuilt);
     }
 
     private void RowMoved(PointerEventArgs e)
     {
         if (pressed == null || session == null) return;
+        if (!e.GetCurrentPoint(rows).Properties.IsLeftButtonPressed) { EndRowDrag(); return; }
         var position = e.GetPosition(rows);
         if (!dragging && Math.Abs(position.Y - pressPoint.Y) < 6) return;
         dragging = true;
@@ -409,20 +437,36 @@ public sealed class LayersPanel : UserControl
             if (position.Y < top || position.Y > row.Bounds.Bottom) continue;
             var fraction = (position.Y - top) / Math.Max(1, row.Bounds.Height);
             var drop = target.IsGroup && fraction is > 0.3 and < 0.7 ? LayerDrop.Into : fraction < 0.5 ? LayerDrop.Above : LayerDrop.Below;
+            // Just under an open folder's header is the top of its contents, not the far side of the whole folder.
+            if (drop == LayerDrop.Below && target.IsGroup && !target.Collapsed && target.Children.Count > 0) drop = LayerDrop.Into;
             dropTarget = (target, drop);
             dropLine.IsVisible = drop != LayerDrop.Into;
             dropLine.Margin = new Thickness(0, (drop == LayerDrop.Above ? top : row.Bounds.Bottom) - 1, 0, 0);
-            foreach (var other in rows.Children.OfType<Border>()) other.BorderBrush = Palette.Divider;
-            if (drop == LayerDrop.Into) { row.BorderBrush = Palette.Accent; row.BorderThickness = new Thickness(1); }
+            foreach (var other in rows.Children.OfType<Border>()) { other.BorderBrush = Palette.Divider; other.BorderThickness = new Thickness(0, 0, 0, 1); }
+            if (drop == LayerDrop.Into) { row.BorderBrush = Palette.Accent; row.BorderThickness = new Thickness(1); dropLine.IsVisible = false; }
             break;
         }
     }
 
+    private void EndRowDrag()
+    {
+        var wasDragging = dragging;
+        pressed = null;
+        dragging = false;
+        dropTarget = null;
+        dropLine.IsVisible = false;
+        if (wasDragging) Rebuild();
+    }
+
     private void RowReleased(PointerReleasedEventArgs e)
     {
-        e.Pointer.Capture(null);
+        // Taken before the capture is released: releasing it raises capture-lost, which ends an abandoned drag.
         var layer = pressed;
         pressed = null;
+        var wasDragging = dragging;
+        dragging = false;
+        e.Pointer.Capture(null);
+        dragging = wasDragging;
         dropLine.IsVisible = false;
         if (session == null || layer == null) return;
         if (!dragging)

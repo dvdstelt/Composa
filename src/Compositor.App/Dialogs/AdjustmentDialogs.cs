@@ -302,6 +302,8 @@ public sealed class CurveEditor : Control
         if (dragging < 0 && points.Count < 16)
         {
             var added = ToCurve(position);
+            // No room for another point between neighbours this close together.
+            if (points.Any(p => Math.Abs(p.X - added.X) < 4)) { e.Pointer.Capture(this); return; }
             points.Add(added);
             points.Sort((a, b) => a.X.CompareTo(b.X));
             dragging = points.IndexOf(added);
@@ -327,7 +329,12 @@ public sealed class CurveEditor : Control
         }
         var moved = ToCurve(position);
         // End points only move vertically; interior points stay between their neighbours.
-        var x = !interior ? points[dragging].X : Math.Clamp(moved.X, points[dragging - 1].X + 2, points[dragging + 1].X - 2);
+        var x = points[dragging].X;
+        if (interior)
+        {
+            double low = points[dragging - 1].X + 2, high = points[dragging + 1].X - 2;
+            if (low <= high) x = Math.Clamp(moved.X, low, high); // Squeezed between close neighbours, it only moves vertically.
+        }
         points[dragging] = new CurvePoint(x, moved.Y);
         Set(points);
     }

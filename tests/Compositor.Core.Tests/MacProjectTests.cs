@@ -92,3 +92,31 @@ public class ImageMagickFallbackTests
         finally { Directory.Delete(folder, recursive: true); }
     }
 }
+
+public class DamagedFileTests
+{
+    [Fact]
+    public void A_project_with_a_nonsense_transform_still_opens()
+    {
+        var session = Compositor.Editing.EditorSession.NewCanvas(40, 30, SKColors.Red);
+        using var stream = new MemoryStream();
+        ProjectFile.Write(session.Document, stream);
+        // Rewrite the manifest with a zero-sized, non-finite placement.
+        using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Update, leaveOpen: true))
+        {
+            var entry = zip.GetEntry("manifest.json")!;
+            string json;
+            using (var reader = new StreamReader(entry.Open())) json = reader.ReadToEnd();
+            entry.Delete();
+            json = System.Text.RegularExpressions.Regex.Replace(json, "\"width\": 40,\\s*\"height\": 30,\\s*\"rotation\"", "\"width\": 0, \"height\": -5, \"rotation\"");
+            Assert.Contains("\"height\": -5", json);
+            using var writer = new StreamWriter(zip.CreateEntry("manifest.json").Open());
+            writer.Write(json);
+        }
+        stream.Position = 0;
+        var loaded = ProjectFile.Read(stream);
+        Assert.Equal(40, loaded.Layers[0].Transform.Width);
+        using var flat = DocumentRenderer.Flatten(loaded);
+        TestImages.AssertColor(SKColors.Red, flat.GetPixel(5, 5));
+    }
+}

@@ -153,7 +153,7 @@ public static class ProjectFile
             if (record.ImageFile != null && record.Kind == LayerKind.Raster)
             {
                 layer.Pixels = Fetch(record.ImageFile, mask: false);
-                layer.Transform = record.Transform ?? LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
+                layer.Transform = IsUsable(record.Transform) ? record.Transform! : LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
             }
             else if (record.Kind == LayerKind.Raster) throw new InvalidDataException($"Layer \"{record.Name}\" has no image.");
             if (record.Kind == LayerKind.Adjustment && record.Adjustment == null) throw new InvalidDataException($"Adjustment layer \"{record.Name}\" has no settings.");
@@ -168,6 +168,12 @@ public static class ProjectFile
         document.SetActive(active);
         return document;
     }
+
+    /// <summary>A damaged file must not feed non-finite or degenerate placements into rendering.</summary>
+    private static bool IsUsable(LayerTransform? t) =>
+        t != null && new[] { t.X, t.Y, t.Width, t.Height, t.Rotation }.All(double.IsFinite)
+        && t.Width >= 1 && t.Height >= 1 && t.Width <= 1_000_000 && t.Height <= 1_000_000 && Math.Abs(t.X) <= 10_000_000 && Math.Abs(t.Y) <= 10_000_000
+        && (t.Distort == null || (t.Distort.Length == 8 && t.Distort.All(float.IsFinite)));
 
     private static byte[] EncodeMask(SKBitmap mask)
     {

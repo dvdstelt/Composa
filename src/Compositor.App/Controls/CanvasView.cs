@@ -30,7 +30,7 @@ public sealed partial class CanvasView : Control
     // What is on screen, rendered straight from the layers at screen resolution. Its cost follows the window size,
     // not the document size, which keeps 24-megapixel documents as responsive as small ones.
     private SKBitmap? viewCache;
-    private (float Scale, SKRectI Document) viewKey;
+    private (float Scale, SKPoint Origin, int Width, int Height) viewKey;
     private SKRectI viewDirty;
     private bool viewStale = true;
 
@@ -45,6 +45,13 @@ public sealed partial class CanvasView : Control
             InvalidateVisual();
         });
         antsTimer.Start();
+        // The Space key-up that ends panning goes wherever focus went, so panning ends with the focus.
+        LostFocus += (_, _) =>
+        {
+            if (!spaceDown) return;
+            spaceDown = false;
+            UpdateCursor();
+        };
     }
 
     public event Action? ViewChanged;
@@ -78,6 +85,9 @@ public sealed partial class CanvasView : Control
                 session.SelectionChanged += OnSelectionChanged;
                 session.LayersChanged += OnLayersChanged;
             }
+            // A crop rectangle belongs to the document it was drawn on.
+            cropRect = null;
+            spaceDown = false;
             outlineStale = true;
             fitPending = true;
             viewStale = true;
@@ -91,10 +101,10 @@ public sealed partial class CanvasView : Control
     {
         if (area is { } changed && !viewStale)
         {
-            var (scale, shown) = viewKey;
+            var (scale, shown, _, _) = viewKey;
             var mapped = new SKRectI(
-                (int)Math.Floor((changed.Left - shown.Left) * scale) - 1, (int)Math.Floor((changed.Top - shown.Top) * scale) - 1,
-                (int)Math.Ceiling((changed.Right - shown.Left) * scale) + 1, (int)Math.Ceiling((changed.Bottom - shown.Top) * scale) + 1);
+                (int)Math.Floor((changed.Left - shown.X) * scale) - 1, (int)Math.Floor((changed.Top - shown.Y) * scale) - 1,
+                (int)Math.Ceiling((changed.Right - shown.X) * scale) + 1, (int)Math.Ceiling((changed.Bottom - shown.Y) * scale) + 1);
             viewDirty = Geometry.Union(viewDirty, mapped);
         }
         else viewStale = true;
@@ -259,24 +269,45 @@ public sealed partial class CanvasView : Control
         if (session == null || !view.TryInvert(out var inverse)) return (null, default, default);
         var shown = Geometry.Intersect(Geometry.RoundOut(inverse.MapRect(new SKRect(0, 0, (float)size.Width, (float)size.Height))), session.Document.Bounds);
         if (shown.IsEmpty) return (null, default, default);
-        // Zoomed out, the cache holds device pixels; zoomed in, it holds document pixels that are then enlarged crisply,
-        // so what is on screen is exactly what an export would contain.
-        var scale = (float)Math.Min(zoom, 1);
-        int width = Math.Max(1, (int)Math.Ceiling(shown.Width * scale)), height = Math.Max(1, (int)Math.Ceiling(shown.Height * scale));
+        // Zoomed in, the cache holds document pixels that are then enlarged crisply, so the screen shows exactly what
+        // an export would contain. Zoomed out, it holds device pixels, and its grid is snapped to the screen's own
+        // pixel grid: drawn at a fractional offset it would be resampled, and fine detail would shimmer while panning.
+        float scale;
+        SKPoint viewOrigin;
+        int width, height;
+        SKRect target;
+        if (zoom >= 1)
+        {
+            scale = 1;
+            viewOrigin = new SKPoint(shown.Left, shown.Top);
+            width = shown.Width;
+            height = shown.Height;
+            target = view.MapRect(new SKRect(shown.Left, shown.Top, shown.Right, shown.Bottom));
+        }
+        else
+        {
+            scale = (float)zoom;
+            var scaling = Scaling;
+            double left = Math.Floor(origin.X * scaling + shown.Left * zoom), top = Math.Floor(origin.Y * scaling + shown.Top * zoom);
+            double right = Math.Ceiling(origin.X * scaling + shown.Right * zoom), bottom = Math.Ceiling(origin.Y * scaling + shown.Bottom * zoom);
+            viewOrigin = new SKPoint((float)((left - origin.X * scaling) / zoom), (float)((top - origin.Y * scaling) / zoom));
+            width = Math.Max(1, (int)(right - left));
+            height = Math.Max(1, (int)(bottom - top));
+            target = new SKRect((float)(left / scaling), (float)(top / scaling), (float)(right / scaling), (float)(bottom / scaling));
+        }
         if (viewCache == null || viewCache.Width < width || viewCache.Height < height)
         {
             // The old bitmap may still be in use by the render thread, so it is left to the garbage collector.
             viewCache = Pixels.NewColor(Math.Max(width, viewCache?.Width ?? 0) + 64, Math.Max(height, viewCache?.Height ?? 0) + 64);
             viewStale = true;
         }
-        var key = (scale, shown);
+        var key = (scale, viewOrigin, width, height);
         var whole = new SKRectI(0, 0, width, height);
         var dirty = viewStale || key != viewKey ? whole : Geometry.Intersect(viewDirty, whole);
         viewKey = key;
         viewStale = false;
         viewDirty = SKRectI.Empty;
-        if (!dirty.IsEmpty) session.RenderView(viewCache, dirty, new RenderView(scale, new SKPoint(shown.Left, shown.Top)));
-        var target = view.MapRect(new SKRect(shown.Left, shown.Top, shown.Left + width / scale, shown.Top + height / scale));
+        if (!dirty.IsEmpty) session.RenderView(viewCache, dirty, new RenderView(scale, viewOrigin));
         return (viewCache, new SKRect(0, 0, width, height), target);
     }
 

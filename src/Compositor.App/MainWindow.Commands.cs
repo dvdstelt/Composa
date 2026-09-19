@@ -425,7 +425,7 @@ public sealed partial class MainWindow
 
     private async Task Export(ExportFormat format)
     {
-        if (session == null) return;
+        if (this.session is not { } session) return; // Held locally: the active tab may change while a dialog is open.
         if (format == ExportFormat.Jpeg)
         {
             using var preview = session.Flatten();
@@ -591,7 +591,8 @@ public sealed partial class MainWindow
         else layer = target.AddText(at, initial with { Text = "Text" }, commit: false);
 
         var result = await TextDialog.Edit(this, initial, style => target.SetText(layer, style with { Text = style.Text.Length == 0 ? " " : style.Text }));
-        if (result == null || result.Text.Trim().Length == 0 || (existing != null && result == existing.Text)) { target.Cancel(); return; }
+        // Compared with the settings from before the dialog: the live preview has already written the newest ones into the layer.
+        if (result == null || result.Text.Trim().Length == 0 || (existing != null && result == initial)) { target.Cancel(); return; }
         target.SetText(layer, result);
         target.Commit();
         target.TextDefaults = result with { Text = "" };

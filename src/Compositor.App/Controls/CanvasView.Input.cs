@@ -14,6 +14,7 @@ public sealed partial class CanvasView
 
     private Drag drag;
     private MouseButton dragButton;
+    private bool recapture;
 
     /// <summary>True while the pointer is dragging out an edit; commands wait until it finishes.</summary>
     public bool IsDragging => drag is not (Drag.None or Drag.Pan) && !(drag == Drag.Lasso && session?.LassoKind == LassoKind.Polygonal);
@@ -176,7 +177,7 @@ public sealed partial class CanvasView
                 break;
             case Tool.Text:
                 e.Pointer.Capture(null);
-                TextRequested?.Invoke(pressDocument, LayerAt(pressDocument) is { Text: not null } hit ? hit : null);
+                TextRequested?.Invoke(pressDocument, TextLayerAt(pressDocument));
                 break;
             case Tool.Eyedropper:
                 PickColor(alt);
@@ -238,7 +239,13 @@ public sealed partial class CanvasView
     {
         base.OnPointerReleased(e);
         // Only the button that started a drag ends it; a stray right or middle click mid-stroke changes nothing.
-        if (session == null || (drag != Drag.None && e.InitialPressMouseButton != dragButton)) return;
+        if (session == null) return;
+        if (drag != Drag.None && e.InitialPressMouseButton != dragButton)
+        {
+            // Avalonia drops pointer capture on any button-up; the drag takes it back instead of being cancelled.
+            recapture = true;
+            return;
+        }
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
         var moved = Distance(pressScreen, cursorScreen) > 2;
@@ -291,6 +298,12 @@ public sealed partial class CanvasView
     protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
     {
         base.OnPointerCaptureLost(e);
+        if (recapture)
+        {
+            recapture = false;
+            e.Pointer.Capture(this);
+            return;
+        }
         // Losing the pointer mid-drag (the window lost focus, a popup opened) must not leave an edit hanging open.
         if (IsDragging || drag == Drag.Pan) { CancelInteraction(); UpdateCursor(); }
     }
@@ -374,8 +387,10 @@ public sealed partial class CanvasView
         if (handle is TransformHandle.BottomLeft or TransformHandle.Bottom or TransformHandle.BottomRight) bottom = py;
         if (shift && start.Width > 0 && start.Height > 0)
         {
+            // Keep the proportions by adjusting an edge that is not under the pointer's control, anchored opposite the handle.
             var aspect = start.Width / start.Height;
             if (handle is TransformHandle.Left or TransformHandle.Right) bottom = top + Math.Abs(right - left) / aspect;
+            else if (handle is TransformHandle.TopLeft or TransformHandle.BottomLeft) left = right - Math.Abs(bottom - top) * aspect;
             else right = left + Math.Abs(bottom - top) * aspect * (right < left ? -1 : 1);
         }
         else if (shift)
@@ -502,6 +517,19 @@ public sealed partial class CanvasView
             int x = (int)Math.Floor(local.X), y = (int)Math.Floor(local.Y);
             if (x < 0 || y < 0 || x >= layer.Pixels.Width || y >= layer.Pixels.Height) continue;
             if (layer.Pixels.GetPixel(x, y).Alpha > 12) return layer;
+        }
+        return null;
+    }
+
+    /// <summary>The topmost visible text layer whose box holds the point; the gaps between letters count too.</summary>
+    private Layer? TextLayerAt(SKPoint p)
+    {
+        if (session == null) return null;
+        foreach (var layer in session.Document.AllLayers().Reverse())
+        {
+            if (layer.Text == null || layer.Pixels == null || !session.Document.IsEffectivelyVisible(layer) || !layer.Matrix.TryInvert(out var inverse)) continue;
+            var local = inverse.MapPoint(p);
+            if (local.X >= 0 && local.Y >= 0 && local.X <= layer.Pixels.Width && local.Y <= layer.Pixels.Height) return layer;
         }
         return null;
     }
