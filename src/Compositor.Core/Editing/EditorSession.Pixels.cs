@@ -54,7 +54,10 @@ public sealed partial class EditorSession
         layer.Pixels = grown;
         if (layer.Mask is { } mask)
         {
-            var grownMask = Pixels.NewMask(want.Width, want.Height, 255);
+            // A hide-all mask stays hide-all over the new area; any other mask reveals it.
+            var hidesAll = mask.GetPixel(0, 0).Alpha == 0 && mask.GetPixel(mask.Width - 1, 0).Alpha == 0
+                && mask.GetPixel(0, mask.Height - 1).Alpha == 0 && mask.GetPixel(mask.Width - 1, mask.Height - 1).Alpha == 0;
+            var grownMask = Pixels.NewMask(want.Width, want.Height, hidesAll ? (byte)0 : (byte)255);
             using var canvas = new SKCanvas(grownMask);
             using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
             canvas.DrawBitmap(mask, new SKRect(have.Left - want.Left, have.Top - want.Top, have.Right - want.Left, have.Bottom - want.Top), paint);
@@ -243,7 +246,10 @@ public sealed partial class EditorSession
 
     public void ContentAwareFill()
     {
-        if (document.Selection == null || IsEditingMask || !BeginPreview("Content-Aware Fill")) return;
+        if (document.Selection == null || IsEditingMask) return;
+        if (Selections.SelectionMask.Bounds(document.Selection) is var hole && (long)hole.Width * hole.Height > Inpaint.MaxArea)
+            throw new InvalidOperationException("The selection is too large for Content-Aware Fill. Select a smaller area (up to about 16 megapixels).");
+        if (!BeginPreview("Content-Aware Fill")) return;
         PreviewContentAwareFill();
         CommitPreview();
     }
@@ -268,7 +274,12 @@ public sealed partial class EditorSession
         byte* s = (byte*)color.GetPixels(), d = (byte*)mask.GetPixels();
         for (var y = 0; y < color.Height; y++)
         for (var x = 0; x < color.Width; x++)
-            d[(long)y * mask.RowBytes + x] = s[(long)y * color.RowBytes + x * 4];
+        {
+            // Filters that spread past the edges leave partly transparent pixels there; the mask keeps their straight
+            // value, otherwise a blurred mask would fade out along its whole border.
+            var p = s + (long)y * color.RowBytes + x * 4;
+            d[(long)y * mask.RowBytes + x] = p[3] == 0 ? (byte)0 : (byte)Math.Min(255, (p[0] * 255 + p[3] / 2) / p[3]);
+        }
         return mask;
     }
 
@@ -277,6 +288,7 @@ public sealed partial class EditorSession
     /// <summary>Draws a gradient between two document points onto the pending edit's original pixels (call Begin first).</summary>
     public void DrawGradient(Layer layer, SKBitmap original, SKPoint from, SKPoint to)
     {
+        if (!IsInteracting || document.Find(layer.Id) != layer) return; // The edit this drag belonged to is over.
         var matrix = TargetMatrix(layer);
         if (!matrix.TryInvert(out var inverse)) return;
         var start = Foreground;

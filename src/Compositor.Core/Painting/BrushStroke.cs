@@ -136,7 +136,7 @@ public sealed unsafe class BrushStroke : IDisposable
             (int)MathF.Floor(center.X - radius - 1), (int)MathF.Floor(center.Y - radius - 1),
             (int)MathF.Ceiling(center.X + radius + 1), (int)MathF.Ceiling(center.Y + radius + 1)), new SKRectI(0, 0, width, height));
         if (rect.IsEmpty) return rect;
-        if (mode == BrushMode.Smudge) { Smudge(center, rect); return rect; }
+        if (mode == BrushMode.Smudge) return Smudge(center, rect) ? rect : SKRectI.Empty;
         if (mode == BrushMode.Liquify) return Push(center, rect);
 
         var changed = false;
@@ -243,7 +243,7 @@ public sealed unsafe class BrushStroke : IDisposable
 
     // Smudge drags a buffer of paint along: each dab lays the carried pixels down, then picks up what was beneath.
     [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
-    private void Smudge(SKPoint center, SKRectI rect)
+    private bool Smudge(SKPoint center, SKRectI rect)
     {
         var size = (int)MathF.Ceiling(fullRadius * 2 + 3);
         var dst = (byte*)Working.GetPixels();
@@ -259,7 +259,7 @@ public sealed unsafe class BrushStroke : IDisposable
                 int px = Math.Clamp(originX + x, 0, width - 1), py = Math.Clamp(originY + y, 0, height - 1);
                 for (var i = 0; i < bytesPerPixel; i++) carry[(y * size + x) * 4 + i] = dst[(long)py * stride + px * bytesPerPixel + i];
             }
-            return;
+            return false; // The first dab only picks paint up.
         }
         var strength = (float)Math.Clamp(settings.Opacity, 0, 1) * 0.95f;
         for (var y = rect.Top; y < rect.Bottom; y++)
@@ -278,6 +278,7 @@ public sealed unsafe class BrushStroke : IDisposable
                 if (c > 0) dst[index + i] = (byte)Math.Clamp(under + (carry[slot + i] - under) * c + 0.5f, 0, 255);
             }
         }
+        return true;
     }
 
     // Liquify pushes pixels along the drag: every pixel under the brush is re-read from a little way back along the

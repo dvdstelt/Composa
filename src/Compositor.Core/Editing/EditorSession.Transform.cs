@@ -50,6 +50,7 @@ public sealed class TransformEdit
 
     public void Set(SKRect frame, double rotation)
     {
+        if (session.Transform != this) return; // Already committed or cancelled.
         var before = Area();
         Frame = frame;
         Rotation = rotation;
@@ -176,13 +177,21 @@ public sealed class TransformEdit
         }
     }
 
+    /// <summary>True when any layer ended up somewhere other than where it started.</summary>
+    public bool HasChanges => layers.Any(l => !Same(l.Layer.Transform, l.Start));
+
+    /// <summary>Record equality compares the distort array by reference, so it is compared separately.</summary>
+    public static bool Same(LayerTransform a, LayerTransform b) =>
+        a with { Distort = null } == b with { Distort = null }
+        && (a.Distort ?? []).AsSpan().SequenceEqual(b.Distort ?? []);
+
     private static float[] ScaleDistort(float[] distort, double sx, double sy) =>
         distort.Select((v, i) => (float)(v * (i % 2 == 0 ? sx : sy))).ToArray();
 
     /// <summary>Moves one corner freely (Ctrl-drag), distorting a single layer.</summary>
     public void DistortCorner(int corner, SKPoint point)
     {
-        if (layers.Count != 1) return;
+        if (layers.Count != 1 || session.Transform != this) return;
         var before = Area();
         var (layer, start) = layers[0];
         var unrotate = SKMatrix.CreateRotationDegrees((float)-start.Rotation, start.Center.X, start.Center.Y);
@@ -215,7 +224,7 @@ public sealed partial class EditorSession
     public void CommitTransform()
     {
         if (Transform == null) return;
-        var changed = false;
+        var changed = Transform.HasChanges;
         foreach (var layer in Transform.Layers)
         {
             // Live shapes are redrawn at their new size instead of being stretched.
@@ -224,7 +233,6 @@ public sealed partial class EditorSession
                 int w = Math.Max(1, (int)Math.Round(layer.Transform.Width)), h = Math.Max(1, (int)Math.Round(layer.Transform.Height));
                 if (w != layer.Pixels.Width || h != layer.Pixels.Height) layer.Pixels = RenderShape(layer.Shape, w, h);
             }
-            changed = true;
         }
         Transform = null;
         if (changed) Commit(); else Cancel();
@@ -251,7 +259,7 @@ public sealed partial class EditorSession
     /// <summary>Sets exact values from the transform inspector.</summary>
     public void SetTransform(Layer layer, LayerTransform transform)
     {
-        if (layer.Pixels == null || transform == layer.Transform) return;
+        if (layer.Pixels == null || TransformEdit.Same(transform, layer.Transform)) return;
         Apply("Transform", () =>
         {
             layer.Transform = transform;

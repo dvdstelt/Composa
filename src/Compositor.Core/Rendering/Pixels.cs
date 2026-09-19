@@ -111,9 +111,13 @@ public static class Pixels
         }
     }
 
+    /// <summary>Raised when a bitmap's pixels changed in place, so other caches keyed on it (thumbnails) can drop it too.</summary>
+    public static event Action<SKBitmap>? Invalidated;
+
     /// <summary>Drops everything cached for a bitmap whose pixels changed.</summary>
     public static void Invalidate(SKBitmap bitmap)
     {
+        Invalidated?.Invoke(bitmap);
         lock (bitmap)
         {
             if (!Pyramids.TryGetValue(bitmap, out var pyramid)) return;

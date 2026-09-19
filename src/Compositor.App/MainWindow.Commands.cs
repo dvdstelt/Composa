@@ -192,7 +192,7 @@ public sealed partial class MainWindow
 
     private void Execute(Command command)
     {
-        if (command.Enabled?.Invoke() == false) return;
+        if (command.Enabled?.Invoke() == false || canvas.IsDragging) return;
         problem = null;
         try { command.Run(); }
         catch (Exception error) { _ = Prompts.Alert(this, command.Name.TrimEnd('…'), error.Message); }
@@ -231,6 +231,7 @@ public sealed partial class MainWindow
         if (focused is Control control && control.FindAncestorOfType<MenuItem>() != null) return;
 
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
+        if (canvas.IsDragging) { e.Handled = true; return; }
 
         var gesture = commands.FirstOrDefault(c => c.Gesture != null && c.Gesture.Key == e.Key && c.Gesture.KeyModifiers == e.KeyModifiers);
         if (gesture != null) { Execute(gesture); e.Handled = true; return; }
@@ -534,8 +535,19 @@ public sealed partial class MainWindow
     private async Task NewAdjustmentLayer(AdjustmentKind kind)
     {
         if (session == null) return;
-        var layer = session.AddAdjustmentLayer(Adjustment.Create(kind));
-        await EditAdjustmentLayer(layer, isNew: true);
+        var adjustment = Adjustment.Create(kind);
+        if (adjustment is InvertAdjustment) { session.AddAdjustmentLayer(adjustment); return; }
+        // The layer and its settings are one undo step, and cancelling the dialog leaves no trace of either.
+        var target = session;
+        var layer = target.AddAdjustmentLayer(adjustment, commit: false);
+        var result = await AdjustmentDialogs.Edit(this, adjustment, a => target.SetAdjustment(layer, a), Histogram.Of(target.Composite()), target.Foreground, target.Background);
+        if (result == null) target.Cancel();
+        else
+        {
+            target.SetAdjustment(layer, result);
+            target.Commit();
+            target.NotifyLayersChanged();
+        }
     }
 
     private async Task EditAdjustmentLayer(Layer layer, bool isNew)
@@ -547,16 +559,12 @@ public sealed partial class MainWindow
         var histogram = Histogram.Of(target.Composite());
         target.Begin("Edit Adjustment");
         var result = await AdjustmentDialogs.Edit(this, original, a => target.SetAdjustment(layer, a), histogram, target.Foreground, target.Background);
-        if (result != null)
+        if (result != null && !result.ContentEquals(original))
         {
             target.SetAdjustment(layer, result);
             target.Commit();
         }
-        else
-        {
-            target.Cancel();
-            if (isNew) target.Undo();
-        }
+        else target.Cancel();
     }
 
     private async Task CanvasSize()

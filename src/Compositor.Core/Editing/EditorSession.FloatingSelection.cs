@@ -8,7 +8,8 @@ namespace Compositor.Editing;
 public sealed partial class EditorSession
 {
     private Layer? floatLayer;
-    private SKBitmap? floatBase, floatPixels, floatSelection, floatPreview;
+    private SKBitmap? floatBase, floatPixels, floatSelection, floatPreview, floatOriginal;
+    private SKPointI floatOffset;
     private SKPointI floatOrigin;
 
     public bool IsMovingPixels => floatLayer != null;
@@ -45,6 +46,8 @@ public sealed partial class EditorSession
         }
         floatOrigin = new SKPointI(bounds.Left, bounds.Top);
         floatSelection = document.Selection;
+        floatOriginal = original;
+        floatOffset = SKPointI.Empty;
         floatLayer = layer;
         return true;
     }
@@ -52,9 +55,17 @@ public sealed partial class EditorSession
     public void MovePixelsBy(int dx, int dy)
     {
         if (floatLayer is not { } layer || floatBase == null || floatPixels == null) return;
-        var moved = Pixels.Clone(floatBase);
-        using (var canvas = new SKCanvas(moved)) canvas.DrawBitmap(floatPixels, floatOrigin.X + dx, floatOrigin.Y + dy);
-        layer.Pixels = moved;
+        floatOffset = new SKPointI(dx, dy);
+        // Back at the start nothing has moved: with a feathered selection, re-compositing the lifted pixels over their
+        // own hole would otherwise leave a faint translucent seam.
+        SKBitmap? moved = null;
+        if (dx != 0 || dy != 0)
+        {
+            moved = Pixels.Clone(floatBase);
+            using var canvas = new SKCanvas(moved);
+            canvas.DrawBitmap(floatPixels, floatOrigin.X + dx, floatOrigin.Y + dy);
+        }
+        layer.Pixels = moved ?? floatOriginal!;
         // Only bitmaps made by earlier moves are disposed; the layer's original pixels belong to the undo history.
         if (floatPreview != null) { Pixels.Invalidate(floatPreview); floatPreview.Dispose(); }
         floatPreview = moved;
@@ -66,10 +77,11 @@ public sealed partial class EditorSession
     public void EndMovePixels(bool keep)
     {
         if (floatLayer == null) return;
+        if (floatOffset == SKPointI.Empty) keep = false;
         floatLayer = null;
         floatPixels?.Dispose();
         if (!keep && floatPreview != null) { Pixels.Invalidate(floatPreview); floatPreview.Dispose(); }
-        floatBase = floatPixels = floatSelection = floatPreview = null;
+        floatBase = floatPixels = floatSelection = floatPreview = floatOriginal = null;
         if (keep) { Commit(); LayersChanged?.Invoke(); }
         else Cancel();
     }

@@ -13,6 +13,10 @@ public sealed partial class CanvasView
     private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub }
 
     private Drag drag;
+    private MouseButton dragButton;
+
+    /// <summary>True while the pointer is dragging out an edit; commands wait until it finishes.</summary>
+    public bool IsDragging => drag is not (Drag.None or Drag.Pan) && !(drag == Drag.Lasso && session?.LassoKind == LassoKind.Polygonal);
     private Point pressScreen, cursorScreen;
     private SKPoint pressDocument, currentDocument;
     private bool cursorInside;
@@ -100,6 +104,7 @@ public sealed partial class CanvasView
         var point = e.GetCurrentPoint(this);
         pressScreen = cursorScreen = point.Position;
         pressDocument = currentDocument = ToDocument(point.Position);
+        dragButton = point.Properties.IsMiddleButtonPressed ? MouseButton.Middle : point.Properties.IsRightButtonPressed ? MouseButton.Right : MouseButton.Left;
         dragModifiers = e.KeyModifiers;
         e.Pointer.Capture(this);
 
@@ -227,7 +232,8 @@ public sealed partial class CanvasView
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (session == null) return;
+        // Only the button that started a drag ends it; a stray right or middle click mid-stroke changes nothing.
+        if (session == null || (drag != Drag.None && e.InitialPressMouseButton != dragButton)) return;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var alt = e.KeyModifiers.HasFlag(KeyModifiers.Alt);
         var moved = Distance(pressScreen, cursorScreen) > 2;
@@ -275,6 +281,13 @@ public sealed partial class CanvasView
                 break;
         }
         InvalidateVisual();
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        // Losing the pointer mid-drag (the window lost focus, a popup opened) must not leave an edit hanging open.
+        if (IsDragging || drag == Drag.Pan) { CancelInteraction(); UpdateCursor(); }
     }
 
     protected override void OnPointerExited(PointerEventArgs e)
@@ -589,6 +602,8 @@ public sealed partial class CanvasView
     {
         if (session == null) return false;
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        // Mid-drag only Escape (cancel) and Space (pan) mean anything; everything else waits for the drag to end.
+        if (IsDragging && e.Key is not (Key.Escape or Key.Space)) return true;
         if (e.KeyModifiers.HasFlag(KeyModifiers.Control) || e.KeyModifiers.HasFlag(KeyModifiers.Alt)) return false;
         switch (e.Key)
         {

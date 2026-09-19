@@ -70,15 +70,15 @@ public sealed partial class EditorSession
         return layer;
     }
 
-    public Layer AddAdjustmentLayer(Adjustment adjustment)
+    /// <param name="commit">False leaves the edit open, so a settings dialog can still <see cref="Cancel"/> the whole layer.</param>
+    public Layer AddAdjustmentLayer(Adjustment adjustment, bool commit = true)
     {
         var layer = Layer.ForAdjustment(adjustment);
         layer.Name = document.UniqueName(adjustment.DisplayName);
-        Apply("New Adjustment Layer", () =>
-        {
-            document.InsertAboveActive(layer);
-            if (document.Selection != null) layer.Mask = Pixels.Clone(document.Selection);
-        });
+        Begin("New Adjustment Layer");
+        document.InsertAboveActive(layer);
+        if (document.Selection != null) layer.Mask = Pixels.Clone(document.Selection);
+        if (commit) Commit();
         InvalidateAll();
         LayersChanged?.Invoke();
         return layer;
@@ -278,7 +278,8 @@ public sealed partial class EditorSession
             if (roots[0].IsGroup) return roots[0].Children.Count > 0;
             var siblings = document.SiblingsOf(roots[0].Id)!;
             var index = siblings.IndexOf(roots[0]);
-            return index > 0 && !siblings[index - 1].IsAdjustment;
+            // Merging into a hidden layer would silently throw that layer's pixels away.
+            return index > 0 && !siblings[index - 1].IsAdjustment && siblings[index - 1].Visible && roots[0].Visible;
         }
     }
 

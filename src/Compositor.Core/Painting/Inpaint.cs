@@ -12,6 +12,9 @@ namespace Compositor.Painting;
 /// </summary>
 public static unsafe class Inpaint
 {
+    /// <summary>The largest hole (bounding box, in pixels) worth attempting; beyond this the working buffers reach gigabytes.</summary>
+    public const long MaxArea = 16_000_000;
+
     /// <summary>Returns a copy of <paramref name="source"/> (RGBA premultiplied) with the masked area replaced.</summary>
     public static SKBitmap Fill(SKBitmap source, SKBitmap mask)
     {

@@ -130,8 +130,16 @@ public sealed partial class EditorSession
         if (strokeMode == BrushMode.Heal)
         {
             using var mask = stroke.CoverageMask();
-            var healed = Inpaint.Fill(strokeOriginal!, mask);
-            Pixels.Invalidate(stroke.Working);
+            if ((long)stroke.Touched.Width * stroke.Touched.Height > Inpaint.MaxArea)
+            {
+                CloseStroke();
+                Cancel();
+                Problem?.Invoke("That area is too large to heal in one stroke. Heal it in smaller strokes.");
+                return;
+            }
+            var selection = SelectionInTargetSpace(layer);
+            var healed = MixBySelection(strokeOriginal!, Inpaint.Fill(strokeOriginal!, mask), selection);
+            if (selection != document.Selection) selection?.Dispose();
             SetTarget(layer, healed);
             Invalidate(AffectedArea(layer));
         }

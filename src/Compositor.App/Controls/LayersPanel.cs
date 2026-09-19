@@ -26,6 +26,7 @@ public sealed class LayersPanel : UserControl
     private readonly Dictionary<Guid, Border> rowFor = [];
     private bool updating;
     private bool opacityDragging;
+    private double opacityStart;
     private Guid? renaming;
     private static readonly ConditionalWeakTable<SKBitmap, Bitmap> Thumbnails = new();
 
@@ -38,6 +39,8 @@ public sealed class LayersPanel : UserControl
 
     public event Action<Layer>? EditAdjustmentRequested;
     public event Action<AdjustmentKind>? NewAdjustmentRequested;
+
+    static LayersPanel() => Compositor.Rendering.Pixels.Invalidated += bitmap => Thumbnails.Remove(bitmap);
 
     public LayersPanel()
     {
@@ -53,7 +56,7 @@ public sealed class LayersPanel : UserControl
         {
             opacityText.Text = $"{Math.Round(e.NewValue)}%";
             if (updating || session?.ActiveLayer is not { } layer) return;
-            if (!opacityDragging) { opacityDragging = true; session.Begin("Opacity"); }
+            if (!opacityDragging) { opacityDragging = true; opacityStart = layer.Opacity; session.Begin("Opacity"); }
             session.SetOpacity(layer, Math.Round(e.NewValue) / 100);
         };
         opacity.AddHandler(PointerReleasedEvent, (_, _) => EndOpacityDrag(), Avalonia.Interactivity.RoutingStrategies.Tunnel | Avalonia.Interactivity.RoutingStrategies.Bubble, true);
@@ -141,7 +144,8 @@ public sealed class LayersPanel : UserControl
     {
         if (!opacityDragging) return;
         opacityDragging = false;
-        session?.Commit();
+        // Dragging back to where it started is not an edit.
+        if (session?.ActiveLayer is { } layer && layer.Opacity == opacityStart) session.Cancel(); else session?.Commit();
     }
 
     private void Rebuild()
@@ -268,12 +272,6 @@ public sealed class LayersPanel : UserControl
         row.PointerPressed += (_, e) => RowPressed(layer, row, e);
         row.PointerMoved += (_, e) => RowMoved(e);
         row.PointerReleased += (_, e) => RowReleased(e);
-        row.DoubleTapped += (_, e) =>
-        {
-            if (layer.IsAdjustment) EditAdjustmentRequested?.Invoke(layer);
-            else { renaming = layer.Id; Rebuild(); }
-            e.Handled = true;
-        };
         row.ContextMenu = BuildMenu(layer);
         return row;
     }
@@ -366,6 +364,14 @@ public sealed class LayersPanel : UserControl
             return;
         }
         if (!properties.IsLeftButtonPressed) return;
+        if (e.ClickCount == 2)
+        {
+            // Selecting on the first click rebuilt the rows, so the control's own double-tap never sees both clicks.
+            if (layer.IsAdjustment) EditAdjustmentRequested?.Invoke(layer);
+            else { renaming = layer.Id; Rebuild(); }
+            e.Handled = true;
+            return;
+        }
         if (e.KeyModifiers.HasFlag(KeyModifiers.Alt) && session.CanClip(layer)) { session.ToggleClippingMask(layer); return; }
         var extend = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var range = e.KeyModifiers.HasFlag(KeyModifiers.Shift);

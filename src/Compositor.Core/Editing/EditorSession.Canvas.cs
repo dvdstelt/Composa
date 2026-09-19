@@ -47,7 +47,11 @@ public sealed partial class EditorSession
     {
         width = Math.Clamp(width, 1, Document.MaxSide);
         height = Math.Clamp(height, 1, Document.MaxSide);
-        if (width == document.Width && height == document.Height && resolution == null) return;
+        if (width == document.Width && height == document.Height)
+        {
+            if (resolution is { } only && only != document.Resolution) Apply("Image Size", () => document.Resolution = Math.Clamp(only, 1, 9600));
+            return;
+        }
         double sx = (double)width / document.Width, sy = (double)height / document.Height;
         Apply("Image Size", () =>
         {

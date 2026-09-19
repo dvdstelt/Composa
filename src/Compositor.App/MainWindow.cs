@@ -98,6 +98,7 @@ public sealed partial class MainWindow : Window
     {
         sessions.Add(added);
         added.HistoryChanged += RebuildTabs;
+        added.Problem += message => { if (added == session) ShowProblem(message); };
         added.LayersChanged += () => { if (added == session) OnSessionLayersChanged(); };
         SetSession(added);
     }

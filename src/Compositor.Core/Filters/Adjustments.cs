@@ -77,6 +77,10 @@ public abstract record Adjustment
 
     private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Adjustment, PixelOp> Ops = new();
 
+    /// <summary>Value equality including array contents, which record equality compares by reference.</summary>
+    public bool ContentEquals(Adjustment other) =>
+        System.Text.Json.JsonSerializer.Serialize(this) == System.Text.Json.JsonSerializer.Serialize(other);
+
     public static Adjustment Create(AdjustmentKind kind) => kind switch
     {
         AdjustmentKind.HueSaturation => new HueSaturationAdjustment(),

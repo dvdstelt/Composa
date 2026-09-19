@@ -77,6 +77,8 @@ public sealed partial class EditorSession
     public event Action? LayersChanged;
     public event Action? SelectionChanged;
     public event Action? HistoryChanged;
+    /// <summary>Raised when an edit could not be carried out, with a message for the user.</summary>
+    public event Action<string>? Problem;
 
     public Layer? ActiveLayer => document.ActiveLayer;
     public bool IsEditingMask => EditingMask && ActiveLayer?.Mask != null;
@@ -87,10 +89,26 @@ public sealed partial class EditorSession
     /// <summary>Starts an edit that may be previewed live and later committed or cancelled.</summary>
     public void Begin(string name)
     {
-        if (pendingBefore != null) Commit();
+        FinishInteraction();
         pendingBefore = document.Clone();
         pendingName = name;
     }
+
+    /// <summary>
+    /// Completes whatever live edit is still open. A new edit must never start while a stroke, preview, transform or
+    /// pixel move is in flight: those keep replacing (and disposing) bitmaps, which must not end up in a snapshot.
+    /// </summary>
+    private void FinishInteraction()
+    {
+        if (stroke != null) EndStroke();
+        else if (floatLayer != null) EndMovePixels(keep: true);
+        else if (previewLayer != null) CommitPreview();
+        else if (Transform != null) CommitTransform();
+        else if (pendingBefore != null) Commit();
+    }
+
+    /// <summary>True while a drag, preview or other uncommitted edit is open.</summary>
+    public bool IsInteracting => pendingBefore != null;
 
     public void Commit()
     {
@@ -181,7 +199,7 @@ public sealed partial class EditorSession
         }
         if (!dirty.IsEmpty)
         {
-            DocumentRenderer.Render(document, composite, dirty, SoloLayerId is { } solo ? SoloOptions(solo) : null);
+            DocumentRenderer.Render(document, composite, dirty, CurrentOptions());
             dirty = SKRectI.Empty;
         }
         return composite;
@@ -209,7 +227,14 @@ public sealed partial class EditorSession
     /// than <see cref="Composite"/>, so its cost follows the screen size and not the document size.
     /// </summary>
     public void RenderView(SKBitmap target, SKRectI area, RenderView view) =>
-        DocumentRenderer.Render(document, target, area, view, SoloLayerId is { } solo ? SoloOptions(solo) : null);
+        DocumentRenderer.Render(document, target, area, view, CurrentOptions());
+
+    private RenderOptions? CurrentOptions()
+    {
+        // Solo ends by itself when its layer is deleted, merged away or undone out of existence.
+        if (SoloLayerId is { } id && document.Find(id) == null) SoloLayerId = null;
+        return SoloLayerId is { } solo ? SoloOptions(solo) : null;
+    }
 
     /// <summary>A fresh flattened copy, independent of the preview, for export and Copy Merged.</summary>
     public SKBitmap Flatten() => DocumentRenderer.Flatten(document);
