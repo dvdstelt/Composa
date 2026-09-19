@@ -27,7 +27,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Rectangle and Ellipse Marquee, Freehand and Polygonal Lasso, Magic Wand
 - Add, subtract and intersect; move the outline; move or duplicate the pixels inside
 - Select All, Inverse, Expand, Contract, Feather; load a layer's pixels or mask as a selection
-- Content-Aware Fill
+- Content-Aware Fill, which can also extend an image past its edges
 
 ### Painting and retouching
 - Brush and Eraser with size, hardness and stroke-level opacity; Shift-click for straight lines

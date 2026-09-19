@@ -144,3 +144,23 @@ public class RegressionTests
         Assert.False(new LevelsAdjustment().ContentEquals(new LevelsAdjustment().WithRange(1, new LevelsRange { Gamma = 2 })));
     }
 }
+
+public class ContentAwareFillTests
+{
+    [Fact]
+    public void Content_aware_fill_extends_an_image_past_its_edge()
+    {
+        var session = EditorSession.NewCanvas(200, 100);
+        session.Document.Layers.Clear();
+        var photo = session.AddImageLayer("photo", Gradient(120, 100), new SKPoint(60, 50), fit: false);
+        Assert.Equal(0, session.Composite().GetPixel(150, 50).Alpha);
+        session.SelectRect(new SKRect(110, 0, 170, 100));
+        session.ContentAwareFill();
+        var filled = session.Composite().GetPixel(150, 50);
+        Assert.True(filled.Alpha > 200, $"expected the extension to be filled, found {filled}");
+        Assert.Equal(0, session.Composite().GetPixel(190, 50).Alpha);
+        session.Undo();
+        Assert.Equal(0, session.Composite().GetPixel(150, 50).Alpha);
+        Assert.Equal(120, session.Document.Find(photo.Id)!.Pixels!.Width);
+    }
+}

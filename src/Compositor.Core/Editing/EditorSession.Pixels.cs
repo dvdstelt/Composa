@@ -140,10 +140,12 @@ public sealed partial class EditorSession
     public SKBitmap? PreviewOriginal => previewOriginal;
 
     /// <summary>Starts a live, cancellable change to the active layer's pixels or mask.</summary>
-    public bool BeginPreview(string name)
+    /// <param name="coverCanvas">Grow the layer to the canvas first, for edits that may fill beyond the layer's own edges.</param>
+    public bool BeginPreview(string name, bool coverCanvas = false)
     {
         if (EditableLayer is not { } layer) return false;
         Begin(name);
+        if (coverCanvas && !IsEditingMask) EnsureCoversCanvas(layer);
         previewLayer = layer;
         previewOriginal = Target(layer);
         previewOriginalMask = layer.Mask;
@@ -249,7 +251,8 @@ public sealed partial class EditorSession
         if (document.Selection == null || IsEditingMask) return;
         if (Selections.SelectionMask.Bounds(document.Selection) is var hole && (long)hole.Width * hole.Height > Inpaint.MaxArea)
             throw new InvalidOperationException("The selection is too large for Content-Aware Fill. Select a smaller area (up to about 16 megapixels).");
-        if (!BeginPreview("Content-Aware Fill")) return;
+        // Growing the layer to the canvas lets a selection past the image's edge extend the image.
+        if (!BeginPreview("Content-Aware Fill", coverCanvas: true)) return;
         PreviewContentAwareFill();
         CommitPreview();
     }
