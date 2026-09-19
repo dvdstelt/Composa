@@ -108,6 +108,8 @@ public class SessionFuzzTests
             ("nudge", () => session.Nudge(random.Next(-3, 4), random.Next(-3, 4))),
             ("flip-layer", () => session.FlipLayers(random.Next(2) == 0)),
             ("flip-canvas", () => session.FlipCanvas(random.Next(2) == 0)),
+            ("rotate-canvas", () => { if (random.Next(4) == 0) session.RotateCanvas(random.Next(2) == 0); }),
+            ("rotate-layer", () => session.RotateLayers(random.Next(2) == 0 ? 90 : -90)),
             ("move-pixels", () => { if (session.BeginMovePixels(random.Next(2) == 0)) { session.MovePixelsBy(random.Next(-30, 30), random.Next(-30, 30)); session.MovePixelsBy(random.Next(-30, 30), random.Next(-30, 30)); session.EndMovePixels(random.Next(4) != 0); } }),
             ("copy-paste", () => { if (random.Next(2) == 0) session.Copy(); else session.CopyMerged(); session.Paste(); }),
             ("cut", () => session.Cut()),
