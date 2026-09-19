@@ -96,7 +96,7 @@ public sealed partial class EditorSession
         {
             if (!IsEditingMask) EnsureCoversCanvas(layer);
             var original = Target(layer);
-            var filled = original.Copy();
+            var filled = Pixels.Clone(original);
             if (IsEditingMask) filled.GetPixelSpan().Fill((byte)((color.Red * 54 + color.Green * 183 + color.Blue * 19) >> 8));
             else filled.Erase(color);
             var selection = SelectionInTargetSpace(layer);
@@ -114,7 +114,7 @@ public sealed partial class EditorSession
         Apply("Clear", () =>
         {
             var original = Target(layer);
-            var cleared = original.Copy();
+            var cleared = Pixels.Clone(original);
             cleared.Erase(SKColors.Transparent);
             var selection = SelectionInTargetSpace(layer);
             SetTarget(layer, MixBySelection(original, cleared, selection));
@@ -153,7 +153,7 @@ public sealed partial class EditorSession
     {
         if (source.ColorType != SKColorType.Alpha8)
         {
-            var copy = source.Copy();
+            var copy = Pixels.Clone(source);
             adjustment.Apply(copy, (int)(previewTransform?.X ?? 0), (int)(previewTransform?.Y ?? 0));
             return (copy, 0, 0);
         }
@@ -172,7 +172,7 @@ public sealed partial class EditorSession
 
     public void PreviewContentAwareFill() => Preview(source =>
     {
-        if (previewSelection == null || source.ColorType == SKColorType.Alpha8) return (source.Copy(), 0, 0);
+        if (previewSelection == null || source.ColorType == SKColorType.Alpha8) return (Pixels.Clone(source), 0, 0);
         return (Inpaint.Fill(source, previewSelection), 0, 0);
     }, mix: false);
 
@@ -288,7 +288,7 @@ public sealed partial class EditorSession
             start = new SKColor(0, 0, 0, Gray(Foreground));
             end = new SKColor(0, 0, 0, Gray(Background));
         }
-        var painted = original.Copy();
+        var painted = Pixels.Clone(original);
         using (var canvas = new SKCanvas(painted))
         {
             canvas.SetMatrix(in inverse);
@@ -403,7 +403,7 @@ public sealed partial class EditorSession
     {
         image ??= Clipboard;
         if (image == null) return null;
-        var pixels = image.Pixels.Copy();
+        var pixels = Pixels.Clone(image.Pixels);
         var placed = new SKRectI(image.Origin.X, image.Origin.Y, image.Origin.X + pixels.Width, image.Origin.Y + pixels.Height);
         var fits = document.Bounds.Contains(placed);
         var layer = Layer.Raster(document.UniqueName(name), pixels,

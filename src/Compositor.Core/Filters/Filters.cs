@@ -62,7 +62,7 @@ public static unsafe class ImageFilters
             case FilterKind.RemoveBackground:
                 return (RemoveBackground(source, settings.Amount), 0, 0);
             default:
-                return (source.Copy(), 0, 0);
+                return (Pixels.Clone(source), 0, 0);
         }
     }
 
@@ -115,7 +115,7 @@ public static unsafe class ImageFilters
         using (var canvas = new SKCanvas(blurred))
         using (var paint = new SKPaint { ImageFilter = filter, BlendMode = SKBlendMode.Src })
             canvas.DrawBitmap(source, 0, 0, paint);
-        var result = source.Copy();
+        var result = Pixels.Clone(source);
         byte* dst = (byte*)result.GetPixels(), soft = (byte*)blurred.GetPixels();
         var s = (float)strength;
         Parallel.For(0, source.Height, y =>
@@ -133,7 +133,7 @@ public static unsafe class ImageFilters
 
     private static SKBitmap AddNoise(SKBitmap source, double amount, bool monochrome, uint seed)
     {
-        var result = source.Copy();
+        var result = Pixels.Clone(source);
         var dst = (byte*)result.GetPixels();
         var strength = (float)(Math.Clamp(amount, 0, 100) / 100 * 128);
         Parallel.For(0, source.Height, y =>
@@ -210,7 +210,7 @@ public static unsafe class ImageFilters
             for (var i = 0L; i < (long)h * region.RowBytes; i++) if (r[i] != 0) bg[i] = 255;
         }
         using var soft = Selections.SelectionMask.Feather(background, 2);
-        var result = source.Copy();
+        var result = Pixels.Clone(source);
         using var canvas = new SKCanvas(result);
         using var paint = new SKPaint { BlendMode = SKBlendMode.DstOut };
         canvas.DrawBitmap(soft, 0, 0, paint);

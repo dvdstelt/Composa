@@ -77,7 +77,7 @@ public sealed partial class EditorSession
         Apply("New Adjustment Layer", () =>
         {
             document.InsertAboveActive(layer);
-            if (document.Selection != null) layer.Mask = document.Selection.Copy();
+            if (document.Selection != null) layer.Mask = Pixels.Clone(document.Selection);
         });
         InvalidateAll();
         LayersChanged?.Invoke();
@@ -375,7 +375,7 @@ public sealed partial class EditorSession
         Apply("Add Layer Mask", () =>
         {
             if (layer.Pixels == null)
-                layer.Mask = document.Selection?.Copy() ?? Pixels.NewMask(document.Width, document.Height, hideAll ? (byte)0 : (byte)255);
+                layer.Mask = document.Selection != null ? Pixels.Clone(document.Selection) : Pixels.NewMask(document.Width, document.Height, hideAll ? (byte)0 : (byte)255);
             else if (document.Selection != null) layer.Mask = SelectionInLayerSpace(layer)!;
             else layer.Mask = Pixels.NewMask(layer.Pixels.Width, layer.Pixels.Height, hideAll ? (byte)0 : (byte)255);
             layer.MaskEnabled = true;
@@ -400,7 +400,7 @@ public sealed partial class EditorSession
         if (layer.Mask == null || layer.Pixels == null) return;
         Apply("Apply Layer Mask", () =>
         {
-            var pixels = layer.Pixels.Copy();
+            var pixels = Pixels.Clone(layer.Pixels);
             using (var canvas = new SKCanvas(pixels))
             using (var paint = new SKPaint { BlendMode = SKBlendMode.DstIn })
                 canvas.DrawBitmap(layer.Mask, new SKRect(0, 0, pixels.Width, pixels.Height), paint);

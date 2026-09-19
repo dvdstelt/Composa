@@ -36,7 +36,7 @@ public sealed partial class EditorSession
             using var keep = new SKPaint { BlendMode = SKBlendMode.DstIn };
             canvas.DrawBitmap(selection, -bounds.Left, -bounds.Top, keep);
         }
-        floatBase = original.Copy();
+        floatBase = Pixels.Clone(original);
         if (!duplicate)
         {
             using var canvas = new SKCanvas(floatBase);
@@ -52,7 +52,7 @@ public sealed partial class EditorSession
     public void MovePixelsBy(int dx, int dy)
     {
         if (floatLayer is not { } layer || floatBase == null || floatPixels == null) return;
-        var moved = floatBase.Copy();
+        var moved = Pixels.Clone(floatBase);
         using (var canvas = new SKCanvas(moved)) canvas.DrawBitmap(floatPixels, floatOrigin.X + dx, floatOrigin.Y + dy);
         layer.Pixels = moved;
         // Only bitmaps made by earlier moves are disposed; the layer's original pixels belong to the undo history.

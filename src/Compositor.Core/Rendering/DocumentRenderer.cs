@@ -13,15 +13,51 @@ public static class Pixels
     public static SKBitmap NewColor(int width, int height)
     {
         var bitmap = new SKBitmap(ColorInfo(Math.Max(1, width), Math.Max(1, height)));
-        bitmap.Erase(SKColors.Transparent);
+        Fill(bitmap, 0);
         return bitmap;
     }
 
     public static SKBitmap NewMask(int width, int height, byte fill = 0)
     {
         var bitmap = new SKBitmap(MaskInfo(Math.Max(1, width), Math.Max(1, height)));
-        bitmap.GetPixelSpan().Fill(fill);
+        Fill(bitmap, fill);
         return bitmap;
+    }
+
+    private const int ChunkRows = 256;
+
+    private static unsafe void Fill(SKBitmap bitmap, byte value)
+    {
+        var pixels = (byte*)bitmap.GetPixels();
+        long stride = bitmap.RowBytes, height = bitmap.Height;
+        if (stride * height < 4_000_000) { new Span<byte>(pixels, (int)(stride * height)).Fill(value); return; }
+        Parallel.For(0, (int)((height + ChunkRows - 1) / ChunkRows), chunk =>
+        {
+            var rows = Math.Min(ChunkRows, height - (long)chunk * ChunkRows);
+            new Span<byte>(pixels + chunk * ChunkRows * stride, (int)(rows * stride)).Fill(value);
+        });
+    }
+
+    /// <summary>An independent copy of a bitmap. Far faster than <c>SKBitmap.Copy</c>, which converts pixel by pixel.</summary>
+    public static unsafe SKBitmap Clone(SKBitmap source)
+    {
+        var copy = new SKBitmap(source.Info);
+        byte* from = (byte*)source.GetPixels(), to = (byte*)copy.GetPixels();
+        long height = source.Height;
+        if (source.RowBytes != copy.RowBytes)
+        {
+            for (var y = 0; y < height; y++) Buffer.MemoryCopy(from + y * (long)source.RowBytes, to + y * (long)copy.RowBytes, copy.RowBytes, Math.Min(source.RowBytes, copy.RowBytes));
+            return copy;
+        }
+        long stride = source.RowBytes;
+        if (stride * height < 4_000_000) { Buffer.MemoryCopy(from, to, stride * height, stride * height); return copy; }
+        Parallel.For(0, (int)((height + ChunkRows - 1) / ChunkRows), chunk =>
+        {
+            var offset = chunk * ChunkRows * stride;
+            var bytes = Math.Min(ChunkRows, height - (long)chunk * ChunkRows) * stride;
+            Buffer.MemoryCopy(from + offset, to + offset, bytes, bytes);
+        });
+        return copy;
     }
 
     private static readonly ConditionalWeakTable<SKBitmap, SKImage> Images = new();
@@ -129,7 +165,7 @@ public static class DocumentRenderer
     {
         using var tile = new Tile(area);
         RenderNodes(layers.ToList(), tile, null);
-        return tile.Bitmap.Copy();
+        return Pixels.Clone(tile.Bitmap);
     }
 
     private static Layer Resolve(Layer layer, RenderOptions? options) =>
@@ -176,7 +212,7 @@ public static class DocumentRenderer
 
         if (clipped.Count > 0)
         {
-            using var baseAlpha = content.Bitmap.Copy();
+            using var baseAlpha = Pixels.Clone(content.Bitmap);
             foreach (var top in clipped)
             {
                 if (top.IsAdjustment) { ApplyAdjustment(top, content); continue; }
@@ -249,7 +285,7 @@ public static class DocumentRenderer
     {
         if (layer.Adjustment == null || layer.Adjustment.IsIdentity) return;
         tile.Canvas.Flush();
-        using var adjusted = tile.Bitmap.Copy();
+        using var adjusted = Pixels.Clone(tile.Bitmap);
         layer.Adjustment.Apply(adjusted, tile.Area.Left, tile.Area.Top);
         var hasMask = layer.Mask != null && layer.MaskEnabled;
         using var replace = new SKPaint { BlendMode = SKBlendMode.Src };

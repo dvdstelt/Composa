@@ -47,7 +47,7 @@ public static class SelectionMask
     {
         if (current == null || mode == SelectionMode.Replace)
             return mode is SelectionMode.Subtract or SelectionMode.Intersect || IsEmpty(shape) ? null : shape;
-        var result = current.Copy();
+        var result = Pixels.Clone(current);
         using var canvas = new SKCanvas(result);
         using var paint = new SKPaint
         {
@@ -67,7 +67,7 @@ public static class SelectionMask
 
     public static SKBitmap Invert(SKBitmap mask)
     {
-        var result = mask.Copy();
+        var result = Pixels.Clone(mask);
         var span = result.GetPixelSpan();
         for (var i = 0; i < span.Length; i++) span[i] = (byte)(255 - span[i]);
         return result;
@@ -111,7 +111,7 @@ public static class SelectionMask
     public static SKBitmap Expand(SKBitmap mask, int pixels)
     {
         using var filter = SKImageFilter.CreateDilate(pixels, pixels);
-        return Rounded(mask, filter, pixels);
+        return Filtered(mask, filter);
     }
 
     public static SKBitmap? Contract(SKBitmap mask, int pixels)
@@ -119,18 +119,10 @@ public static class SelectionMask
         // Erode treats the area beyond the bitmap as unselected, so a selection touching the canvas edge pulls
         // away from it, as in Photoshop.
         using var filter = SKImageFilter.CreateErode(pixels, pixels);
-        var result = Rounded(mask, filter, pixels);
+        var result = Filtered(mask, filter);
         if (!IsEmpty(result)) return result;
         result.Dispose();
         return null;
-    }
-
-    // Skia's morphology uses a square kernel; blurring and re-thresholding the result rounds the corners it leaves.
-    private static SKBitmap Rounded(SKBitmap mask, SKImageFilter morphology, int pixels)
-    {
-        if (pixels < 3) return Filtered(mask, morphology);
-        using var square = Filtered(mask, morphology);
-        return square.Copy();
     }
 
     public static SKBitmap Feather(SKBitmap mask, float radius)

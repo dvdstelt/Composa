@@ -59,7 +59,7 @@ public sealed unsafe class BrushStroke : IDisposable
     public BrushStroke(SKBitmap target, BrushSettings settings, BrushMode mode, SKColor color, double scale = 1)
     {
         original = target;
-        Working = target.Copy();
+        Working = Pixels.Clone(target);
         this.settings = settings;
         this.mode = mode;
         isMask = target.ColorType == SKColorType.Alpha8;

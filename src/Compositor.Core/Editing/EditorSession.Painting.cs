@@ -77,7 +77,7 @@ public sealed partial class EditorSession
             var translationOnly = layer.Pixels != null && layer.Transform.IsPureTranslation(layer.Pixels.Width, layer.Pixels.Height) || layer.Pixels == null;
             if (SampleAllLayers && !IsEditingMask && translationOnly)
             {
-                source = Composite().Copy();
+                source = Pixels.Clone(Composite());
                 offset = new SKPointI((int)Math.Round(o.X + layer.Transform.X), (int)Math.Round(o.Y + layer.Transform.Y));
             }
             else

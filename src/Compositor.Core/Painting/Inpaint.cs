@@ -1,5 +1,6 @@
 using Compositor.Model;
 using Compositor.Selections;
+using Compositor.Rendering;
 using SkiaSharp;
 
 namespace Compositor.Painting;
@@ -14,7 +15,7 @@ public static unsafe class Inpaint
     /// <summary>Returns a copy of <paramref name="source"/> (RGBA premultiplied) with the masked area replaced.</summary>
     public static SKBitmap Fill(SKBitmap source, SKBitmap mask)
     {
-        var result = source.Copy();
+        var result = Pixels.Clone(source);
         var hole = SelectionMask.Bounds(mask, 1);
         hole = Geometry.Intersect(hole, new SKRectI(0, 0, source.Width, source.Height));
         if (hole.IsEmpty) return result;
