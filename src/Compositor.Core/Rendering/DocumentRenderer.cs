@@ -154,6 +154,20 @@ public static class DocumentRenderer
             return;
         }
 
+        // A Normal folder is rendered over a copy of what lies beneath it and then mixed back in by its mask and
+        // opacity. For ordinary layers that equals compositing the folder on its own, and it is what lets adjustment
+        // layers inside the folder see (and change) the picture below them.
+        if (layer.IsGroup && layer.Blend == BlendMode.Normal && clipped.Count == 0)
+        {
+            tile.Canvas.Flush();
+            using var seeded = tile.Sibling();
+            seeded.DrawRaw(tile.Bitmap, Replace);
+            RenderNodes(layer.Children, seeded, options);
+            seeded.Canvas.Flush();
+            Mix(tile, seeded.Bitmap, layer, hasMask);
+            return;
+        }
+
         using var content = tile.Sibling();
         if (layer.IsGroup) RenderNodes(layer.Children, content, options);
         else DrawPixels(layer, content.Canvas, 1, BlendMode.Normal);
@@ -161,8 +175,12 @@ public static class DocumentRenderer
 
         if (clipped.Count > 0)
         {
+            // Clipped layers paint onto the base's colors as if the base were opaque; the base's own coverage is
+            // applied once, at the end. Blending onto the still-transparent base instead would let its color bleed
+            // through and square its alpha wherever it is soft or semi-transparent.
             content.Canvas.Flush();
             using var baseAlpha = Pixels.Clone(content.Bitmap);
+            MakeOpaque(content.Bitmap);
             foreach (var top in clipped)
             {
                 if (top.IsAdjustment) { ApplyAdjustment(top, content); continue; }
@@ -170,12 +188,10 @@ public static class DocumentRenderer
                 if (top.IsGroup) RenderNodes(top.Children, over, options);
                 else DrawPixels(top, over.Canvas, 1, BlendMode.Normal);
                 if (top.Mask != null && top.MaskEnabled) MultiplyByMask(top, over);
-                using (var clip = new SKPaint { BlendMode = SKBlendMode.DstIn }) over.DrawRaw(baseAlpha, clip);
                 over.Canvas.Flush();
                 using var blend = new SKPaint { BlendMode = top.Blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(top.Opacity)) };
                 content.DrawRaw(over.Bitmap, blend);
             }
-            // Blending can raise alpha slightly at soft edges; the unit never shows beyond its base.
             using var restore = new SKPaint { BlendMode = SKBlendMode.DstIn };
             content.DrawRaw(baseAlpha, restore);
         }
@@ -183,6 +199,47 @@ public static class DocumentRenderer
         content.Canvas.Flush();
         using var paint = new SKPaint { BlendMode = layer.Blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(layer.Opacity)) };
         tile.DrawRaw(content.Bitmap, paint);
+    }
+
+    private static readonly SKPaint Replace = new() { BlendMode = SKBlendMode.Src };
+
+    /// <summary>Straightens premultiplied pixels and gives every covered pixel full alpha.</summary>
+    private static unsafe void MakeOpaque(SKBitmap bitmap)
+    {
+        var pixels = (byte*)bitmap.GetPixels();
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            var p = pixels + (long)y * bitmap.RowBytes;
+            for (var x = 0; x < bitmap.Width; x++, p += 4)
+            {
+                int a = p[3];
+                if (a is 0 or 255) continue;
+                p[0] = (byte)Math.Min(255, (p[0] * 255 + a / 2) / a);
+                p[1] = (byte)Math.Min(255, (p[1] * 255 + a / 2) / a);
+                p[2] = (byte)Math.Min(255, (p[2] * 255 + a / 2) / a);
+                p[3] = 255;
+            }
+        }
+    }
+
+    /// <summary>tile = tile × (1 - m) + replacement × m, where m is the layer's mask times its opacity.</summary>
+    private static void Mix(Tile tile, SKBitmap replacement, Layer layer, bool hasMask)
+    {
+        if (!hasMask && layer.Opacity >= 1)
+        {
+            tile.DrawRaw(replacement, Replace);
+            return;
+        }
+        using var coverage = tile.Sibling(mask: true);
+        coverage.Canvas.Clear(SKColors.Black.WithAlpha(ToByte(layer.Opacity)));
+        if (hasMask) MultiplyByMask(layer, coverage);
+        coverage.Canvas.Flush();
+        using (var canvas = new SKCanvas(replacement))
+        using (var keep = new SKPaint { BlendMode = SKBlendMode.DstIn })
+            canvas.DrawBitmap(coverage.Bitmap, 0, 0, keep);
+        using (var remove = new SKPaint { BlendMode = SKBlendMode.DstOut }) tile.DrawRaw(coverage.Bitmap, remove);
+        using var plus = new SKPaint { BlendMode = SKBlendMode.Plus };
+        tile.DrawRaw(replacement, plus);
     }
 
     private static byte ToByte(double opacity) => (byte)Math.Clamp(Math.Round(opacity * 255), 0, 255);
@@ -264,23 +321,6 @@ public static class DocumentRenderer
         var (originX, originY, step) = tile.DocumentGrid;
         // Bands already run side by side, so the adjustment itself stays on this thread.
         layer.Adjustment.Apply(adjusted, new SKRectI(0, 0, adjusted.Width, adjusted.Height), originX, originY, step, parallel: tile.Area.Height * (long)tile.Area.Width > 2_000_000);
-        var hasMask = layer.Mask != null && layer.MaskEnabled;
-        using var replace = new SKPaint { BlendMode = SKBlendMode.Src };
-        if (!hasMask && layer.Opacity >= 1)
-        {
-            tile.DrawRaw(adjusted, replace);
-            return;
-        }
-        // result = backdrop × (1 - m) + adjusted × m, where m is the mask times the layer's opacity.
-        using var coverage = tile.Sibling(mask: true);
-        coverage.Canvas.Clear(SKColors.Black.WithAlpha(ToByte(layer.Opacity)));
-        if (hasMask) MultiplyByMask(layer, coverage);
-        coverage.Canvas.Flush();
-        using (var adjustedCanvas = new SKCanvas(adjusted))
-        using (var keep = new SKPaint { BlendMode = SKBlendMode.DstIn })
-            adjustedCanvas.DrawBitmap(coverage.Bitmap, 0, 0, keep);
-        using (var remove = new SKPaint { BlendMode = SKBlendMode.DstOut }) tile.DrawRaw(coverage.Bitmap, remove);
-        using var plus = new SKPaint { BlendMode = SKBlendMode.Plus };
-        tile.DrawRaw(adjusted, plus);
+        Mix(tile, adjusted, layer, layer.Mask != null && layer.MaskEnabled);
     }
 }

@@ -192,3 +192,64 @@ public class ViewRenderingTests
         TestImages.AssertColor(SKColors.Lime, view.GetPixel(10, 10));
     }
 }
+
+public class CompositingQaTests
+{
+    [Fact]
+    public void A_layer_clipped_to_a_semi_transparent_base_takes_the_bases_alpha_once()
+    {
+        var document = new Document(20, 20);
+        document.Layers.Add(Layer.Raster("base", TestImages.Solid(20, 20, new SKColor(255, 0, 0, 128))));
+        var top = Layer.Raster("top", TestImages.Solid(20, 20, SKColors.Blue));
+        top.Clipped = true;
+        document.Layers.Add(top);
+        using var flat = DocumentRenderer.Flatten(document);
+        TestImages.AssertColor(new SKColor(0, 0, 255, 128), flat.GetPixel(5, 5), 3);
+    }
+
+    [Fact]
+    public void A_clipped_adjustment_on_a_semi_transparent_base_keeps_its_alpha()
+    {
+        var document = new Document(20, 20);
+        document.Layers.Add(Layer.Raster("white", TestImages.Solid(20, 20, SKColors.White)));
+        document.Layers.Add(Layer.Raster("base", TestImages.Solid(20, 20, new SKColor(200, 100, 50, 128))));
+        var invert = Layer.ForAdjustment(new InvertAdjustment());
+        invert.Clipped = true;
+        document.Layers.Add(invert);
+        using var flat = DocumentRenderer.Flatten(document);
+        TestImages.AssertColor(new SKColor(155, 205, 230), flat.GetPixel(5, 5), 3);
+    }
+
+    [Fact]
+    public void Adjustments_inside_a_folder_keep_working_when_the_folder_has_opacity_or_a_mask()
+    {
+        var document = new Document(20, 20);
+        document.Layers.Add(Layer.Raster("photo", TestImages.Solid(20, 20, new SKColor(200, 100, 50))));
+        var folder = Layer.Group("folder");
+        folder.Children.Add(Layer.ForAdjustment(new InvertAdjustment()));
+        document.Layers.Add(folder);
+        folder.Opacity = 0.5;
+        using (var flat = DocumentRenderer.Flatten(document)) TestImages.AssertColor(new SKColor(128, 128, 128), flat.GetPixel(5, 5), 3);
+
+        folder.Opacity = 1;
+        folder.Mask = Pixels.NewMask(20, 20, 255);
+        for (var y = 0; y < 20; y++) for (var x = 10; x < 20; x++) folder.Mask.SetPixel(x, y, new SKColor(0, 0, 0, 0));
+        using var masked = DocumentRenderer.Flatten(document);
+        TestImages.AssertColor(new SKColor(55, 155, 205), masked.GetPixel(5, 5), 3);
+        TestImages.AssertColor(new SKColor(200, 100, 50), masked.GetPixel(15, 5), 3);
+    }
+
+    [Fact]
+    public void A_folder_with_opacity_composites_ordinary_layers_as_before()
+    {
+        var document = new Document(20, 20);
+        document.Layers.Add(Layer.Raster("white", TestImages.Solid(20, 20, SKColors.White)));
+        var folder = Layer.Group("folder");
+        folder.Children.Add(Layer.Raster("black", TestImages.Solid(10, 20, SKColors.Black)));
+        folder.Opacity = 0.5;
+        document.Layers.Add(folder);
+        using var flat = DocumentRenderer.Flatten(document);
+        TestImages.AssertColor(new SKColor(128, 128, 128), flat.GetPixel(5, 5), 3);
+        TestImages.AssertColor(SKColors.White, flat.GetPixel(15, 5), 1);
+    }
+}
