@@ -64,7 +64,7 @@ public sealed class LayersPanel : UserControl
         var title = Ui.Label("Layers", weight: FontWeight.SemiBold);
         title.Margin = new Thickness(0, 0, 0, 6);
         Grid.SetColumnSpan(title, 3);
-        var blendRow = new Grid { ColumnDefinitions = new ColumnDefinitions("118,10,Auto,*,Auto") };
+        var blendRow = new Grid { ColumnDefinitions = new ColumnDefinitions("112,10,Auto,*,Auto") };
         blendRow.Children.Add(blend);
         var opacityLabel = Ui.Label("Opacity", Palette.Secondary);
         Grid.SetColumn(opacityLabel, 2);
@@ -175,7 +175,7 @@ public sealed class LayersPanel : UserControl
         var selected = current.Document.SelectedLayerIds.Contains(layer.Id);
         var dim = !layer.Visible || !parentVisible;
 
-        var eye = new Button { Classes = { "flat" }, Width = 28, Height = 28, Padding = new Thickness(0), Content = Icons.Create(Icons.Eye, 15, layer.Visible ? null : Brushes.Transparent) };
+        var eye = new Button { Classes = { "flat" }, Width = 28, Height = 28, Padding = new Thickness(0), Content = Icons.Create(Icons.Eye, 15, layer.Visible ? null : new SolidColorBrush(Color.Parse("#555555"))) };
         ToolTip.SetTip(eye, "Show or hide (drag down the column to swipe, Alt-click to show only this layer)");
         eye.AddHandler(PointerPressedEvent, (_, e) =>
         {

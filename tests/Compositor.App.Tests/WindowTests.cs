@@ -158,3 +158,54 @@ public class KeyboardTests
         Assert.Equal(0.5, session.Brush.Opacity);
     }
 }
+
+public class LayersPanelTests
+{
+    [AvaloniaFact]
+    public void Complex_layer_stack_renders()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(800, 600, new SKColor(0x30, 0x34, 0x40));
+        window.AddSession(session);
+        session.ShapeKind = Model.ShapeKind.Ellipse;
+        session.Foreground = new SKColor(0xFF, 0x8A, 0x3D);
+        var sun = session.AddShape(new SKRect(250, 120, 550, 420))!;
+        session.ShapeKind = Model.ShapeKind.RoundedRectangle;
+        session.Foreground = new SKColor(0x3D, 0x9B, 0xFF);
+        var stripe = session.AddShape(new SKRect(100, 240, 700, 330))!;
+        session.ToggleClippingMask(stripe);
+        session.SelectLayer(sun.Id);
+        session.SelectLayer(stripe.Id, extend: true);
+        session.GroupSelectedLayers();
+        var folder = session.ActiveLayer!;
+        session.AddMask(folder);
+        session.EditingMask = true;
+        session.Foreground = SKColors.Black;
+        session.GradientToTransparent = false;
+        session.Begin("Gradient");
+        session.DrawGradient(folder, folder.Mask!, new SKPoint(0, 300), new SKPoint(800, 300));
+        session.Commit();
+        session.EditingMask = false;
+        var curves = session.AddAdjustmentLayer(new CurvesAdjustment().WithChannel(0, [new(0, 20), new(128, 170), new(255, 255)]));
+        var hidden = session.AddBlankLayer();
+        session.SetVisible(hidden, false);
+        session.SelectLayer(curves.Id);
+        window.SelectTool(Tool.Crop);
+        Dispatcher.UIThread.RunJobs();
+        var view = window.Canvas;
+        var from = view.TranslatePoint(view.ToScreen(new SKPoint(100, 80)), window)!.Value;
+        var to = view.TranslatePoint(view.ToScreen(new SKPoint(640, 500)), window)!.Value;
+        window.MouseDown(from, MouseButton.Left);
+        window.MouseMove(to);
+        window.MouseUp(to, MouseButton.Left);
+        Assert.True(view.HasCrop);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Directory.CreateDirectory(WindowTests.Shots);
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "07-layers-and-crop.png"));
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Equal(540, session.Document.Width);
+        Assert.Equal(420, session.Document.Height);
+    }
+}

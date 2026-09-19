@@ -15,7 +15,7 @@ public sealed partial class MainWindow : Window
     private readonly List<EditorSession> sessions = [];
     private EditorSession? session;
     private readonly CanvasView canvas = new();
-    private readonly LayersPanel layers = new() { Width = 270 };
+    private readonly LayersPanel layers = new() { Width = 296 };
     private readonly StackPanel tabs = new() { Orientation = Orientation.Horizontal, Spacing = 2 };
     private readonly Border optionsHost = new() { Height = 40, Background = Palette.Panel, Padding = new Thickness(12, 0) };
     private readonly Dictionary<Tool, ToggleButton> toolButtons = [];
