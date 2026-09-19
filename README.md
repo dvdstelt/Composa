@@ -97,7 +97,8 @@ scripts/install.sh
 dotnet test
 ```
 
-The core library is tested directly through `EditorSession`. The app tests run Avalonia headless with real Skia rendering and write screenshots to `artifacts/screenshots/`.
+- `tests/Compositor.Core.Tests` drives the editor through `EditorSession`: compositing, selections, every brush mode, healing, filters, canvas operations, project files, the macOS importer, regressions found in review, and a fuzz test that runs thousands of random edits, undos and redos while checking the document stays consistent.
+- `tests/Compositor.App.Tests` runs the real window with Avalonia's headless platform and Skia rendering. Every tool and the layers panel are driven with pointer and key events, and screenshots of the window and each dialog are written to `artifacts/screenshots/`, which is the way to review UI changes without a display.
 
 ## Shortcuts
 
