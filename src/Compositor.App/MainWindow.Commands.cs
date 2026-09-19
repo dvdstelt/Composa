@@ -24,6 +24,7 @@ public sealed partial class MainWindow
     private MenuItem? undoItem, redoItem, mergeItem, clipItem;
     private Guid? optionsLayer;
     private int jpegQuality = 90;
+    private MenuItem? recentMenu;
 
     private bool HasDocument => session != null;
 
@@ -62,6 +63,7 @@ public sealed partial class MainWindow
         Top("_File",
             Item("New Canvas…", () => _ = NewCanvas(), Key.N, ctrl, needsDocument: false),
             Item("Open…", () => _ = Open(), Key.O, ctrl, needsDocument: false),
+            recentMenu = Sub("Open Recent"),
             Item("Open macOS Project Folder (.comp)…", () => _ = OpenMacProject(), needsDocument: false),
             Item("Place Images as Layers…", () => _ = PlaceImages()),
             Line(),
@@ -149,7 +151,7 @@ public sealed partial class MainWindow
             Item("Flip Layer Horizontal", () => session!.FlipLayers(true)),
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 
-        var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = true };
+        var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
         grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); };
         Top("_View",
             Item("Fit Canvas", canvas.Fit, Key.D0, ctrl),
@@ -169,6 +171,17 @@ public sealed partial class MainWindow
 
     private void RefreshMenuState()
     {
+        if (recentMenu != null)
+        {
+            recentMenu.Items.Clear();
+            foreach (var path in settings.RecentFiles.Where(p => File.Exists(p) || Directory.Exists(p)))
+            {
+                var item = new MenuItem { Header = path.Replace("_", "__") };
+                item.Click += (_, _) => OpenPaths([path]);
+                recentMenu.Items.Add(item);
+            }
+            recentMenu.IsEnabled = recentMenu.Items.Count > 0;
+        }
         foreach (var (item, command) in menuItems) item.IsEnabled = command.Enabled?.Invoke() ?? true;
         if (session == null) return;
         undoItem!.Header = session.History.CanUndo ? $"Undo {session.History.UndoName}" : "Undo";
@@ -331,7 +344,8 @@ public sealed partial class MainWindow
                     AddSession(new EditorSession(document) { SuggestedName = Path.GetFileNameWithoutExtension(path) });
                 }
             }
-            catch (Exception error) { _ = Prompts.Alert(this, "Couldn't open " + Path.GetFileName(path), error.Message); }
+            catch (Exception error) { _ = Prompts.Alert(this, "Couldn't open " + Path.GetFileName(path), error.Message); continue; }
+            settings.AddRecent(Path.GetFullPath(path));
         }
     }
 
@@ -391,6 +405,7 @@ public sealed partial class MainWindow
         {
             Busy(() => ProjectFile.Save(target.Document, path));
             target.MarkSaved(path);
+            settings.AddRecent(Path.GetFullPath(path));
             return true;
         }
         catch (Exception error)

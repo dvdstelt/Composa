@@ -9,6 +9,8 @@ namespace Compositor.App.Tests;
 
 public static class TestApp
 {
+    static TestApp() => Settings.Persist = false;
+
     public static AppBuilder BuildAvaloniaApp() => AppBuilder.Configure<App>()
         .UseSkia()
         .WithInterFont()

@@ -26,13 +26,17 @@ public sealed partial class MainWindow : Window
     private readonly Border backgroundSwatch = new() { Width = 26, Height = 26, BorderBrush = Brushes.White, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(3) };
     private readonly Panel welcome;
     private Action? refreshOptions;
+    private readonly Settings settings = Settings.Load();
     private string? problem;
 
     public MainWindow()
     {
         Title = "Compositor";
-        Width = 1280;
-        Height = 820;
+        Width = Math.Clamp(settings.WindowWidth, 800, 10000);
+        Height = Math.Clamp(settings.WindowHeight, 520, 10000);
+        if (settings.Maximized) WindowState = WindowState.Maximized;
+        canvas.ShowPixelGrid = settings.ShowPixelGrid;
+        jpegQuality = Math.Clamp(settings.JpegQuality, 1, 100);
         MinWidth = 800;
         MinHeight = 520;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -180,8 +184,18 @@ public sealed partial class MainWindow : Window
 
     private bool closingConfirmed;
 
+    private void RememberWindow()
+    {
+        settings.Maximized = WindowState == WindowState.Maximized;
+        if (WindowState == WindowState.Normal) { settings.WindowWidth = Width; settings.WindowHeight = Height; }
+        settings.ShowPixelGrid = canvas.ShowPixelGrid;
+        settings.JpegQuality = jpegQuality;
+        settings.Save();
+    }
+
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
+        RememberWindow();
         if (closingConfirmed || sessions.All(s => !s.IsModified)) return;
         e.Cancel = true;
         foreach (var item in sessions.Where(s => s.IsModified).ToList())
