@@ -373,6 +373,28 @@ public sealed partial class MainWindow : Window
         _ => "Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly"
     };
 
+    private bool reportingFailure;
+
+    /// <summary>Tells the user about an unexpected error, once at a time, after putting the editor back into a sane state.</summary>
+    public void ReportFailure(Exception error)
+    {
+        try { canvas.CancelInteraction(); }
+        catch (Exception secondary) { Console.Error.WriteLine(secondary); }
+        if (reportingFailure) return;
+        reportingFailure = true;
+        _ = Show();
+
+        async Task Show()
+        {
+            try
+            {
+                await Dialogs.Prompts.Alert(this, "Something went wrong",
+                    $"{error.GetType().Name}: {error.Message}\n\nThe last action may not have completed. Your document is still open; saving a copy now (File > Save As) is a good idea.");
+            }
+            finally { reportingFailure = false; }
+        }
+    }
+
     public void ShowProblem(string message)
     {
         problem = message;
