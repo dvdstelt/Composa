@@ -36,6 +36,7 @@ public sealed partial class MainWindow : Window
         MinWidth = 800;
         MinHeight = 520;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
+        Icon = new WindowIcon(Avalonia.Platform.AssetLoader.Open(new Uri("avares://compositor/Assets/icon.png")));
 
         welcome = BuildWelcome();
         var canvasHost = new Panel { Children = { canvas, welcome } };
