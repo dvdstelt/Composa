@@ -6,3 +6,4 @@ obj/
 publish/
 dist/
 plan-*.md
+artifacts/
