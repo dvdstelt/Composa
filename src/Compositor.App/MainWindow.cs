@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly Panel welcome;
     private Action? refreshOptions;
     private readonly Settings settings = Settings.Load();
+    private readonly Recovery? recovery = Settings.Persist ? new Recovery() : null;
     private string? problem;
 
     public MainWindow()
@@ -76,6 +77,41 @@ public sealed partial class MainWindow : Window
         Closing += OnClosing;
 
         SetSession(null);
+
+        if (recovery != null)
+        {
+            var autosave = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(2) };
+            autosave.Tick += (_, _) => recovery.Save(sessions);
+            autosave.Start();
+            Opened += (_, _) => _ = OfferRecovery();
+        }
+    }
+
+    private async Task OfferRecovery()
+    {
+        var abandoned = recovery!.FindAbandoned();
+        if (abandoned.Count == 0) return;
+        var names = string.Join("\n", abandoned.Select(e => $"• {e.Title} (autosaved {e.SavedAt:g})"));
+        var recover = await Dialogs.Prompts.Confirm(this, "Recover Unsaved Work",
+            $"Compositor did not close normally last time. These documents had unsaved changes:\n\n{names}\n\nRecover them? Choosing Cancel discards the autosaved copies.", "Recover");
+        foreach (var entry in abandoned)
+        {
+            if (recover)
+            {
+                try
+                {
+                    var restored = new EditorSession(Compositor.IO.ProjectFile.Load(entry.ProjectPath)) { SuggestedName = entry.Title + " (recovered)" };
+                    restored.MarkModified();
+                    AddSession(restored);
+                }
+                catch (Exception error)
+                {
+                    await Dialogs.Prompts.Alert(this, "Couldn't recover " + entry.Title, error.Message + "\n\nThe autosaved copy was kept at " + entry.ProjectPath);
+                    continue;
+                }
+            }
+            recovery.Discard(entry);
+        }
     }
 
     private static T AddAt<T>(Grid grid, T control, int column) where T : Control
@@ -177,6 +213,7 @@ public sealed partial class MainWindow : Window
         }
         var index = sessions.IndexOf(item);
         sessions.Remove(item);
+        recovery?.Forget(item);
         item.HistoryChanged -= RebuildTabs;
         if (lastToolSource == item) lastToolSource = null;
         if (item == session) SetSession(sessions.Count == 0 ? null : sessions[Math.Clamp(index, 0, sessions.Count - 1)]);

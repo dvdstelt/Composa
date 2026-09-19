@@ -413,6 +413,7 @@ public sealed partial class MainWindow
         {
             Busy(() => ProjectFile.Save(target.Document, path));
             target.MarkSaved(path);
+            recovery?.Forget(target);
             settings.AddRecent(Path.GetFullPath(path));
             return true;
         }

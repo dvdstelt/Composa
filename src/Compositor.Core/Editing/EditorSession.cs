@@ -44,6 +44,8 @@ public sealed partial class EditorSession
     public History History { get; } = new();
     public string? FilePath { get; set; }
     public bool IsModified { get; private set; }
+    /// <summary>Counts every change to the document, so autosave can tell whether anything happened since its last copy.</summary>
+    public int Revision { get; private set; }
     /// <summary>The name shown for a project that has not been saved yet.</summary>
     public string? SuggestedName { get; set; }
     public string Title => FilePath != null ? Path.GetFileNameWithoutExtension(FilePath) : SuggestedName ?? "Untitled";
@@ -118,6 +120,7 @@ public sealed partial class EditorSession
         History.Push(pendingName, pendingBefore);
         pendingBefore = null;
         IsModified = true;
+        Revision++;
         HistoryChanged?.Invoke();
     }
 
@@ -145,6 +148,7 @@ public sealed partial class EditorSession
         if (!CanUndo) return;
         if (History.Undo(document.Clone()) is { } state) Restore(state);
         IsModified = true;
+        Revision++;
         HistoryChanged?.Invoke();
     }
 
@@ -153,6 +157,7 @@ public sealed partial class EditorSession
         if (!CanRedo) return;
         if (History.Redo(document.Clone()) is { } state) Restore(state);
         IsModified = true;
+        Revision++;
         HistoryChanged?.Invoke();
     }
 
@@ -164,6 +169,14 @@ public sealed partial class EditorSession
         InvalidateAll();
         LayersChanged?.Invoke();
         SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Marks a document that did not come from a saved file (a recovered copy) as needing a save.</summary>
+    public void MarkModified()
+    {
+        IsModified = true;
+        Revision++;
+        HistoryChanged?.Invoke();
     }
 
     public void MarkSaved(string path)

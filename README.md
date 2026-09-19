@@ -53,6 +53,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
 - Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
+- Autosave for crash recovery: unsaved work is copied to `~/.cache/compositor/recovery` every two minutes and offered back after an unclean exit
 
 ## Differences from the macOS app
 
