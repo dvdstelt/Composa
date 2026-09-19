@@ -96,6 +96,7 @@ public sealed partial class EditorSession
         strokeOriginal = target;
         strokeMode = mode;
         SetTarget(layer, stroke.Working);
+        Pixels.SetLive(stroke.Working, true);
         if (lineFromLast && lastStrokeEnd is { } from) stroke.AddPoint(strokeToLayer.MapPoint(from));
         ContinueStroke(point);
         if (lineFromLast) Invalidate(AffectedArea(layer));
@@ -148,6 +149,7 @@ public sealed partial class EditorSession
 
     private void CloseStroke()
     {
+        if (stroke != null) { Pixels.SetLive(stroke.Working, false); Pixels.Invalidate(stroke.Working); }
         if (stroke?.CloneSource != null && !ReferenceEquals(stroke.CloneSource, strokeOriginal)) stroke.CloneSource.Dispose();
         stroke?.Dispose();
         stroke = null;

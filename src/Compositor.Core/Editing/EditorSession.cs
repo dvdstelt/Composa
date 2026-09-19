@@ -204,6 +204,13 @@ public sealed partial class EditorSession
         return new RenderOptions { Overrides = overrides };
     }
 
+    /// <summary>
+    /// Renders what a view shows straight from the layers, at the view's own resolution. The canvas uses this rather
+    /// than <see cref="Composite"/>, so its cost follows the screen size and not the document size.
+    /// </summary>
+    public void RenderView(SKBitmap target, SKRectI area, RenderView view) =>
+        DocumentRenderer.Render(document, target, area, view, SoloLayerId is { } solo ? SoloOptions(solo) : null);
+
     /// <summary>A fresh flattened copy, independent of the preview, for export and Copy Merged.</summary>
     public SKBitmap Flatten() => DocumentRenderer.Flatten(document);
 

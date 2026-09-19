@@ -8,6 +8,8 @@ using Avalonia.Skia;
 using Avalonia.Threading;
 using Compositor.Editing;
 using Compositor.Model;
+using Compositor.Rendering;
+using Geometry = Compositor.Model.Geometry;
 using Compositor.Selections;
 using SkiaSharp;
 
@@ -24,6 +26,13 @@ public sealed partial class CanvasView : Control
     private bool outlineStale = true;
     private float antsPhase;
     private readonly DispatcherTimer antsTimer;
+
+    // What is on screen, rendered straight from the layers at screen resolution. Its cost follows the window size,
+    // not the document size, which keeps 24-megapixel documents as responsive as small ones.
+    private SKBitmap? viewCache;
+    private (float Scale, SKRectI Document) viewKey;
+    private SKRectI viewDirty;
+    private bool viewStale = true;
 
     public CanvasView()
     {
@@ -69,6 +78,7 @@ public sealed partial class CanvasView : Control
             }
             outlineStale = true;
             fitPending = true;
+            viewStale = true;
             UpdateCursor();
             InvalidateVisual();
             ViewChanged?.Invoke();
@@ -77,6 +87,15 @@ public sealed partial class CanvasView : Control
 
     private void OnCanvasChanged(SKRectI? area)
     {
+        if (area is { } changed && !viewStale)
+        {
+            var (scale, shown) = viewKey;
+            var mapped = new SKRectI(
+                (int)Math.Floor((changed.Left - shown.Left) * scale) - 1, (int)Math.Floor((changed.Top - shown.Top) * scale) - 1,
+                (int)Math.Ceiling((changed.Right - shown.Left) * scale) + 1, (int)Math.Ceiling((changed.Bottom - shown.Top) * scale) + 1);
+            viewDirty = Geometry.Union(viewDirty, mapped);
+        }
+        else viewStale = true;
         if (area == null) outlineStale = true;
         InvalidateVisual();
         if (area == null) ViewChanged?.Invoke();
@@ -198,10 +217,10 @@ public sealed partial class CanvasView : Control
             outlineStale = false;
         }
         // Everything the render thread needs is captured here, on the UI thread.
-        var composite = session.Composite();
         var units = (float)UnitsPerPixel;
         var view = SKMatrix.CreateScale(units, units).PostConcat(SKMatrix.CreateTranslation((float)origin.X, (float)origin.Y));
         var documentRect = new SKRect(0, 0, session.Document.Width, session.Document.Height);
+        var (cache, cacheSource, cacheTarget) = UpdateViewCache(view, size);
         var overlay = CaptureOverlay(view);
         var grid = ShowPixelGrid && zoom >= 8;
         var nearest = zoom >= 1;
@@ -217,19 +236,46 @@ public sealed partial class CanvasView : Control
                 canvas.DrawRect(screenRect, shadow);
             DrawCheckerboard(canvas, screenRect);
 
-            canvas.Save();
-            canvas.Concat(in view);
-            using (var image = SKImage.FromPixels(composite.PeekPixels()))
+            if (cache != null)
             {
-                var sampling = nearest ? new SKSamplingOptions(SKFilterMode.Nearest) : new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
-                canvas.DrawImage(image, 0, 0, sampling);
+                canvas.Save();
+                canvas.ClipRect(screenRect);
+                using var image = SKImage.FromPixels(cache.PeekPixels());
+                canvas.DrawImage(image, cacheSource, cacheTarget, new SKSamplingOptions(nearest ? SKFilterMode.Nearest : SKFilterMode.Linear));
+                canvas.Restore();
             }
-            canvas.Restore();
 
             if (grid) DrawPixelGrid(canvas, view, documentRect, new SKRect(0, 0, (float)size.Width, (float)size.Height));
             if (outline != null) DrawAnts(canvas, outline, view, phase, scaling);
             overlay?.Invoke(canvas);
         }));
+    }
+
+    /// <summary>Brings the on-screen render up to date and returns it with the rectangles to draw it from and to.</summary>
+    private (SKBitmap? Cache, SKRect Source, SKRect Target) UpdateViewCache(SKMatrix view, Size size)
+    {
+        if (session == null || !view.TryInvert(out var inverse)) return (null, default, default);
+        var shown = Geometry.Intersect(Geometry.RoundOut(inverse.MapRect(new SKRect(0, 0, (float)size.Width, (float)size.Height))), session.Document.Bounds);
+        if (shown.IsEmpty) return (null, default, default);
+        // Zoomed out, the cache holds device pixels; zoomed in, it holds document pixels that are then enlarged crisply,
+        // so what is on screen is exactly what an export would contain.
+        var scale = (float)Math.Min(zoom, 1);
+        int width = Math.Max(1, (int)Math.Ceiling(shown.Width * scale)), height = Math.Max(1, (int)Math.Ceiling(shown.Height * scale));
+        if (viewCache == null || viewCache.Width < width || viewCache.Height < height)
+        {
+            // The old bitmap may still be in use by the render thread, so it is left to the garbage collector.
+            viewCache = Pixels.NewColor(Math.Max(width, viewCache?.Width ?? 0) + 64, Math.Max(height, viewCache?.Height ?? 0) + 64);
+            viewStale = true;
+        }
+        var key = (scale, shown);
+        var whole = new SKRectI(0, 0, width, height);
+        var dirty = viewStale || key != viewKey ? whole : Geometry.Intersect(viewDirty, whole);
+        viewKey = key;
+        viewStale = false;
+        viewDirty = SKRectI.Empty;
+        if (!dirty.IsEmpty) session.RenderView(viewCache, dirty, new RenderView(scale, new SKPoint(shown.Left, shown.Top)));
+        var target = view.MapRect(new SKRect(shown.Left, shown.Top, shown.Left + width / scale, shown.Top + height / scale));
+        return (viewCache, new SKRect(0, 0, width, height), target);
     }
 
     private static void DrawCheckerboard(SKCanvas canvas, SKRect rect)

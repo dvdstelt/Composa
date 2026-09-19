@@ -129,6 +129,7 @@ public sealed unsafe class BrushStroke : IDisposable
         return 0.5f * (1 + MathF.Cos(MathF.PI * t)) * edge;
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private SKRectI Dab(SKPoint center)
     {
         var rect = Geometry.Intersect(new SKRectI(
@@ -165,6 +166,7 @@ public sealed unsafe class BrushStroke : IDisposable
         return ((byte*)Selection.GetPixels())[(long)sy * Selection.RowBytes + sx] / 255f;
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private void Recompute(SKRectI rect)
     {
         if (mode == BrushMode.Blur && blurred == null) blurred = MakeBlurred();
@@ -240,6 +242,7 @@ public sealed unsafe class BrushStroke : IDisposable
     }
 
     // Smudge drags a buffer of paint along: each dab lays the carried pixels down, then picks up what was beneath.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private void Smudge(SKPoint center, SKRectI rect)
     {
         var size = (int)MathF.Ceiling(fullRadius * 2 + 3);
@@ -279,6 +282,7 @@ public sealed unsafe class BrushStroke : IDisposable
 
     // Liquify pushes pixels along the drag: every pixel under the brush is re-read from a little way back along the
     // movement, most strongly at the center.
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private SKRectI Push(SKPoint center, SKRectI rect)
     {
         var previous = lastDab;

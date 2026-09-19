@@ -30,15 +30,23 @@ public abstract record Adjustment
     /// <summary>Adjusts RGBA8888 premultiplied pixels in place.</summary>
     public void Apply(SKBitmap bitmap, int originX = 0, int originY = 0) => Apply(bitmap, new SKRectI(0, 0, bitmap.Width, bitmap.Height), originX, originY);
 
-    public unsafe void Apply(SKBitmap bitmap, SKRectI area, int originX = 0, int originY = 0)
+    /// <summary>
+    /// Adjusts an area of the bitmap. The bitmap's pixel (0,0) sits at document point (<paramref name="originX"/>,
+    /// <paramref name="originY"/>) and neighbouring pixels are <paramref name="step"/> document pixels apart, so
+    /// position-dependent adjustments (grain) keep their pattern fixed to the document at any zoom.
+    /// </summary>
+    public unsafe void Apply(SKBitmap bitmap, SKRectI area, double originX = 0, double originY = 0, double step = 1, bool parallel = true)
     {
         if (IsIdentity) return;
         area = Model.Geometry.Intersect(area, new SKRectI(0, 0, bitmap.Width, bitmap.Height));
         if (area.IsEmpty) return;
-        var op = CreateOp();
+        // Settings are immutable, so the per-pixel operation (often a lookup table) is built once per instance.
+        var op = Ops.GetValue(this, static adjustment => adjustment.CreateOp());
         var pixels = (byte*)bitmap.GetPixels();
         var stride = bitmap.RowBytes;
-        Parallel.For(area.Top, area.Bottom, y =>
+        // Fully optimized from the first call: tiered JIT would otherwise run this loop unoptimized for the first renders.
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
+        void Row(int y)
         {
             var row = pixels + (long)y * stride + area.Left * 4;
             for (var x = area.Left; x < area.Right; x++, row += 4)
@@ -53,7 +61,7 @@ public abstract record Adjustment
                     g = Math.Min(255, (row[1] * 255 + a / 2) / a);
                     b = Math.Min(255, (row[2] * 255 + a / 2) / a);
                 }
-                op.Invoke(ref r, ref g, ref b, x + originX, y + originY);
+                op.Invoke(ref r, ref g, ref b, (int)Math.Floor(originX + x * step), (int)Math.Floor(originY + y * step));
                 if (a == 255) { row[0] = (byte)r; row[1] = (byte)g; row[2] = (byte)b; }
                 else
                 {
@@ -62,8 +70,12 @@ public abstract record Adjustment
                     row[2] = (byte)((b * a + 127) / 255);
                 }
             }
-        });
+        }
+        if (parallel && (long)area.Width * area.Height > 200_000) Parallel.For(area.Top, area.Bottom, Row);
+        else for (var y = area.Top; y < area.Bottom; y++) Row(y);
     }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Adjustment, PixelOp> Ops = new();
 
     public static Adjustment Create(AdjustmentKind kind) => kind switch
     {
@@ -83,7 +95,7 @@ internal delegate void PixelOp(ref int r, ref int g, ref int b, int docX, int do
 internal static class Lut
 {
     public static PixelOp Op(byte[] red, byte[] green, byte[] blue) =>
-        (ref int r, ref int g, ref int b, int _, int _) => { r = red[r]; g = green[g]; b = blue[b]; };
+        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int _, int _) => { r = red[r]; g = green[g]; b = blue[b]; };
 
     public static byte ToByte(double unit) => (byte)Math.Clamp(Math.Round(unit * 255), 0, 255);
 }
@@ -292,7 +304,7 @@ public sealed record GradientMapAdjustment : Adjustment
             green[i] = (byte)Math.Round(dark.Green + (light.Green - dark.Green) * t);
             blue[i] = (byte)Math.Round(dark.Blue + (light.Blue - dark.Blue) * t);
         }
-        return (ref int r, ref int g, ref int b, int _, int _) =>
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int _, int _) =>
         {
             var luma = (r * 54 + g * 183 + b * 19) >> 8;
             r = red[luma]; g = green[luma]; b = blue[luma];
@@ -337,7 +349,7 @@ public sealed record GrainAdjustment : Adjustment
         var size = (float)Math.Clamp(Size, 0.5, 20);
         var rough = (float)(Math.Clamp(Roughness, 0, 100) / 100);
         var seed = Seed;
-        return (ref int r, ref int g, ref int b, int x, int y) =>
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int x, int y) =>
         {
             var noise = Smooth(x / size, y / size, seed) * (1 - rough) * 1.6f + Hash(x, y, seed ^ 0x9E3779B9u) * rough;
             var luma = (r * 54 + g * 183 + b * 19) / 65280f;
@@ -384,7 +396,7 @@ public sealed record HueSaturationAdjustment : Adjustment
         var shifts = Shifts;
         var colorize = Colorize;
         var anyRange = shifts.Skip(1).Any(s => !s.IsZero);
-        return (ref int r, ref int g, ref int b, int _, int _) =>
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int _, int _) =>
         {
             ColorMath.RgbToHsl(r / 255.0, g / 255.0, b / 255.0, out var h, out var s, out var l);
             var master = shifts[0];

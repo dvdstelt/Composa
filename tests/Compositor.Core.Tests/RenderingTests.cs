@@ -145,3 +145,50 @@ public class RenderingTests
         }
     }
 }
+
+public class ViewRenderingTests
+{
+    [Fact]
+    public void A_view_at_full_scale_matches_the_same_region_of_the_flattened_document()
+    {
+        var session = Editing.EditorSession.NewCanvas(300, 200, SKColors.White);
+        var photo = session.AddImageLayer("photo", TestImages.Gradient(120, 90), new SKPoint(140, 100));
+        photo.Transform = photo.Transform with { Rotation = 20 };
+        session.AddMask(photo);
+        session.AddAdjustmentLayer(new GrainAdjustment { Amount = 40, Seed = 7 });
+        session.AddAdjustmentLayer(new HueSaturationAdjustment().WithShift(HueRange.Master, new HslShift(60, 10, 0)));
+        session.Document.Layers[^1].Opacity = 0.6;
+
+        using var flat = session.Flatten();
+        using var view = Pixels.NewColor(100, 80);
+        session.RenderView(view, new SKRectI(0, 0, 100, 80), new RenderView(1, new SKPoint(90, 60)));
+        // Interior pixels are identical; along the rotated layer's antialiased edge Skia's coverage may differ by a
+        // few levels because the view's translation is folded into the matrix.
+        var differing = 0;
+        for (var y = 0; y < 80; y++)
+        for (var x = 0; x < 100; x++)
+        {
+            SKColor a = flat.GetPixel(x + 90, y + 60), b = view.GetPixel(x, y);
+            if (Math.Abs(a.Red - b.Red) > 2 || Math.Abs(a.Green - b.Green) > 2 || Math.Abs(a.Blue - b.Blue) > 2) differing++;
+        }
+        Assert.True(differing < 8000 * 0.02, $"{differing} pixels differ");
+    }
+
+    [Fact]
+    public void A_reduced_view_approximates_the_flattened_document_and_uses_the_pyramid()
+    {
+        var session = Editing.EditorSession.NewCanvas(1600, 1200, SKColors.White);
+        session.AddImageLayer("photo", TestImages.Solid(800, 600, SKColors.Red), new SKPoint(800, 600));
+        using var view = Pixels.NewColor(200, 150);
+        session.RenderView(view, new SKRectI(0, 0, 200, 150), new RenderView(0.125f, SKPoint.Empty));
+        TestImages.AssertColor(SKColors.Red, view.GetPixel(100, 75));
+        TestImages.AssertColor(SKColors.White, view.GetPixel(10, 10));
+        TestImages.AssertColor(SKColors.White, view.GetPixel(190, 140));
+
+        // Re-rendering only a dirty rectangle leaves the rest of the view untouched.
+        view.Erase(SKColors.Lime);
+        session.RenderView(view, new SKRectI(90, 60, 110, 90), new RenderView(0.125f, SKPoint.Empty));
+        TestImages.AssertColor(SKColors.Red, view.GetPixel(100, 75));
+        TestImages.AssertColor(SKColors.Lime, view.GetPixel(10, 10));
+    }
+}
