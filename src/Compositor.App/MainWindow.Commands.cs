@@ -206,7 +206,13 @@ public sealed partial class MainWindow
     private void OnWindowKeyDown(object? sender, KeyEventArgs e)
     {
         var focused = FocusManager?.GetFocusedElement();
-        if (focused is TextBox) return; // Text fields keep their own editing keys.
+        if (SwallowAlt(e)) return;
+        if (focused is TextBox)
+        {
+            // Text fields keep their own editing keys; Enter or Escape hands the keyboard back to the canvas.
+            if (e.Key is Key.Enter or Key.Escape && session != null) Avalonia.Threading.Dispatcher.UIThread.Post(() => canvas.Focus());
+            return;
+        }
         if (focused is Control control && control.FindAncestorOfType<MenuItem>() != null) return;
 
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
@@ -255,6 +261,18 @@ public sealed partial class MainWindow
                 break;
             default: e.Handled = false; break;
         }
+    }
+
+    /// <summary>
+    /// Alt is a tool modifier here (subtract from selection, clone source, pick color). Left alone, a bare Alt press
+    /// would hand keyboard focus to the menu bar and tool shortcuts would stop working after every Alt-click.
+    /// </summary>
+    private bool SwallowAlt(KeyEventArgs e)
+    {
+        if (session == null || e.Key is not (Key.LeftAlt or Key.RightAlt)) return false;
+        e.Handled = true;
+        canvas.InvalidateVisual();
+        return true;
     }
 
     private void DeletePressed()

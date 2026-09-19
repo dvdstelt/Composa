@@ -64,7 +64,7 @@ public sealed partial class MainWindow : Window
         layers.NewAdjustmentRequested += kind => _ = NewAdjustmentLayer(kind);
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
-        AddHandler(KeyUpEvent, (_, e) => canvas.HandleKeyUp(e), Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, (_, e) => { if (!SwallowAlt(e)) canvas.HandleKeyUp(e); }, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(DragDrop.DropEvent, OnDrop);
         DragDrop.SetAllowDrop(this, true);
         Closing += OnClosing;

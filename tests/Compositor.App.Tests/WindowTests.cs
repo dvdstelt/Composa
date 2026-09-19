@@ -114,3 +114,47 @@ public class WindowTests
         Assert.Equal(Tool.Marquee, session.Tool);
     }
 }
+
+public class KeyboardTests
+{
+    [AvaloniaFact]
+    public void A_bare_alt_press_does_not_steal_focus_for_the_menu()
+    {
+        var window = new MainWindow { Width = 1000, Height = 700 };
+        window.Show();
+        window.AddSession(EditorSession.NewCanvas(200, 200, SKColors.White));
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.AltLeft, RawInputModifiers.Alt);
+        window.KeyReleaseQwerty(PhysicalKey.AltLeft, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.None);
+        Assert.Equal(Tool.Brush, window.Session!.Tool);
+        Assert.False(window.FocusManager?.GetFocusedElement() is MenuItem);
+    }
+
+    [AvaloniaFact]
+    public void Tool_and_command_shortcuts_work()
+    {
+        var window = new MainWindow { Width = 1000, Height = 700 };
+        window.Show();
+        var session = EditorSession.NewCanvas(200, 200, SKColors.White);
+        window.AddSession(session);
+        Dispatcher.UIThread.RunJobs();
+        window.KeyPressQwerty(PhysicalKey.A, RawInputModifiers.Control);
+        Assert.NotNull(session.Selection);
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.Control);
+        Assert.Equal("Invert", session.History.UndoName);
+        window.KeyPressQwerty(PhysicalKey.D, RawInputModifiers.Control);
+        Assert.Null(session.Selection);
+        window.KeyPressQwerty(PhysicalKey.N, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Assert.Equal(2, session.Document.Layers.Count);
+        window.KeyPressQwerty(PhysicalKey.E, RawInputModifiers.Control);
+        Assert.Single(session.Document.Layers);
+        window.KeyPressQwerty(PhysicalKey.E, RawInputModifiers.None);
+        Assert.True(session.EraserMode);
+        window.KeyPressQwerty(PhysicalKey.BracketRight, RawInputModifiers.None);
+        Assert.Equal(45, session.Brush.Size);
+        window.KeyPressQwerty(PhysicalKey.Digit5, RawInputModifiers.None);
+        Assert.Equal(0.5, session.Brush.Opacity);
+    }
+}
