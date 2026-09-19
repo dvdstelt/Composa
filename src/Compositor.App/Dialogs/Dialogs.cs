@@ -192,11 +192,48 @@ public static class CanvasDialogs
         return (width, height, resolution);
     }
 
-    public static async Task<int?> JpegQuality(Window owner, int initial)
+    /// <summary>Picks the JPEG quality while showing what the compression does to the picture and how large the file gets.</summary>
+    public static async Task<int?> JpegQuality(Window owner, int initial, SKBitmap flattened)
     {
         var quality = initial;
-        var (row, _) = Ui.SliderRow("Quality", initial, 1, 100, v => quality = (int)v, sliderWidth: 220);
-        return await new DialogWindow("Export JPEG", row, "Export…").Ask(owner) ? quality : null;
+        var preview = new Image { Width = 520, Height = 340, Stretch = Stretch.Uniform };
+        var info = Ui.Label("Measuring…", Palette.Secondary);
+        var generation = 0;
+        var closed = false;
+        Task inFlight = Task.CompletedTask;
+        var timer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+
+        async void Refresh()
+        {
+            timer.Stop();
+            var mine = ++generation;
+            var q = quality;
+            info.Text = "Measuring…";
+            // Encoding a large photo takes a moment, so it runs off the UI thread; a newer request supersedes this one.
+            var work = Task.Run(() =>
+            {
+                var encoded = Compositor.IO.ImageFiles.Encode(flattened, Compositor.IO.ExportFormat.Jpeg, q);
+                using var decoded = SKBitmap.Decode(encoded);
+                return (encoded.LongLength, decoded == null ? null : Ui.ToAvaloniaBitmap(decoded, 1040));
+            });
+            inFlight = Task.WhenAll(inFlight, work);
+            var (bytes, shown) = await work;
+            if (closed || mine != generation) return;
+            if (shown != null) preview.Source = shown;
+            info.Text = $"{flattened.Width} × {flattened.Height} px · {(bytes >= 1024 * 1024 ? $"{bytes / 1048576.0:0.0} MB" : $"{bytes / 1024.0:0} KB")}";
+        }
+
+        timer.Tick += (_, _) => Refresh();
+        var (row, _) = Ui.SliderRow("Quality", initial, 1, 100, v => { quality = (int)v; timer.Stop(); timer.Start(); }, sliderWidth: 320);
+        var frame = new Border { Child = preview, Background = new SolidColorBrush(Color.Parse("#1A1A1A")), Padding = new Thickness(1) };
+        var dialog = new DialogWindow("Export JPEG", Ui.Column(12, frame, row, info), "Export…");
+        dialog.Opened += (_, _) => Refresh();
+        var accepted = await dialog.Ask(owner);
+        closed = true;
+        timer.Stop();
+        // The caller disposes the flattened bitmap next; no encode may still be reading it.
+        try { await inFlight; } catch (Exception) { /* A failed preview encode does not block the export itself. */ }
+        return accepted ? quality : null;
     }
 
     public static Grid Form(params (string Label, Control Field)[] rows)

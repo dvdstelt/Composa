@@ -94,6 +94,19 @@ public static class Ui
         ? new Border { Width = 1, Background = Palette.Divider, Margin = new Thickness(4, 6) }
         : new Border { Height = 1, Background = Palette.Divider };
 
+    /// <summary>Copies Skia pixels into an Avalonia bitmap, reduced to fit <paramref name="maxSide"/>.</summary>
+    public static Avalonia.Media.Imaging.Bitmap ToAvaloniaBitmap(SkiaSharp.SKBitmap source, int maxSide)
+    {
+        var scale = Math.Min(1, Math.Min((double)maxSide / source.Width, (double)maxSide / source.Height));
+        int w = Math.Max(1, (int)Math.Round(source.Width * scale)), h = Math.Max(1, (int)Math.Round(source.Height * scale));
+        using var small = new SkiaSharp.SKBitmap(new SkiaSharp.SKImageInfo(w, h, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul));
+        using (var canvas = new SkiaSharp.SKCanvas(small))
+        using (var image = SkiaSharp.SKImage.FromPixels(source.PeekPixels()))
+            canvas.DrawImage(image, new SkiaSharp.SKRect(0, 0, w, h), new SkiaSharp.SKSamplingOptions(SkiaSharp.SKFilterMode.Linear, SkiaSharp.SKMipmapMode.Linear));
+        return new Avalonia.Media.Imaging.Bitmap(Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul, small.GetPixels(),
+            new PixelSize(w, h), new Vector(96, 96), small.RowBytes);
+    }
+
     public static Color ToAvalonia(this SkiaSharp.SKColor c) => Color.FromArgb(c.Alpha, c.Red, c.Green, c.Blue);
     public static SkiaSharp.SKColor ToSkia(this Color c) => new(c.R, c.G, c.B, c.A);
 }

@@ -51,7 +51,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Canvas Size and Image Size
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
 - Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
-- Export PNG, JPEG and WebP; Copy Merged
+- Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
 
 ## Differences from the macOS app

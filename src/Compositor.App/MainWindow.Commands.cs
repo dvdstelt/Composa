@@ -423,7 +423,8 @@ public sealed partial class MainWindow
         if (session == null) return;
         if (format == ExportFormat.Jpeg)
         {
-            if (await CanvasDialogs.JpegQuality(this, jpegQuality) is not { } quality) return;
+            using var preview = session.Flatten();
+            if (await CanvasDialogs.JpegQuality(this, jpegQuality, preview) is not { } quality) return;
             jpegQuality = quality;
         }
         var extension = format switch { ExportFormat.Jpeg => "jpg", ExportFormat.Webp => "webp", _ => "png" };

@@ -91,3 +91,28 @@ public class TextToolTests
         Assert.Single(session.Document.Layers);
     }
 }
+
+public class JpegDialogTests
+{
+    [AvaloniaFact]
+    public async Task Jpeg_dialog_previews_and_reports_the_size()
+    {
+        var window = new MainWindow { Width = 1000, Height = 700 };
+        window.Show();
+        using var picture = new SKBitmap(new SKImageInfo(640, 420, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using (var canvas = new SKCanvas(picture))
+        {
+            using var shader = SKShader.CreateSweepGradient(new SKPoint(320, 210), [SKColors.Crimson, SKColors.Gold, SKColors.Teal, SKColors.Crimson]);
+            using var paint = new SKPaint { Shader = shader };
+            canvas.DrawPaint(paint);
+        }
+        var task = CanvasDialogs.JpegQuality(window, 60, picture);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows);
+        for (var i = 0; i < 40; i++) { await Task.Delay(25); Dispatcher.UIThread.RunJobs(); }
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "21-jpeg-export.png"));
+        dialog.Close(true);
+        Assert.Equal(60, await task);
+    }
+}
