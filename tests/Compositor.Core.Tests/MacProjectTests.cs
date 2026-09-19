@@ -65,3 +65,30 @@ public class MacProjectTests
         finally { Directory.Delete(Path.GetDirectoryName(folder)!, recursive: true); }
     }
 }
+
+public class ImageMagickFallbackTests
+{
+    [Fact]
+    public void Tiff_opens_through_imagemagick_when_it_is_installed()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "compositor-tests-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(folder);
+        try
+        {
+            var png = Path.Combine(folder, "source.png");
+            var tiff = Path.Combine(folder, "source.tiff");
+            using (var red = TestImages.Solid(12, 8, SKColors.Red)) ImageFiles.Save(red, png, ExportFormat.Png);
+            try
+            {
+                using var convert = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("magick", [png, tiff]) { RedirectStandardError = true });
+                convert!.WaitForExit();
+            }
+            catch (System.ComponentModel.Win32Exception) { return; } // ImageMagick is not installed here.
+            if (!File.Exists(tiff)) return;
+            using var loaded = ImageFiles.Load(tiff);
+            Assert.Equal((12, 8), (loaded.Width, loaded.Height));
+            TestImages.AssertColor(SKColors.Red, loaded.GetPixel(3, 3));
+        }
+        finally { Directory.Delete(folder, recursive: true); }
+    }
+}

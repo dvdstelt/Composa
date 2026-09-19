@@ -14,14 +14,50 @@ public static class ImageFiles
     /// <summary>Decodes an image file to RGBA premultiplied pixels, upright according to its EXIF orientation.</summary>
     public static SKBitmap Load(string path)
     {
-        using var stream = File.OpenRead(path);
-        return Load(stream, Path.GetFileName(path));
+        try
+        {
+            using var stream = File.OpenRead(path);
+            return Load(stream, Path.GetFileName(path));
+        }
+        catch (InvalidDataException) when (ConvertWithImageMagick(path) is { } converted)
+        {
+            // Skia has no HEIC, AVIF or TIFF decoder; ImageMagick, when installed, fills the gap.
+            using var stream = new MemoryStream(converted);
+            return Load(stream, Path.GetFileName(path));
+        }
+    }
+
+    private static byte[]? ConvertWithImageMagick(string path)
+    {
+        foreach (var tool in new[] { "magick", "convert" })
+        {
+            try
+            {
+                var start = new System.Diagnostics.ProcessStartInfo(tool) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+                start.ArgumentList.Add(path + "[0]");
+                start.ArgumentList.Add("-auto-orient");
+                start.ArgumentList.Add("png:-");
+                using var process = System.Diagnostics.Process.Start(start);
+                if (process == null) continue;
+                using var output = new MemoryStream();
+                var errors = process.StandardError.ReadToEndAsync();
+                process.StandardOutput.BaseStream.CopyTo(output);
+                process.WaitForExit(60_000);
+                _ = errors.Result;
+                if (process.ExitCode == 0 && output.Length > 0) return output.ToArray();
+            }
+            catch (Exception error) when (error is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
+            {
+                // The tool is not installed or could not run; try the next one, then report the original decode error.
+            }
+        }
+        return null;
     }
 
     public static SKBitmap Load(Stream stream, string name = "image")
     {
         using var codec = SKCodec.Create(stream, out var status)
-            ?? throw new InvalidDataException($"{name} could not be read ({status}). Supported formats are PNG, JPEG, WebP, BMP and GIF.");
+            ?? throw new InvalidDataException($"{name} could not be read ({status}). Supported formats are PNG, JPEG, WebP, BMP and GIF; HEIC, AVIF and TIFF open when ImageMagick is installed.");
         var info = codec.Info;
         if ((long)info.Width * info.Height > MaxPixels || info.Width > Model.Document.MaxSide || info.Height > Model.Document.MaxSide)
             throw new InvalidDataException($"{name} is larger than the supported 100 megapixels.");

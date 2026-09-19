@@ -49,7 +49,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Crop with snapping, Shift to keep proportions, Alt for symmetric cropping; Trim
 - Canvas Size and Image Size
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
-- Open PNG, JPEG, WebP, BMP and GIF; drop files onto the window; paste images from other apps
+- Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
 - Export PNG, JPEG and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
 
@@ -57,7 +57,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 
 - Projects are saved as `.compositor` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
 - Remove Background clears a plain backdrop connected to the image's edges. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent.
-- HEIC and TIFF cannot be opened, because Skia does not decode them. Convert them first.
+- HEIC, AVIF and TIFF open only when ImageMagick (`magick` or `convert`) is installed, because Skia does not decode them itself.
 - There is no auto-update.
 
 ## Requirements
