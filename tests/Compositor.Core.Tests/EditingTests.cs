@@ -388,3 +388,40 @@ public class EditingTests
         }
     }
 }
+
+public class FloatingSelectionTests
+{
+    [Fact]
+    public void Moving_selected_pixels_cuts_them_out_and_takes_the_selection_along()
+    {
+        var session = EditorSession.NewCanvas(60, 40, SKColors.White);
+        session.SelectRect(new SKRect(5, 5, 15, 15));
+        session.Fill(SKColors.Red);
+        Assert.True(session.BeginMovePixels(duplicate: false));
+        session.MovePixelsBy(30, 10);
+        session.EndMovePixels(keep: true);
+        Assert.Equal(0, session.Composite().GetPixel(10, 10).Alpha);
+        TestImages.AssertColor(SKColors.Red, session.Composite().GetPixel(40, 20));
+        Assert.Equal(new SKRectI(35, 15, 45, 25), SelectionMask.Bounds(session.Selection!));
+        session.Undo();
+        TestImages.AssertColor(SKColors.Red, session.Composite().GetPixel(10, 10));
+        Assert.Equal(new SKRectI(5, 5, 15, 15), SelectionMask.Bounds(session.Selection!));
+    }
+
+    [Fact]
+    public void Duplicating_keeps_the_original_and_cancel_restores_everything()
+    {
+        var session = EditorSession.NewCanvas(60, 40, SKColors.White);
+        session.SelectRect(new SKRect(5, 5, 15, 15));
+        session.Fill(SKColors.Blue);
+        session.BeginMovePixels(duplicate: true);
+        session.MovePixelsBy(30, 0);
+        session.EndMovePixels(keep: true);
+        TestImages.AssertColor(SKColors.Blue, session.Composite().GetPixel(10, 10));
+        TestImages.AssertColor(SKColors.Blue, session.Composite().GetPixel(40, 10));
+        session.BeginMovePixels(duplicate: false);
+        session.MovePixelsBy(0, 20);
+        session.EndMovePixels(keep: false);
+        TestImages.AssertColor(SKColors.Blue, session.Composite().GetPixel(40, 10));
+    }
+}

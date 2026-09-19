@@ -10,7 +10,7 @@ namespace Compositor.App.Controls;
 
 public sealed partial class CanvasView
 {
-    private enum Drag { None, Pan, Marquee, MoveSelection, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub }
+    private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub }
 
     private Drag drag;
     private Point pressScreen, cursorScreen;
@@ -49,6 +49,7 @@ public sealed partial class CanvasView
         {
             case Drag.Stroke: session.CancelStroke(); break;
             case Drag.Transform: session.CancelTransform(); break;
+            case Drag.MovePixels: session.EndMovePixels(keep: false); break;
             case Drag.Gradient: session.Cancel(); gradientOriginal = null; break;
         }
         drag = Drag.None;
@@ -116,10 +117,12 @@ public sealed partial class CanvasView
         switch (session.Tool)
         {
             case Tool.Move:
-                BeginMove(control, e.ClickCount);
+                if (session.CanMovePixels && InsideSelection(pressDocument) && session.BeginMovePixels(duplicate: alt)) drag = Drag.MovePixels;
+                else BeginMove(control, e.ClickCount);
                 break;
             case Tool.Marquee:
-                dragMode = ModeFor(e.KeyModifiers);
+                dragMode = ModeFor(e.KeyModifiers & ~KeyModifiers.Control);
+                if (control && InsideSelection(pressDocument) && session.BeginMovePixels(duplicate: alt)) { drag = Drag.MovePixels; break; }
                 drag = dragMode == SelectionMode.Replace && InsideSelection(pressDocument) ? Drag.MoveSelection : Drag.Marquee;
                 break;
             case Tool.Lasso:
@@ -199,6 +202,11 @@ public sealed partial class CanvasView
                 if (polygon.Count == 0 || Distance(ToScreen(polygon[^1]), position) >= 2) polygon.Add(currentDocument);
                 break;
             case Drag.Crop: DragCrop(shift, alt); break;
+            case Drag.MovePixels:
+                float mx = currentDocument.X - pressDocument.X, my = currentDocument.Y - pressDocument.Y;
+                if (shift) { if (Math.Abs(mx) > Math.Abs(my)) my = 0; else mx = 0; }
+                session.MovePixelsBy((int)Math.Round(mx), (int)Math.Round(my));
+                break;
             case Drag.Transform: DragTransform(shift, alt, e.KeyModifiers.HasFlag(KeyModifiers.Control)); break;
             case Drag.Gradient:
                 if (gradientLayer != null && gradientOriginal != null) session.DrawGradient(gradientLayer, gradientOriginal, pressDocument, ConstrainAngle(currentDocument, shift));
@@ -248,6 +256,7 @@ public sealed partial class CanvasView
                 if (cropRect is { } crop && (crop.Width < 1 || crop.Height < 1)) cropRect = null;
                 ToolStateChanged?.Invoke();
                 break;
+            case Drag.MovePixels: session.EndMovePixels(keep: moved); break;
             case Drag.Transform:
                 guides.Clear();
                 if (moved) session.CommitTransform(); else session.CancelTransform();
