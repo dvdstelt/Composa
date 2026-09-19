@@ -11,6 +11,8 @@ public sealed class History
     private readonly List<(string Name, Document State)> undo = [];
     private readonly List<(string Name, Document State)> redo = [];
 
+    private int sinceCollect;
+
     public long MemoryBudget { get; set; } = 3L * 1024 * 1024 * 1024;
     public int MaxEntries { get; set; } = 100;
 
@@ -60,8 +62,12 @@ public sealed class History
 
     private void Trim()
     {
-        while (undo.Count > MaxEntries) undo.RemoveAt(0);
-        while (undo.Count > 1 && HeldBytes() > MemoryBudget) undo.RemoveAt(0);
+        var dropped = false;
+        while (undo.Count > MaxEntries) { undo.RemoveAt(0); dropped = true; }
+        while (undo.Count > 1 && HeldBytes() > MemoryBudget) { undo.RemoveAt(0); dropped = true; }
+        // Bitmaps live in native memory the garbage collector cannot see, so it gets a nudge when history lets go of
+        // some; they cannot simply be disposed here because newer snapshots may still share them.
+        if (dropped && ++sinceCollect >= 8) { sinceCollect = 0; GC.Collect(2, GCCollectionMode.Optimized, blocking: false); }
     }
 
     private long HeldBytes()
