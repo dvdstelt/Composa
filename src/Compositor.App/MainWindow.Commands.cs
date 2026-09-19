@@ -118,6 +118,8 @@ public sealed partial class MainWindow
             Item("Image Size…", () => _ = ImageSize(), Key.I, ctrl | alt),
             Item("Trim Transparent Edges", () => { session!.TrimCanvas(); canvas.Fit(); }),
             Line(),
+            Item("Rotate Canvas 90° Clockwise", () => { session!.RotateCanvas(true); canvas.Fit(); }),
+            Item("Rotate Canvas 90° Counterclockwise", () => { session!.RotateCanvas(false); canvas.Fit(); }),
             Item("Flip Canvas Horizontal", () => session!.FlipCanvas(true)),
             Item("Flip Canvas Vertical", () => session!.FlipCanvas(false)));
 
@@ -149,6 +151,9 @@ public sealed partial class MainWindow
             Line(),
             Item("Edit Text…", () => _ = EditText(default, session!.ActiveLayer), enabled: () => session!.ActiveLayer?.Text != null),
             Item("Rasterize Layer", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.IsLive == true),
+            Item("Rotate Layer 90° Clockwise", () => session!.RotateLayers(90)),
+            Item("Rotate Layer 90° Counterclockwise", () => session!.RotateLayers(-90)),
+            Item("Rotate Layer 180°", () => session!.RotateLayers(180)),
             Item("Flip Layer Horizontal", () => session!.FlipLayers(true)),
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 

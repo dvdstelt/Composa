@@ -130,6 +130,56 @@ public sealed partial class EditorSession
         SelectionChanged?.Invoke();
     }
 
+    /// <summary>Turns the whole document a quarter turn. Layers keep their pixels; only their placement changes.</summary>
+    public void RotateCanvas(bool clockwise)
+    {
+        int width = document.Width, height = document.Height;
+        Apply(clockwise ? "Rotate Canvas 90° Clockwise" : "Rotate Canvas 90° Counterclockwise", () =>
+        {
+            // Clockwise: (x, y) → (height - y, x). Counterclockwise: (x, y) → (y, width - x).
+            var turn = clockwise ? new SKMatrix(0, -1, height, 1, 0, 0, 0, 0, 1) : new SKMatrix(0, 1, 0, -1, 0, width, 0, 0, 1);
+            foreach (var layer in document.AllLayers())
+            {
+                if (layer.Pixels != null)
+                {
+                    var t = layer.Transform;
+                    var center = turn.MapPoint(t.Center);
+                    var rotation = t.Rotation + (clockwise ? 90 : -90);
+                    if (rotation > 180) rotation -= 360;
+                    if (rotation <= -180) rotation += 360;
+                    layer.Transform = t with { X = center.X - t.Width / 2, Y = center.Y - t.Height / 2, Rotation = rotation };
+                }
+                else if (layer.Mask != null) layer.Mask = RemapDocumentMask(layer.Mask, height, width, turn, 255);
+            }
+            if (document.Selection != null) document.Selection = SelectionMask.Remap(document.Selection, height, width, turn);
+            document.Width = height;
+            document.Height = width;
+        });
+        composite = null;
+        InvalidateAll();
+        LayersChanged?.Invoke();
+        SelectionChanged?.Invoke();
+    }
+
+    /// <summary>Turns the selected layers in place, each around its own center.</summary>
+    public void RotateLayers(double degrees)
+    {
+        var layers = SelectedRoots().SelectMany(r => Document.Flatten([r])).Where(l => l.Pixels != null).ToList();
+        if (layers.Count == 0) return;
+        Apply("Rotate Layer", () =>
+        {
+            foreach (var layer in layers)
+            {
+                var rotation = (layer.Transform.Rotation + degrees) % 360;
+                if (rotation > 180) rotation -= 360;
+                if (rotation <= -180) rotation += 360;
+                layer.Transform = layer.Transform with { Rotation = rotation };
+            }
+        });
+        InvalidateAll();
+        LayersChanged?.Invoke();
+    }
+
     /// <summary>Flips the selected layers in place, each around its own center.</summary>
     public void FlipLayers(bool horizontally)
     {

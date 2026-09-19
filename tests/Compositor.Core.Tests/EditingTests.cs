@@ -495,3 +495,28 @@ public class TextLayerTests
         session.EndStroke();
     }
 }
+
+public class RotateCanvasTests
+{
+    [Fact]
+    public void Rotating_the_canvas_clockwise_moves_the_top_left_to_the_top_right()
+    {
+        var session = EditorSession.NewCanvas(60, 40, SKColors.White);
+        session.AddImageLayer("dot", TestImages.Solid(10, 10, SKColors.Red), new SKPoint(5, 5));
+        session.SelectRect(new SKRect(0, 0, 10, 10));
+        session.RotateCanvas(clockwise: true);
+        Assert.Equal((40, 60), (session.Document.Width, session.Document.Height));
+        TestImages.AssertColor(SKColors.Red, session.Composite().GetPixel(35, 5));
+        TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(5, 5));
+        TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(20, 50));
+        Assert.Equal(new SKRectI(30, 0, 40, 10), SelectionMask.Bounds(session.Selection!, 128));
+
+        session.RotateCanvas(clockwise: false);
+        Assert.Equal((60, 40), (session.Document.Width, session.Document.Height));
+        TestImages.AssertColor(SKColors.Red, session.Composite().GetPixel(5, 5));
+        session.Undo();
+        session.Undo();
+        Assert.Equal(60, session.Document.Width);
+        Assert.Equal(0, session.Document.Layers[1].Transform.Rotation);
+    }
+}

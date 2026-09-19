@@ -48,7 +48,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 ### Canvas and files
 - Multiple projects in tabs
 - Crop with snapping, Shift to keep proportions, Alt for symmetric cropping; Trim
-- Canvas Size and Image Size
+- Canvas Size, Image Size, and quarter-turn rotation of the canvas or of single layers
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
 - Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
 - Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
