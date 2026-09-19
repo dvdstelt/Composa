@@ -9,7 +9,7 @@ public enum Tool { Move, Marquee, Lasso, Wand, Crop, Brush, SpotHealing, CloneSt
 
 public enum MarqueeKind { Rectangle, Ellipse }
 public enum LassoKind { Freehand, Polygonal }
-public enum SmearMode { Blur, Smudge, Dodge, Burn }
+public enum SmearMode { Liquify, Blur, Smudge, Dodge, Burn }
 
 /// <summary>
 /// One open project: the document, its undo history, the flattened preview, and every editing command. It has no

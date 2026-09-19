@@ -212,7 +212,7 @@ public sealed partial class MainWindow : Window
         (Tool.Move, Icons.Move, "Move / Transform (V)"), (Tool.Marquee, Icons.Marquee, "Marquee (M) · press again for Ellipse"),
         (Tool.Lasso, Icons.Lasso, "Lasso (L) · press again for Polygonal"), (Tool.Wand, Icons.Wand, "Magic Wand (W)"), (Tool.Crop, Icons.Crop, "Crop (C)"),
         (Tool.Brush, Icons.Brush, "Brush (B) · Eraser (E)"), (Tool.SpotHealing, Icons.Heal, "Spot Healing Brush (J)"),
-        (Tool.CloneStamp, Icons.Stamp, "Clone Stamp (S) · Alt-click sets the source"), (Tool.Smear, Icons.Drop, "Smear: Blur, Smudge, Dodge, Burn (R)"),
+        (Tool.CloneStamp, Icons.Stamp, "Clone Stamp (S) · Alt-click sets the source"), (Tool.Smear, Icons.Drop, "Smear: Liquify, Blur, Smudge, Dodge, Burn (R)"),
         (Tool.Gradient, Icons.Gradient, "Gradient (G)"), (Tool.Shape, Icons.Shape, "Shape (U) · Shift+U switches shape"),
         (Tool.Eyedropper, Icons.Eyedropper, "Eyedropper (I)"), (Tool.Hand, Icons.Hand, "Hand (H) · hold Space with any tool"), (Tool.Zoom, Icons.Zoom, "Zoom (Z)")
     ];
@@ -332,7 +332,7 @@ public sealed partial class MainWindow : Window
         Tool.Brush => (s.EraserMode ? "Drag to erase" : "Drag to paint · Alt-click picks a color") + " · Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity",
         Tool.SpotHealing => "Drag over blemishes to heal · [ ] size",
         Tool.CloneStamp => "Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity",
-        Tool.Smear => "Drag to " + s.SmearMode.ToString().ToLowerInvariant() + " · [ ] size · 1–0 strength",
+        Tool.Smear => "Drag to " + (s.SmearMode == SmearMode.Liquify ? "push pixels" : s.SmearMode.ToString().ToLowerInvariant()) + " · [ ] size · 1–0 strength",
         Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Shift snaps to 45°",
         Tool.Shape => "Drag to draw a shape on a new layer · Shift square · Alt from center",
         Tool.Eyedropper => "Click to pick the foreground color · Alt-click for the background",

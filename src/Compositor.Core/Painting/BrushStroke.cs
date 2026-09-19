@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace Compositor.Painting;
 
-public enum BrushMode { Paint, Erase, Clone, Heal, Blur, Smudge, Dodge, Burn }
+public enum BrushMode { Paint, Erase, Clone, Heal, Blur, Smudge, Dodge, Burn, Liquify }
 
 public sealed record BrushSettings
 {
@@ -38,6 +38,7 @@ public sealed unsafe class BrushStroke : IDisposable
     private float[]? carry;
     private int carrySize;
     private SKPoint? last;
+    private SKPoint? lastDab;
     private float residual;
 
     /// <summary>The bitmap being painted; becomes the layer's new pixels when the stroke commits.</summary>
@@ -125,6 +126,7 @@ public sealed unsafe class BrushStroke : IDisposable
             (int)MathF.Ceiling(center.X + radius + 1), (int)MathF.Ceiling(center.Y + radius + 1)), new SKRectI(0, 0, width, height));
         if (rect.IsEmpty) return rect;
         if (mode == BrushMode.Smudge) { Smudge(center, rect); return rect; }
+        if (mode == BrushMode.Liquify) return Push(center, rect);
 
         var changed = false;
         for (var y = rect.Top; y < rect.Bottom; y++)
@@ -263,6 +265,47 @@ public sealed unsafe class BrushStroke : IDisposable
                 if (c > 0) dst[index + i] = (byte)Math.Clamp(under + (carry[slot + i] - under) * c + 0.5f, 0, 255);
             }
         }
+    }
+
+    // Liquify pushes pixels along the drag: every pixel under the brush is re-read from a little way back along the
+    // movement, most strongly at the center.
+    private SKRectI Push(SKPoint center, SKRectI rect)
+    {
+        var previous = lastDab;
+        lastDab = center;
+        if (previous is not { } from) return SKRectI.Empty;
+        float dx = center.X - from.X, dy = center.Y - from.Y;
+        if (dx == 0 && dy == 0) return SKRectI.Empty;
+        var strength = (float)Math.Clamp(settings.Opacity, 0, 1);
+        var reach = (int)MathF.Ceiling(MathF.Max(MathF.Abs(dx), MathF.Abs(dy))) + 2;
+        var area = Geometry.Intersect(new SKRectI(rect.Left - reach, rect.Top - reach, rect.Right + reach, rect.Bottom + reach), new SKRectI(0, 0, width, height));
+        int aw = area.Width, ah = area.Height;
+        var dst = (byte*)Working.GetPixels();
+        var stride = Working.RowBytes;
+        var snapshot = new byte[aw * ah * bytesPerPixel];
+        for (var y = 0; y < ah; y++)
+            fixed (byte* row = &snapshot[y * aw * bytesPerPixel])
+                Buffer.MemoryCopy(dst + (long)(y + area.Top) * stride + (long)area.Left * bytesPerPixel, row, aw * bytesPerPixel, aw * bytesPerPixel);
+
+        for (var y = rect.Top; y < rect.Bottom; y++)
+        for (var x = rect.Left; x < rect.Right; x++)
+        {
+            float px = x + 0.5f - center.X, py = y + 0.5f - center.Y;
+            var weight = Falloff(MathF.Sqrt(px * px + py * py)) * strength * SelectionAt(x, y);
+            if (weight <= 0) continue;
+            float sx = x - dx * weight - area.Left, sy = y - dy * weight - area.Top;
+            int x0 = (int)MathF.Floor(sx), y0 = (int)MathF.Floor(sy);
+            float tx = sx - x0, ty = sy - y0;
+            int xa = Math.Clamp(x0, 0, aw - 1), xb = Math.Clamp(x0 + 1, 0, aw - 1), ya = Math.Clamp(y0, 0, ah - 1), yb = Math.Clamp(y0 + 1, 0, ah - 1);
+            var index = (long)y * stride + x * bytesPerPixel;
+            for (var i = 0; i < bytesPerPixel; i++)
+            {
+                var top = snapshot[(ya * aw + xa) * bytesPerPixel + i] * (1 - tx) + snapshot[(ya * aw + xb) * bytesPerPixel + i] * tx;
+                var bottom = snapshot[(yb * aw + xa) * bytesPerPixel + i] * (1 - tx) + snapshot[(yb * aw + xb) * bytesPerPixel + i] * tx;
+                dst[index + i] = (byte)Math.Clamp(top * (1 - ty) + bottom * ty + 0.5f, 0, 255);
+            }
+        }
+        return rect;
     }
 
     /// <summary>The painted coverage as an Alpha8 mask, for tools that finish their work after the drag (healing).</summary>

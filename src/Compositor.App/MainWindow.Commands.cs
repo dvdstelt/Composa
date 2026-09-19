@@ -242,7 +242,7 @@ public sealed partial class MainWindow
             case Key.J: SelectTool(Tool.SpotHealing); break;
             case Key.S: SelectTool(Tool.CloneStamp); break;
             case Key.R:
-                if (session.Tool == Tool.Smear) session.SmearMode = (SmearMode)(((int)session.SmearMode + 1) % 4);
+                if (session.Tool == Tool.Smear) session.SmearMode = (SmearMode)(((int)session.SmearMode + 1) % 5);
                 SelectTool(Tool.Smear);
                 break;
             case Key.G: SelectTool(Tool.Gradient); break;

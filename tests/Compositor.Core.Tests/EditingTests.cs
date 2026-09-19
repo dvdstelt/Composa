@@ -425,3 +425,26 @@ public class FloatingSelectionTests
         TestImages.AssertColor(SKColors.Blue, session.Composite().GetPixel(40, 10));
     }
 }
+
+public class LiquifyTests
+{
+    [Fact]
+    public void Liquify_pushes_an_edge_along_the_drag()
+    {
+        var session = EditorSession.NewCanvas(200, 100, SKColors.White);
+        session.SelectRect(new SKRect(0, 0, 100, 100));
+        session.Fill(SKColors.Black);
+        session.Deselect();
+        session.Tool = Tool.Smear;
+        session.SmearMode = SmearMode.Liquify;
+        session.Brush = new BrushSettings { Size = 60, Hardness = 0.5, Opacity = 1 };
+        TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(112, 50));
+        Assert.True(session.BeginStroke(new SKPoint(90, 50), out _));
+        for (var x = 92; x <= 130; x += 2) session.ContinueStroke(new SKPoint(x, 50));
+        session.EndStroke();
+        Assert.True(session.Composite().GetPixel(112, 50).Red < 60, "the black edge should have been pushed to the right");
+        TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(112, 5));
+        session.Undo();
+        TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(112, 50));
+    }
+}

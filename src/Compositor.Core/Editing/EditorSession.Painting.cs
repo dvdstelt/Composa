@@ -38,7 +38,7 @@ public sealed partial class EditorSession
         Tool.CloneStamp => BrushMode.Clone,
         Tool.Smear => SmearMode switch
         {
-            SmearMode.Smudge => BrushMode.Smudge, SmearMode.Dodge => BrushMode.Dodge, SmearMode.Burn => BrushMode.Burn, _ => BrushMode.Blur
+            SmearMode.Liquify => BrushMode.Liquify, SmearMode.Smudge => BrushMode.Smudge, SmearMode.Dodge => BrushMode.Dodge, SmearMode.Burn => BrushMode.Burn, _ => BrushMode.Blur
         },
         _ => EraserMode ? BrushMode.Erase : BrushMode.Paint
     };
@@ -58,7 +58,7 @@ public sealed partial class EditorSession
         Begin(mode switch
         {
             BrushMode.Erase => "Eraser", BrushMode.Clone => "Clone Stamp", BrushMode.Heal => "Spot Healing Brush",
-            BrushMode.Blur => "Blur", BrushMode.Smudge => "Smudge", BrushMode.Dodge => "Dodge", BrushMode.Burn => "Burn", _ => "Brush"
+            BrushMode.Liquify => "Liquify", BrushMode.Blur => "Blur", BrushMode.Smudge => "Smudge", BrushMode.Dodge => "Dodge", BrushMode.Burn => "Burn", _ => "Brush"
         });
         if (!IsEditingMask) EnsureCoversCanvas(layer);
         var target = Target(layer);
