@@ -13,7 +13,7 @@ namespace Compositor.App.Tests;
 
 public class WindowTests
 {
-    private static readonly string Shots = Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/screenshots");
+    internal static readonly string Shots = Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/screenshots");
 
     private static void Capture(Window window, string name)
     {

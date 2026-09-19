@@ -98,12 +98,30 @@ public static class DocumentRenderer
     {
         area = Geometry.Intersect(area, document.Bounds);
         if (area.IsEmpty) return;
-        using var tile = new Tile(area);
-        RenderNodes(document.Layers, tile, options);
-        using var canvas = new SKCanvas(target);
-        using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
-        tile.DrawOnto(canvas, paint);
+        // Skia's raster backend draws on one thread, so large areas are split into bands rendered side by side.
+        // Every layer operation is per-pixel, which makes the bands independent of each other.
+        var bands = (long)area.Width * area.Height < 400_000 ? 1 : Math.Clamp(area.Height / 64, 1, Environment.ProcessorCount);
+        var bandHeight = (area.Height + bands - 1) / bands;
+        Parallel.For(0, bands, band =>
+        {
+            var top = area.Top + band * bandHeight;
+            var part = new SKRectI(area.Left, top, area.Right, Math.Min(area.Bottom, top + bandHeight));
+            if (part.Height <= 0) return;
+            using var tile = new Tile(part);
+            RenderNodes(document.Layers, tile, options);
+            tile.Canvas.Flush();
+            CopyRows(tile.Bitmap, target, part);
+        });
         Pixels.Invalidate(target);
+    }
+
+    private static unsafe void CopyRows(SKBitmap from, SKBitmap to, SKRectI area)
+    {
+        var source = (byte*)from.GetPixels();
+        var destination = (byte*)to.GetPixels();
+        long bytes = (long)area.Width * 4;
+        for (var y = 0; y < area.Height; y++)
+            Buffer.MemoryCopy(source + (long)y * from.RowBytes, destination + (long)(y + area.Top) * to.RowBytes + (long)area.Left * 4, bytes, bytes);
     }
 
     /// <summary>Renders only the given layers (and their clipped followers), for merges and copies.</summary>
