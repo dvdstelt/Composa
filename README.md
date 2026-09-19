@@ -54,7 +54,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 
 ## Differences from the macOS app
 
-- Projects are saved as `.compositor` files: a zip archive with a JSON manifest and one PNG per layer and mask. The macOS `.comp` package format is not read or written yet.
+- Projects are saved as `.compositor` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
 - Remove Background clears a plain backdrop connected to the image's edges. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent.
 - HEIC and TIFF cannot be opened, because Skia does not decode them. Convert them first.
 - The Liquify mode of the Smear tool is not implemented; Dodge and Burn are offered in its place.

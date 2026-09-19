@@ -44,7 +44,9 @@ public sealed partial class EditorSession
     public History History { get; } = new();
     public string? FilePath { get; set; }
     public bool IsModified { get; private set; }
-    public string Title => FilePath != null ? Path.GetFileNameWithoutExtension(FilePath) : "Untitled";
+    /// <summary>The name shown for a project that has not been saved yet.</summary>
+    public string? SuggestedName { get; set; }
+    public string Title => FilePath != null ? Path.GetFileNameWithoutExtension(FilePath) : SuggestedName ?? "Untitled";
 
     // Tool state shared with the UI.
     public Tool Tool { get; set; } = Tool.Move;

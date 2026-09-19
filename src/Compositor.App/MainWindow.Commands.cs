@@ -62,6 +62,7 @@ public sealed partial class MainWindow
         Top("_File",
             Item("New Canvas…", () => _ = NewCanvas(), Key.N, ctrl, needsDocument: false),
             Item("Open…", () => _ = Open(), Key.O, ctrl, needsDocument: false),
+            Item("Open macOS Project Folder (.comp)…", () => _ = OpenMacProject(), needsDocument: false),
             Item("Place Images as Layers…", () => _ = PlaceImages()),
             Line(),
             Item("Save", () => _ = Save(session!, false), Key.S, ctrl),
@@ -308,7 +309,12 @@ public sealed partial class MainWindow
             try
             {
                 if (sessions.FirstOrDefault(s => s.FilePath == path) is { } open) { SetSession(open); continue; }
-                if (Path.GetExtension(path).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase))
+                if (MacProject.IsProject(path))
+                {
+                    // Projects from the macOS app open as unsaved documents; saving writes this app's own format.
+                    AddSession(new EditorSession(MacProject.Load(path)) { SuggestedName = Path.GetFileNameWithoutExtension(path.TrimEnd(Path.DirectorySeparatorChar)) });
+                }
+                else if (Path.GetExtension(path).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase))
                 {
                     var loaded = new EditorSession(ProjectFile.Load(path));
                     loaded.MarkSaved(path);
@@ -321,11 +327,17 @@ public sealed partial class MainWindow
                     var layer = Layer.Raster(Path.GetFileNameWithoutExtension(path), pixels);
                     document.Layers.Add(layer);
                     document.SetActive(layer.Id);
-                    AddSession(new EditorSession(document));
+                    AddSession(new EditorSession(document) { SuggestedName = Path.GetFileNameWithoutExtension(path) });
                 }
             }
             catch (Exception error) { _ = Prompts.Alert(this, "Couldn't open " + Path.GetFileName(path), error.Message); }
         }
+    }
+
+    private async Task OpenMacProject()
+    {
+        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Open macOS Compositor Project (.comp folder)" });
+        OpenPaths(folders.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
     private async Task PlaceImages()
@@ -349,7 +361,7 @@ public sealed partial class MainWindow
     {
         var paths = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
         if (paths.Count == 0) return;
-        var projects = paths.Where(p => Path.GetExtension(p).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)).ToList();
+        var projects = paths.Where(p => MacProject.IsProject(p) || Path.GetExtension(p).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)).ToList();
         var images = paths.Except(projects).ToList();
         OpenPaths(projects);
         if (session == null || projects.Count > 0) OpenPaths(images);
