@@ -448,3 +448,50 @@ public class LiquifyTests
         TestImages.AssertColor(SKColors.White, session.Composite().GetPixel(112, 50));
     }
 }
+
+public class TextLayerTests
+{
+    [Fact]
+    public void Text_layers_render_stay_live_and_round_trip()
+    {
+        var session = EditorSession.NewCanvas(400, 200, SKColors.White);
+        var style = new TextStyle { Text = "Hello\nWorld", Size = 40, Color = 0xFFFF0000, FontFamily = EditorSession.FontFamilies.FirstOrDefault() ?? "sans-serif" };
+        var layer = session.AddText(new SKPoint(20, 20), style);
+        Assert.NotNull(layer.Text);
+        Assert.Equal("Hello", layer.Name);
+        using (var flat = session.Flatten())
+        {
+            var red = 0;
+            for (var y = 0; y < 200; y++) for (var x = 0; x < 400; x++) if (flat.GetPixel(x, y) is { Red: > 200, Green: < 80 }) red++;
+            Assert.True(red > 200, $"expected red glyph pixels, found {red}");
+        }
+        session.Tool = Tool.Brush;
+        Assert.False(session.BeginStroke(new SKPoint(30, 30), out var problem));
+        Assert.Contains("text", problem);
+
+        // Scaling redraws the glyphs at the new size instead of stretching pixels.
+        var heightBefore = layer.Pixels!.Height;
+        var edit = session.BeginTransform()!;
+        edit.Set(SKRect.Create(edit.StartFrame.Left, edit.StartFrame.Top, edit.StartFrame.Width * 2, edit.StartFrame.Height * 2), 0);
+        session.CommitTransform();
+        Assert.InRange(layer.Text!.Size, 75, 85);
+        Assert.InRange(layer.Pixels!.Height, heightBefore * 1.8, heightBefore * 2.2);
+        Assert.Equal(layer.Pixels.Height, layer.Transform.Height);
+
+        session.Begin("Edit Text");
+        session.SetText(layer, layer.Text with { Text = "Changed" });
+        session.Commit();
+        Assert.Equal("Changed", layer.Name);
+        session.Undo();
+        Assert.Equal("Hello\nWorld", session.Document.Find(layer.Id)!.Text!.Text);
+
+        using var stream = new MemoryStream();
+        ProjectFile.Write(session.Document, stream);
+        stream.Position = 0;
+        Assert.Equal("Hello\nWorld", ProjectFile.Read(stream).Find(layer.Id)!.Text!.Text);
+
+        session.RasterizeShape(session.Document.Find(layer.Id)!);
+        Assert.True(session.BeginStroke(new SKPoint(30, 30), out _));
+        session.EndStroke();
+    }
+}

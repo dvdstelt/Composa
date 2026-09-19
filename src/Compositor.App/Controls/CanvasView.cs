@@ -51,6 +51,8 @@ public sealed partial class CanvasView : Control
     public event Action<string>? Problem;
     /// <summary>Raised when a tool changed session state the chrome displays (colors, brush size, crop presence).</summary>
     public event Action? ToolStateChanged;
+    /// <summary>Raised by the Text tool: where to put new text, or the text layer that was clicked.</summary>
+    public event Action<SKPoint, Layer?>? TextRequested;
 
     public bool ShowPixelGrid { get; set; } = true;
     public bool ShowTransformControls { get; set; } = true;

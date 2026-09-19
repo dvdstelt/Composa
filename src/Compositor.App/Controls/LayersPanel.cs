@@ -11,6 +11,7 @@ using Compositor.Filters;
 using Compositor.Model;
 using SkiaSharp;
 using BlendMode = Compositor.Model.BlendMode;
+using TextAlignment = Avalonia.Media.TextAlignment;
 
 namespace Compositor.App.Controls;
 
@@ -38,6 +39,7 @@ public sealed class LayersPanel : UserControl
     private bool? eyeSwipe;
 
     public event Action<Layer>? EditAdjustmentRequested;
+    public event Action<Layer>? EditTextRequested;
     public event Action<AdjustmentKind>? NewAdjustmentRequested;
 
     static LayersPanel() => Compositor.Rendering.Pixels.Invalidated += bitmap => Thumbnails.Remove(bitmap);
@@ -255,7 +257,7 @@ public sealed class LayersPanel : UserControl
             var name = Ui.Label(layer.Name);
             name.TextTrimming = TextTrimming.CharacterEllipsis;
             name.MaxWidth = 150;
-            if (layer.Shape != null) name.FontStyle = FontStyle.Italic;
+            if (layer.IsLive) name.FontStyle = FontStyle.Italic;
             content.Children.Add(name);
         }
 
@@ -344,7 +346,8 @@ public sealed class LayersPanel : UserControl
             Add("Select Mask", () => current.SelectLayerMask(layer));
         }
         if (layer.Pixels != null) Add("Select Pixels", () => current.SelectLayerPixels(layer));
-        if (layer.Shape != null) Add("Rasterize Shape", () => current.RasterizeShape(layer));
+        if (layer.Text != null) Add("Edit Text…", () => EditTextRequested?.Invoke(layer));
+        if (layer.IsLive) Add("Rasterize Layer", () => current.RasterizeShape(layer));
         menu.Items.Add(new Separator());
         Add("Group Selected Layers", current.GroupSelectedLayers);
         if (layer.IsGroup) Add("Ungroup", () => current.Ungroup(layer));
@@ -368,6 +371,7 @@ public sealed class LayersPanel : UserControl
         {
             // Selecting on the first click rebuilt the rows, so the control's own double-tap never sees both clicks.
             if (layer.IsAdjustment) EditAdjustmentRequested?.Invoke(layer);
+            else if (layer.Text != null && e.Source is Image) EditTextRequested?.Invoke(layer); // Double-click the thumbnail to edit, the name to rename.
             else { renaming = layer.Id; Rebuild(); }
             e.Handled = true;
             return;

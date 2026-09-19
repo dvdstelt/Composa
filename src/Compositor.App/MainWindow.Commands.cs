@@ -147,7 +147,8 @@ public sealed partial class MainWindow
             mergeItem,
             Item("Flatten Image", () => session!.FlattenImage()),
             Line(),
-            Item("Rasterize Shape", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.Shape != null),
+            Item("Edit Text…", () => _ = EditText(default, session!.ActiveLayer), enabled: () => session!.ActiveLayer?.Text != null),
+            Item("Rasterize Layer", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.IsLive == true),
             Item("Flip Layer Horizontal", () => session!.FlipLayers(true)),
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 
@@ -265,6 +266,7 @@ public sealed partial class MainWindow
                 if (shift || session.Tool == Tool.Shape) session.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % 3);
                 SelectTool(Tool.Shape);
                 break;
+            case Key.T: SelectTool(Tool.Text); break;
             case Key.I: SelectTool(Tool.Eyedropper); break;
             case Key.H: SelectTool(Tool.Hand); break;
             case Key.Z: SelectTool(Tool.Zoom); break;
@@ -567,6 +569,30 @@ public sealed partial class MainWindow
         else target.Cancel();
     }
 
+    /// <summary>Adds text at a point, or edits an existing text layer, with the canvas updating as you type.</summary>
+    private async Task EditText(SKPoint at, Layer? existing)
+    {
+        if (session == null) return;
+        var target = session;
+        Layer layer;
+        var initial = existing?.Text ?? target.TextDefaults with { Text = "", Color = (uint)target.Foreground };
+        if (existing != null)
+        {
+            target.SelectLayer(existing.Id);
+            layer = existing;
+            target.Begin("Edit Text");
+        }
+        else layer = target.AddText(at, initial with { Text = "Text" }, commit: false);
+
+        var result = await TextDialog.Edit(this, initial, style => target.SetText(layer, style with { Text = style.Text.Length == 0 ? " " : style.Text }));
+        if (result == null || result.Text.Trim().Length == 0 || (existing != null && result == existing.Text)) { target.Cancel(); return; }
+        target.SetText(layer, result);
+        target.Commit();
+        target.TextDefaults = result with { Text = "" };
+        target.NotifyLayersChanged();
+        SelectTool(Tool.Move);
+    }
+
     private async Task CanvasSize()
     {
         if (session == null) return;
@@ -584,7 +610,7 @@ public sealed partial class MainWindow
     }
 
     private Task ShowShortcuts() => Prompts.Alert(this, "Keyboard Shortcuts",
-        "Tools: V Move · M Marquee · L Lasso · W Wand · C Crop · B Brush · E Eraser · J Spot Healing · S Clone Stamp · R Smear · G Gradient · U Shape · I Eyedropper · H Hand · Z Zoom\n\n" +
+        "Tools: V Move · M Marquee · L Lasso · W Wand · C Crop · B Brush · E Eraser · J Spot Healing · S Clone Stamp · R Smear · G Gradient · U Shape · T Text · I Eyedropper · H Hand · Z Zoom\n\n" +
         "Canvas: Space pan · Ctrl+wheel zoom · Ctrl+0 fit · Ctrl+1 100%\n\n" +
         "Brushes: [ ] size · { } hardness · 1–0 opacity · Shift-click straight line · Alt-click pick color or clone source\n\n" +
         "Colors: X swap · D reset · Alt+Backspace fill foreground · Ctrl+Backspace fill background\n\n" +

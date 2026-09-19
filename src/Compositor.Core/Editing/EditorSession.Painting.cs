@@ -51,7 +51,7 @@ public sealed partial class EditorSession
         problem = null;
         if (ActiveLayer is not { } layer) { problem = "Select a layer to paint on."; return false; }
         if (!IsEditingMask && layer.Pixels == null) { problem = layer.IsGroup ? "Folders can't be painted on. Select a layer inside." : "Adjustment layers have no pixels. Add a mask to paint on."; return false; }
-        if (!IsEditingMask && layer.Shape != null) { problem = "This is a live shape. Rasterize it (Layer menu) to paint on it."; return false; }
+        if (!IsEditingMask && layer.IsLive) { problem = $"This is live {(layer.Text != null ? "text" : "shape")}. Rasterize it (Layer menu) to paint on it."; return false; }
         if (!document.IsEffectivelyVisible(layer)) { problem = "The layer is hidden."; return false; }
         var mode = CurrentBrushMode;
         if (mode == BrushMode.Clone && cloneSource == null) { problem = "Alt-click to set the clone source first."; return false; }

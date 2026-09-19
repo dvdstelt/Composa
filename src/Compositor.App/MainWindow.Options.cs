@@ -71,6 +71,9 @@ public sealed partial class MainWindow
                     Ui.SliderRow("Corner radius", s.ShapeCornerRadius, 0, 400, v => s.ShapeCornerRadius = v, 1, "0", 120).Row,
                     Ui.Label("Fills with the foreground color", Palette.Secondary));
                 break;
+            case Tool.Text:
+                Add(Title("Text"), Ui.Label("Click on the canvas to add text in the foreground color, or click existing text to edit it", Palette.Secondary));
+                break;
             case Tool.Crop:
                 Add(Title("Crop"));
                 var readout = Ui.Label("Drag on the canvas to choose the area to keep", Palette.Secondary);

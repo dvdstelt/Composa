@@ -10,6 +10,23 @@ public enum ShapeKind { Rectangle, RoundedRectangle, Ellipse }
 /// <summary>A live shape: redrawn at full sharpness whenever its layer is scaled.</summary>
 public sealed record ShapeStyle(ShapeKind Kind, uint Fill, double CornerRadius);
 
+public enum TextAlignment { Left, Center, Right }
+
+/// <summary>Live text: kept as characters and redrawn sharp whenever it is edited or its layer is scaled.</summary>
+public sealed record TextStyle
+{
+    public string Text { get; init; } = "";
+    public string FontFamily { get; init; } = "Inter";
+    /// <summary>Font size in document pixels.</summary>
+    public double Size { get; init; } = 72;
+    public uint Color { get; init; } = 0xFF000000;
+    public bool Bold { get; init; }
+    public bool Italic { get; init; }
+    public TextAlignment Alignment { get; init; }
+    /// <summary>Line height as a multiple of the font's own spacing.</summary>
+    public double LineSpacing { get; init; } = 1;
+}
+
 /// <summary>
 /// A node in the layer tree. Bitmaps are treated as immutable once a layer has been committed to the document:
 /// every edit swaps in a new bitmap, so history snapshots can share pixels freely.
@@ -32,6 +49,9 @@ public sealed class Layer
     public bool Clipped { get; set; }
     public Adjustment? Adjustment { get; set; }
     public ShapeStyle? Shape { get; set; }
+    public TextStyle? Text { get; set; }
+    /// <summary>Live layers (shapes and text) are regenerated from their settings; they take pixel edits only once rasterized.</summary>
+    public bool IsLive => Shape != null || Text != null;
     /// <summary>Bottom-to-top children of a group.</summary>
     public List<Layer> Children { get; init; } = [];
     public bool Collapsed { get; set; }
@@ -52,7 +72,7 @@ public sealed class Layer
         {
             Id = newIds ? Guid.NewGuid() : Id, Name = Name, Kind = Kind, Visible = Visible, Opacity = Opacity, Blend = Blend,
             Pixels = Pixels, Transform = Transform, Mask = Mask, MaskEnabled = MaskEnabled, Clipped = Clipped,
-            Adjustment = Adjustment, Shape = Shape, Collapsed = Collapsed
+            Adjustment = Adjustment, Shape = Shape, Text = Text, Collapsed = Collapsed
         };
         foreach (var child in Children) copy.Children.Add(child.Clone(newIds));
         return copy;

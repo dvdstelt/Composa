@@ -25,6 +25,7 @@ public static class Icons
     public static readonly Icon Drop = new("M12 3 C12 3 5.5 10.5 5.5 15 A6.5 6.5 0 0 0 18.5 15 C18.5 10.5 12 3 12 3 Z");
     public static readonly Icon Gradient = new("M3.5 3.5 H20.5 V20.5 H3.5 Z", "M3.5 12 H20.5 V20.5 H3.5 Z");
     public static readonly Icon Shape = new("M3 3 H14 V14 H3 Z M21.5 15.5 A6 6 0 1 1 9.5 15.5 A6 6 0 1 1 21.5 15.5 Z");
+    public static readonly Icon Text = new("M5 7 V4.5 H19 V7 M12 4.5 V19.5 M9 19.5 H15");
     public static readonly Icon Eyedropper = new("M13.5 8.5 L4.5 17.5 L3 21 L6.5 19.5 L15.5 10.5", "M15.5 3.5 C17 2 19 2 20.5 3.5 C22 5 22 7 20.5 8.5 L18 11 L19 12 L17.5 13.5 L10.5 6.5 L12 5 L13 6 Z");
     public static readonly Icon Hand = new("M8 12 V5.5 A1.5 1.5 0 0 1 11 5.5 V11 V4 A1.5 1.5 0 0 1 14 4 V11 V5 A1.5 1.5 0 0 1 17 5 V11.5 V8 A1.5 1.5 0 0 1 20 8 V15 C20 19 17 22 13 22 C10 22 8.2 20.5 6.5 18 L3.6 13.6 A1.5 1.5 0 0 1 6 11.8 L8 14.5 Z");
     public static readonly Icon Zoom = new("M10 3 A7 7 0 1 1 10 17 A7 7 0 1 1 10 3 Z M15 15 L21 21");

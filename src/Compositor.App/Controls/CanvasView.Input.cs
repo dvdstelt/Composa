@@ -72,6 +72,7 @@ public sealed partial class CanvasView
             {
                 Tool.Hand => StandardCursorType.Hand,
                 Tool.Marquee or Tool.Lasso or Tool.Wand or Tool.Crop or Tool.Gradient or Tool.Shape or Tool.Eyedropper => StandardCursorType.Cross,
+                Tool.Text => StandardCursorType.Ibeam,
                 Tool.Brush or Tool.SpotHealing or Tool.CloneStamp or Tool.Smear => StandardCursorType.None,
                 Tool.Zoom => StandardCursorType.Cross,
                 _ => StandardCursorType.Arrow
@@ -172,6 +173,10 @@ public sealed partial class CanvasView
                 break;
             case Tool.Shape:
                 drag = Drag.Shape;
+                break;
+            case Tool.Text:
+                e.Pointer.Capture(null);
+                TextRequested?.Invoke(pressDocument, LayerAt(pressDocument) is { Text: not null } hit ? hit : null);
                 break;
             case Tool.Eyedropper:
                 PickColor(alt);

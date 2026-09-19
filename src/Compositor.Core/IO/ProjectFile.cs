@@ -54,6 +54,7 @@ public static class ProjectFile
         public bool? Collapsed { get; set; }
         public Adjustment? Adjustment { get; set; }
         public ShapeStyle? Shape { get; set; }
+        public TextStyle? Text { get; set; }
         public List<LayerRecord>? Children { get; set; }
     }
 
@@ -92,7 +93,7 @@ public static class ProjectFile
             MaskEnabled = layer.Mask != null ? layer.MaskEnabled : null,
             Clipped = layer.Clipped ? true : null,
             Collapsed = layer.Collapsed ? true : null,
-            Adjustment = layer.Adjustment, Shape = layer.Shape,
+            Adjustment = layer.Adjustment, Shape = layer.Shape, Text = layer.Text,
             Children = layer.IsGroup ? layer.Children.Select(Record).ToList() : null
         };
 
@@ -147,7 +148,7 @@ public static class ProjectFile
                 Id = record.Id == Guid.Empty ? Guid.NewGuid() : record.Id, Name = record.Name, Kind = record.Kind, Visible = record.Visible,
                 Opacity = double.IsFinite(record.Opacity) ? Math.Clamp(record.Opacity, 0, 1) : 1, Blend = record.Blend,
                 MaskEnabled = record.MaskEnabled ?? true, Clipped = record.Clipped ?? false, Collapsed = record.Collapsed ?? false,
-                Adjustment = record.Adjustment, Shape = record.Shape
+                Adjustment = record.Adjustment, Shape = record.Shape, Text = record.Text
             };
             if (record.ImageFile != null && record.Kind == LayerKind.Raster)
             {

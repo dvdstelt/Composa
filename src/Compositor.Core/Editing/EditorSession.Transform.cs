@@ -228,6 +228,7 @@ public sealed partial class EditorSession
         foreach (var layer in Transform.Layers)
         {
             // Live shapes are redrawn at their new size instead of being stretched.
+            if (layer.Text != null && layer.Pixels != null) RescaleText(layer);
             if (layer.Shape != null && layer.Pixels != null)
             {
                 int w = Math.Max(1, (int)Math.Round(layer.Transform.Width)), h = Math.Max(1, (int)Math.Round(layer.Transform.Height));
@@ -263,6 +264,7 @@ public sealed partial class EditorSession
         Apply("Transform", () =>
         {
             layer.Transform = transform;
+            if (layer.Text != null) RescaleText(layer);
             if (layer.Shape != null)
                 layer.Pixels = RenderShape(layer.Shape, Math.Max(1, (int)Math.Round(transform.Width)), Math.Max(1, (int)Math.Round(transform.Height)));
         });

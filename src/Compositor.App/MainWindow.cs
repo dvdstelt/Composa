@@ -64,6 +64,8 @@ public sealed partial class MainWindow : Window
         canvas.ViewChanged += UpdateStatus;
         canvas.Problem += message => { problem = message; UpdateStatus(); };
         canvas.ToolStateChanged += () => { refreshOptions?.Invoke(); UpdateColors(); };
+        canvas.TextRequested += (at, existing) => _ = EditText(at, existing);
+        layers.EditTextRequested += layer => _ = EditText(default, layer);
         layers.EditAdjustmentRequested += layer => _ = EditAdjustmentLayer(layer, isNew: false);
         layers.NewAdjustmentRequested += kind => _ = NewAdjustmentLayer(kind);
 
@@ -134,7 +136,7 @@ public sealed partial class MainWindow : Window
             target.EraserMode = from.EraserMode; target.SmearMode = from.SmearMode; target.MarqueeKind = from.MarqueeKind; target.LassoKind = from.LassoKind;
             target.Feather = from.Feather; target.WandTolerance = from.WandTolerance; target.WandContiguous = from.WandContiguous;
             target.SampleAllLayers = from.SampleAllLayers; target.CloneAligned = from.CloneAligned; target.ShapeKind = from.ShapeKind;
-            target.ShapeCornerRadius = from.ShapeCornerRadius; target.GradientRadial = from.GradientRadial; target.GradientToTransparent = from.GradientToTransparent;
+            target.ShapeCornerRadius = from.ShapeCornerRadius; target.GradientRadial = from.GradientRadial; target.GradientToTransparent = from.GradientToTransparent; target.TextDefaults = from.TextDefaults;
             target.Tool = tool;
         }
         lastToolSource = target;
@@ -229,7 +231,7 @@ public sealed partial class MainWindow : Window
         (Tool.Brush, Icons.Brush, "Brush (B) · Eraser (E)"), (Tool.SpotHealing, Icons.Heal, "Spot Healing Brush (J)"),
         (Tool.CloneStamp, Icons.Stamp, "Clone Stamp (S) · Alt-click sets the source"), (Tool.Smear, Icons.Drop, "Smear: Liquify, Blur, Smudge, Dodge, Burn (R)"),
         (Tool.Gradient, Icons.Gradient, "Gradient (G)"), (Tool.Shape, Icons.Shape, "Shape (U) · Shift+U switches shape"),
-        (Tool.Eyedropper, Icons.Eyedropper, "Eyedropper (I)"), (Tool.Hand, Icons.Hand, "Hand (H) · hold Space with any tool"), (Tool.Zoom, Icons.Zoom, "Zoom (Z)")
+        (Tool.Text, Icons.Text, "Text (T) · click to add, click text to edit it"), (Tool.Eyedropper, Icons.Eyedropper, "Eyedropper (I)"), (Tool.Hand, Icons.Hand, "Hand (H) · hold Space with any tool"), (Tool.Zoom, Icons.Zoom, "Zoom (Z)")
     ];
 
     private Control BuildToolRail()
@@ -350,6 +352,7 @@ public sealed partial class MainWindow : Window
         Tool.Smear => "Drag to " + (s.SmearMode == SmearMode.Liquify ? "push pixels" : s.SmearMode.ToString().ToLowerInvariant()) + " · [ ] size · 1–0 strength",
         Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Shift snaps to 45°",
         Tool.Shape => "Drag to draw a shape on a new layer · Shift square · Alt from center",
+        Tool.Text => "Click to add text · Click existing text to edit it · Scale it with the Move tool and it stays sharp",
         Tool.Eyedropper => "Click to pick the foreground color · Alt-click for the background",
         Tool.Hand => "Drag to pan · Ctrl+wheel zooms",
         _ => "Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly"

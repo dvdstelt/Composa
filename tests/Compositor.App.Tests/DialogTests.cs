@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -48,5 +49,45 @@ public class DialogTests
         Capture(window, "17-image-size");
         _ = Prompts.Color(window, "Foreground Color", new SKColor(0x20, 0xC0, 0xFF));
         Capture(window, "18-color");
+    }
+}
+
+public class TextToolTests
+{
+    [AvaloniaFact]
+    public void Clicking_with_the_text_tool_opens_the_editor_and_previews_on_the_canvas()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = Compositor.Editing.EditorSession.NewCanvas(900, 500, new SKColor(0x1E, 0x22, 0x2E));
+        window.AddSession(session);
+        session.Foreground = new SKColor(0xFF, 0xC8, 0x57);
+        window.SelectTool(Compositor.Editing.Tool.Text);
+        Dispatcher.UIThread.RunJobs();
+        var view = window.Canvas;
+        var at = view.TranslatePoint(view.ToScreen(new SKPoint(80, 120)), window)!.Value;
+        window.MouseDown(at, Avalonia.Input.MouseButton.Left);
+        window.MouseUp(at, Avalonia.Input.MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+
+        var dialog = Assert.Single(window.OwnedWindows);
+        var box = Assert.IsType<TextBox>(dialog.FocusManager?.GetFocusedElement());
+        box.Text = "Compositor\nfor Linux";
+        Thread.Sleep(60);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Directory.CreateDirectory(WindowTests.Shots);
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "19-text-dialog.png"));
+        dialog.Close(true);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "20-text-layer.png"));
+
+        var layer = Assert.Single(session.Document.Layers, l => l.Text != null);
+        Assert.Equal("Compositor\nfor Linux", layer.Text!.Text);
+        Assert.Equal("Text", session.History.UndoName);
+        Assert.Equal(Compositor.Editing.Tool.Move, session.Tool);
+        session.Undo();
+        Assert.Single(session.Document.Layers);
     }
 }

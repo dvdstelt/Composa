@@ -19,7 +19,7 @@ public sealed partial class EditorSession
     public static ClipboardImage? Clipboard { get; set; }
 
     /// <summary>The active layer when it (or its mask) can take pixel edits.</summary>
-    public Layer? EditableLayer => ActiveLayer is { } layer && (IsEditingMask || (layer.Pixels != null && layer.Shape == null)) ? layer : null;
+    public Layer? EditableLayer => ActiveLayer is { } layer && (IsEditingMask || (layer.Pixels != null && !layer.IsLive)) ? layer : null;
 
     public bool CanEditPixels => EditableLayer != null;
 
@@ -356,8 +356,8 @@ public sealed partial class EditorSession
     /// <summary>Turns a live shape into ordinary pixels so it can be painted on.</summary>
     public void RasterizeShape(Layer layer)
     {
-        if (layer.Shape == null) return;
-        Apply("Rasterize Layer", () => layer.Shape = null);
+        if (!layer.IsLive) return;
+        Apply("Rasterize Layer", () => { layer.Shape = null; layer.Text = null; });
         LayersChanged?.Invoke();
     }
 

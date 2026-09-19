@@ -16,7 +16,7 @@ public sealed partial class EditorSession
 
     /// <summary>True when dragging inside the selection should move the selected pixels rather than the whole layer.</summary>
     public bool CanMovePixels =>
-        document.Selection != null && !IsEditingMask && ActiveLayer is { Pixels: { } pixels, Shape: null } layer
+        document.Selection != null && !IsEditingMask && ActiveLayer is { Pixels: { } pixels, IsLive: false } layer
         && layer.Transform.IsPureTranslation(pixels.Width, pixels.Height) && document.IsEffectivelyVisible(layer);
 
     /// <summary>Lifts the selected pixels off the active layer so they can be dragged; with <paramref name="duplicate"/> the originals stay.</summary>

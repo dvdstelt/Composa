@@ -35,6 +35,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Clone Stamp, aligned or not, sampling one layer or all of them
 - Smear tool: Liquify (push), Blur, Smudge, Dodge and Burn
 - Gradient tool (linear or radial, to background or to transparent)
+- Text tool with live, re-editable text layers that stay sharp when scaled (not in the macOS app)
 - Eyedropper and a full color picker
 - Pen pressure varies the brush size on graphics tablets
 - Every painting tool also works on masks
@@ -104,7 +105,7 @@ The core library is tested directly through `EditorSession`. The app tests run A
 | --- | --- |
 | V M L W C | Move, Marquee, Lasso, Magic Wand, Crop (M and L again switch variants) |
 | B E J S R | Brush, Eraser, Spot Healing, Clone Stamp, Smear |
-| G U I H Z | Gradient, Shape, Eyedropper, Hand, Zoom |
+| G U T I H Z | Gradient, Shape, Text, Eyedropper, Hand, Zoom |
 | Space, Ctrl+wheel | Pan, zoom at the cursor |
 | Ctrl+0, Ctrl+1 | Fit canvas, actual pixels |
 | [ ] and { } | Brush size and hardness |

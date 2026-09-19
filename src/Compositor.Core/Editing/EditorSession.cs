@@ -5,7 +5,7 @@ using SkiaSharp;
 
 namespace Compositor.Editing;
 
-public enum Tool { Move, Marquee, Lasso, Wand, Crop, Brush, SpotHealing, CloneStamp, Smear, Gradient, Shape, Eyedropper, Hand, Zoom }
+public enum Tool { Move, Marquee, Lasso, Wand, Crop, Brush, SpotHealing, CloneStamp, Smear, Gradient, Shape, Text, Eyedropper, Hand, Zoom }
 
 public enum MarqueeKind { Rectangle, Ellipse }
 public enum LassoKind { Freehand, Polygonal }
@@ -64,6 +64,8 @@ public sealed partial class EditorSession
     public bool CloneAligned { get; set; } = true;
     public ShapeKind ShapeKind { get; set; } = ShapeKind.Rectangle;
     public double ShapeCornerRadius { get; set; } = 24;
+    /// <summary>The settings new text starts with; the color follows the foreground color.</summary>
+    public TextStyle TextDefaults { get; set; } = new();
     public bool GradientToTransparent { get; set; }
     public bool GradientRadial { get; set; }
     public double GradientOpacity { get; set; } = 1;
