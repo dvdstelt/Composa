@@ -209,3 +209,52 @@ public class LayersPanelTests
         Assert.Equal(420, session.Document.Height);
     }
 }
+
+public class ZoomTests
+{
+    private static void Save(Window window, string name)
+    {
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Directory.CreateDirectory(WindowTests.Shots);
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"));
+    }
+
+    [AvaloniaFact]
+    public void Large_documents_render_zoomed_out_and_zoomed_in()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(4800, 3200, SKColors.White);
+        window.AddSession(session);
+        var photo = Rendering.Pixels.NewColor(4000, 2600);
+        using (var canvas = new SKCanvas(photo))
+        {
+            using var shader = SKShader.CreateSweepGradient(new SKPoint(2000, 1300), [SKColors.OrangeRed, SKColors.Gold, SKColors.MediumSeaGreen, SKColors.RoyalBlue, SKColors.OrangeRed]);
+            using var paint = new SKPaint { Shader = shader };
+            canvas.DrawPaint(paint);
+            using var line = new SKPaint { Color = SKColors.Black, StrokeWidth = 3, IsAntialias = true, Style = SKPaintStyle.Stroke };
+            for (var r = 100; r < 1300; r += 40) canvas.DrawCircle(2000, 1300, r, line);
+        }
+        session.AddImageLayer("Rings", photo, fit: false);
+        session.AddAdjustmentLayer(new CurvesAdjustment().WithChannel(0, [new(0, 0), new(110, 150), new(255, 255)]));
+        session.SelectEllipse(new SKRect(1500, 900, 3300, 2300));
+        Save(window, "08-large-zoomed-out");
+        Assert.True(window.Canvas.Zoom < 0.5);
+
+        // Painting while zoomed out updates just the dirty part of the on-screen render.
+        session.Deselect();
+        session.AddBlankLayer();
+        window.SelectTool(Tool.Brush);
+        session.Foreground = SKColors.White;
+        session.Brush = new BrushSettings { Size = 260, Hardness = 0.7 };
+        session.BeginStroke(new SKPoint(600, 600), out _);
+        for (var i = 0; i <= 30; i++) { session.ContinueStroke(new SKPoint(600 + i * 120, 600 + MathF.Sin(i / 3f) * 300)); Dispatcher.UIThread.RunJobs(); }
+        session.EndStroke();
+        Save(window, "09-large-painted");
+
+        window.Canvas.ZoomTo(12, new Point(window.Canvas.Bounds.Width / 2, window.Canvas.Bounds.Height / 2));
+        Save(window, "09b-zoomed-in-grid");
+        Assert.Equal(12, window.Canvas.Zoom);
+    }
+}
