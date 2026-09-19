@@ -60,7 +60,13 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Projects are saved as `.compositor` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
 - Remove Background clears a plain backdrop connected to the image's edges. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent.
 - HEIC, AVIF and TIFF open only when ImageMagick (`magick` or `convert`) is installed, because Skia does not decode them itself.
+- A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
+- Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries pixels across, keeping their position.
+- Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
+- The Gradient tool applies when you release the drag, rather than staying adjustable until Enter.
 - There is no auto-update.
+
+Beyond the macOS app, this version adds a Text tool, more blend modes (Soft Light, Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery.
 
 ## Requirements
 
