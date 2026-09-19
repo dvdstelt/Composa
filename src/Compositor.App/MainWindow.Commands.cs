@@ -489,7 +489,7 @@ public sealed partial class MainWindow
             if (Clipboard != null && await Clipboard.TryGetInProcessDataAsync() == null && await Clipboard.TryGetBitmapAsync() is { } bitmap)
             {
                 using var stream = new MemoryStream();
-                bitmap.Save(stream);
+                bitmap.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
                 stream.Position = 0;
                 external = new ClipboardImage(ImageFiles.Load(stream, "clipboard"), new SKPointI(int.MinValue / 2, int.MinValue / 2));
             }

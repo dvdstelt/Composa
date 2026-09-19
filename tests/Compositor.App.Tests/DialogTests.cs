@@ -17,7 +17,7 @@ public class DialogTests
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var dialog = owner.OwnedWindows.Last();
         Directory.CreateDirectory(WindowTests.Shots);
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"));
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         dialog.Close();
         Dispatcher.UIThread.RunJobs();
     }
@@ -77,11 +77,11 @@ public class TextToolTests
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         Directory.CreateDirectory(WindowTests.Shots);
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "19-text-dialog.png"));
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "19-text-dialog.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         dialog.Close(true);
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "20-text-layer.png"));
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "20-text-layer.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
 
         var layer = Assert.Single(session.Document.Layers, l => l.Text != null);
         Assert.Equal("Compositor\nfor Linux", layer.Text!.Text);
@@ -111,7 +111,7 @@ public class JpegDialogTests
         var dialog = Assert.Single(window.OwnedWindows);
         for (var i = 0; i < 40; i++) { await Task.Delay(25); Dispatcher.UIThread.RunJobs(); }
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "21-jpeg-export.png"));
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "21-jpeg-export.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         dialog.Close(true);
         Assert.Equal(60, await task);
     }

@@ -188,7 +188,7 @@ public class UiRegressionTests
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             using var frame = window.CaptureRenderedFrame()!;
             using var stream = new MemoryStream();
-            frame.Save(stream);
+            frame.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
             using var shot = SKBitmap.Decode(stream.ToArray());
             var center = window.Canvas.TranslatePoint(new Point(window.Canvas.Bounds.Width / 2, window.Canvas.Bounds.Height / 2), window)!.Value;
             int darkest = 255, lightest = 0;

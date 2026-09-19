@@ -21,7 +21,7 @@ public class WindowTests
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var frame = window.CaptureRenderedFrame();
         Directory.CreateDirectory(Shots);
-        frame?.Save(Path.Combine(Shots, name + ".png"));
+        frame?.Save(Path.Combine(Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
 
     private static MainWindow Open()
@@ -203,7 +203,7 @@ public class LayersPanelTests
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "07-layers-and-crop.png"));
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "07-layers-and-crop.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Assert.Equal(540, session.Document.Width);
         Assert.Equal(420, session.Document.Height);
@@ -217,7 +217,7 @@ public class ZoomTests
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"));
+        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
 
     [AvaloniaFact]
