@@ -232,7 +232,7 @@ public sealed partial class EditorSession
             if (layer.Shape != null && layer.Pixels != null)
             {
                 int w = Math.Max(1, (int)Math.Round(layer.Transform.Width)), h = Math.Max(1, (int)Math.Round(layer.Transform.Height));
-                if (w != layer.Pixels.Width || h != layer.Pixels.Height) layer.Pixels = RenderShape(layer.Shape, w, h);
+                if (w != layer.Pixels.Width || h != layer.Pixels.Height) ReplaceLivePixels(layer, RenderShape(layer.Shape, w, h));
             }
         }
         Transform = null;
@@ -246,6 +246,13 @@ public sealed partial class EditorSession
         if (Transform == null) return;
         Transform = null;
         Cancel();
+    }
+
+    /// <summary>Swaps in regenerated pixels for a live layer; its mask is resampled to stay the same size as the pixels.</summary>
+    private static void ReplaceLivePixels(Layer layer, SKBitmap pixels)
+    {
+        layer.Pixels = pixels;
+        if (layer.Mask is { } mask && (mask.Width != pixels.Width || mask.Height != pixels.Height)) layer.Mask = Resample(mask, pixels.Width, pixels.Height);
     }
 
     /// <summary>Nudges the selected layers with the arrow keys.</summary>
@@ -266,7 +273,7 @@ public sealed partial class EditorSession
             layer.Transform = transform;
             if (layer.Text != null) RescaleText(layer);
             if (layer.Shape != null)
-                layer.Pixels = RenderShape(layer.Shape, Math.Max(1, (int)Math.Round(transform.Width)), Math.Max(1, (int)Math.Round(transform.Height)));
+                ReplaceLivePixels(layer, RenderShape(layer.Shape, Math.Max(1, (int)Math.Round(transform.Width)), Math.Max(1, (int)Math.Round(transform.Height))));
         });
         InvalidateAll();
         LayersChanged?.Invoke();

@@ -70,9 +70,8 @@ public sealed partial class EditorSession
         double scaleX = t.Width / layer.Pixels.Width, scaleY = t.Height / layer.Pixels.Height;
         var pixels = RenderText(style);
         var previous = layer.Pixels;
-        layer.Pixels = pixels;
+        ReplaceLivePixels(layer, pixels);
         layer.Text = style;
-        if (layer.Mask != null) layer.Mask = null; // A mask sized for the old text no longer fits.
         // Anchor the edge the alignment reads from, so typing grows the text the way the eye expects.
         double width = pixels.Width * scaleX, height = pixels.Height * scaleY;
         var x = style.Alignment switch { TextAlignment.Center => t.X + (t.Width - width) / 2, TextAlignment.Right => t.X + t.Width - width, _ => t.X };
@@ -92,9 +91,8 @@ public sealed partial class EditorSession
         var resized = style with { Size = Math.Clamp(style.Size * factor, 1, 4000) };
         var center = layer.Transform.Center;
         var rendered = RenderText(resized);
-        layer.Pixels = rendered;
+        ReplaceLivePixels(layer, rendered);
         layer.Text = resized;
-        layer.Mask = null;
         layer.Transform = layer.Transform with { X = center.X - rendered.Width / 2.0, Y = center.Y - rendered.Height / 2.0, Width = rendered.Width, Height = rendered.Height };
     }
 }
