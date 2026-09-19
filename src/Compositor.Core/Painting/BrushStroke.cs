@@ -31,7 +31,9 @@ public sealed unsafe class BrushStroke : IDisposable
     private readonly bool isMask;
     private readonly byte[] coverage;
     private readonly int width, height, bytesPerPixel;
-    private readonly float radius;
+    private readonly float fullRadius;
+    private float radius;
+    private float lastPressure = 1;
     private readonly float[] premulColor = new float[4];
     private readonly byte maskValue;
     private SKBitmap? blurred;
@@ -65,25 +67,29 @@ public sealed unsafe class BrushStroke : IDisposable
         width = target.Width;
         height = target.Height;
         coverage = new byte[(long)width * height];
-        radius = (float)Math.Max(0.5, settings.Size / 2 / Math.Max(1e-6, scale));
+        radius = fullRadius = (float)Math.Max(0.5, settings.Size / 2 / Math.Max(1e-6, scale));
         var alpha = color.Alpha / 255f;
         premulColor[0] = color.Red * alpha; premulColor[1] = color.Green * alpha; premulColor[2] = color.Blue * alpha; premulColor[3] = color.Alpha;
         maskValue = (byte)((color.Red * 54 + color.Green * 183 + color.Blue * 19) >> 8);
     }
 
     /// <summary>Extends the stroke to a point (bitmap coordinates). Returns the changed rectangle.</summary>
-    public SKRectI AddPoint(SKPoint point)
+    /// <param name="pressure">Pen pressure 0…1; it scales the brush size. Mice report 1.</param>
+    public SKRectI AddPoint(SKPoint point, float pressure = 1)
     {
+        pressure = Math.Clamp(pressure, 0, 1);
         var dirty = SKRectI.Empty;
         if (last is not { } from)
         {
+            lastPressure = pressure;
+            radius = RadiusFor(pressure);
             dirty = Dab(point);
             last = point;
             residual = 0;
         }
         else
         {
-            var spacing = Math.Max(0.5f, radius * 2 * (float)settings.Spacing);
+            var spacing = Math.Max(0.5f, RadiusFor(Math.Min(pressure, lastPressure)) * 2 * (float)settings.Spacing);
             float dx = point.X - from.X, dy = point.Y - from.Y;
             var length = MathF.Sqrt(dx * dx + dy * dy);
             if (length <= 0) return dirty;
@@ -91,11 +97,13 @@ public sealed unsafe class BrushStroke : IDisposable
             while (travelled <= length)
             {
                 var t = travelled / length;
+                radius = RadiusFor(lastPressure + (pressure - lastPressure) * t);
                 dirty = Geometry.Union(dirty, Dab(new SKPoint(from.X + dx * t, from.Y + dy * t)));
                 travelled += spacing;
             }
             residual = length - (travelled - spacing);
             last = point;
+            lastPressure = pressure;
         }
         if (!dirty.IsEmpty)
         {
@@ -104,6 +112,8 @@ public sealed unsafe class BrushStroke : IDisposable
         }
         return dirty;
     }
+
+    private float RadiusFor(float pressure) => Math.Max(0.5f, fullRadius * (0.15f + 0.85f * pressure));
 
     /// <summary>A straight segment from the last point, for Shift-click lines.</summary>
     public SKRectI LineTo(SKPoint point) => AddPoint(point);
@@ -232,7 +242,7 @@ public sealed unsafe class BrushStroke : IDisposable
     // Smudge drags a buffer of paint along: each dab lays the carried pixels down, then picks up what was beneath.
     private void Smudge(SKPoint center, SKRectI rect)
     {
-        var size = (int)MathF.Ceiling(radius * 2 + 3);
+        var size = (int)MathF.Ceiling(fullRadius * 2 + 3);
         var dst = (byte*)Working.GetPixels();
         var stride = Working.RowBytes;
         int originX = (int)MathF.Floor(center.X - radius - 1), originY = (int)MathF.Floor(center.Y - radius - 1);

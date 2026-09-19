@@ -196,7 +196,8 @@ public sealed partial class CanvasView
         {
             case Drag.Pan: PanBy(delta); break;
             case Drag.Stroke:
-                foreach (var p in e.GetIntermediatePoints(this)) session.ContinueStroke(ToDocument(p.Position));
+                foreach (var p in e.GetIntermediatePoints(this))
+                    session.ContinueStroke(ToDocument(p.Position), e.Pointer.Type == PointerType.Pen ? p.Properties.Pressure : 1);
                 break;
             case Drag.Lasso when session.LassoKind == LassoKind.Freehand:
                 if (polygon.Count == 0 || Distance(ToScreen(polygon[^1]), position) >= 2) polygon.Add(currentDocument);

@@ -36,6 +36,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Smear tool: Liquify (push), Blur, Smudge, Dodge and Burn
 - Gradient tool (linear or radial, to background or to transparent)
 - Eyedropper and a full color picker
+- Pen pressure varies the brush size on graphics tablets
 - Every painting tool also works on masks
 
 ### Adjustments and filters

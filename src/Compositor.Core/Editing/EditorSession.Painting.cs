@@ -17,6 +17,8 @@ public sealed partial class EditorSession
     private SKPoint? lastStrokeEnd;
 
     public bool IsStroking => stroke != null;
+    /// <summary>Lets a pen's pressure vary the brush size.</summary>
+    public bool PressureSensitive { get; set; } = true;
     /// <summary>Where the Clone Stamp samples from, in document space.</summary>
     public SKPoint? CloneSource => cloneSource;
     /// <summary>Where the clone source currently is while painting, for the crosshair overlay.</summary>
@@ -100,10 +102,10 @@ public sealed partial class EditorSession
         return true;
     }
 
-    public void ContinueStroke(SKPoint point)
+    public void ContinueStroke(SKPoint point, float pressure = 1)
     {
         if (stroke == null || strokeLayer == null) return;
-        var changed = stroke.AddPoint(strokeToLayer.MapPoint(point));
+        var changed = stroke.AddPoint(strokeToLayer.MapPoint(point), PressureSensitive ? pressure : 1);
         lastStrokeEnd = point;
         if (changed.IsEmpty) return;
         var area = Geometry.RoundOut(stroke.ToDocument.MapRect(SKRect.Create(changed.Left, changed.Top, changed.Width, changed.Height)));
