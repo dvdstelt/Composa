@@ -27,6 +27,9 @@ public abstract record Adjustment
     /// <summary>Builds the per-pixel operation. <paramref name="originX"/>/<paramref name="originY"/> locate the buffer in the document.</summary>
     internal abstract PixelOp CreateOp();
 
+    /// <summary>A variant for reduced views, where each pixel stands for <paramref name="step"/> document pixels; null when the normal one fits.</summary>
+    internal virtual PixelOp? CreateOp(double step) => null;
+
     /// <summary>Adjusts RGBA8888 premultiplied pixels in place.</summary>
     public void Apply(SKBitmap bitmap, int originX = 0, int originY = 0) => Apply(bitmap, new SKRectI(0, 0, bitmap.Width, bitmap.Height), originX, originY);
 
@@ -41,7 +44,7 @@ public abstract record Adjustment
         area = Model.Geometry.Intersect(area, new SKRectI(0, 0, bitmap.Width, bitmap.Height));
         if (area.IsEmpty) return;
         // Settings are immutable, so the per-pixel operation (often a lookup table) is built once per instance.
-        var op = Ops.GetValue(this, static adjustment => adjustment.CreateOp());
+        var op = step > 1.01 && CreateOp(step) is { } reduced ? reduced : Ops.GetValue(this, static adjustment => adjustment.CreateOp());
         var pixels = (byte*)bitmap.GetPixels();
         var stride = bitmap.RowBytes;
         // Fully optimized from the first call: tiered JIT would otherwise run this loop unoptimized for the first renders.
@@ -346,6 +349,10 @@ public sealed record GrainAdjustment : Adjustment
         var bottom = Hash(x0, y0 + 1, seed) + (Hash(x0 + 1, y0 + 1, seed) - Hash(x0, y0 + 1, seed)) * fx;
         return top + (bottom - top) * fy;
     }
+
+    // Zoomed out, each screen pixel averages many grains, which evens the noise out; one sample at full strength
+    // would make the picture look far grainier than it exports.
+    internal override PixelOp? CreateOp(double step) => (this with { Amount = Amount * Math.Min(1, Math.Max(Size, 1) / step) }).CreateOp();
 
     internal override PixelOp CreateOp()
     {

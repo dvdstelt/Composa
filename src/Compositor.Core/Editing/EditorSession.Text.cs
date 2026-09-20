@@ -70,12 +70,12 @@ public sealed partial class EditorSession
         double scaleX = t.Width / layer.Pixels.Width, scaleY = t.Height / layer.Pixels.Height;
         var pixels = RenderText(style);
         var previous = layer.Pixels;
-        ReplaceLivePixels(layer, pixels);
         layer.Text = style;
         // Anchor the edge the alignment reads from, so typing grows the text the way the eye expects.
         double width = pixels.Width * scaleX, height = pixels.Height * scaleY;
         var x = style.Alignment switch { TextAlignment.Center => t.X + (t.Width - width) / 2, TextAlignment.Right => t.X + t.Width - width, _ => t.X };
         layer.Transform = t with { X = x, Width = width, Height = height, Distort = null };
+        ReplaceLivePixels(layer, pixels);
         var firstLine = style.Text.Split('\n')[0].Trim();
         if (firstLine.Length > 0) layer.Name = firstLine.Length > 24 ? firstLine[..24] + "…" : firstLine;
         if (pendingBefore != null && !ReferenceEquals(previous, pendingBefore.Find(layer.Id)?.Pixels)) { Pixels.Invalidate(previous); previous.Dispose(); }
@@ -91,8 +91,8 @@ public sealed partial class EditorSession
         var resized = style with { Size = Math.Clamp(style.Size * factor, 1, 4000) };
         var center = layer.Transform.Center;
         var rendered = RenderText(resized);
-        ReplaceLivePixels(layer, rendered);
         layer.Text = resized;
         layer.Transform = layer.Transform with { X = center.X - rendered.Width / 2.0, Y = center.Y - rendered.Height / 2.0, Width = rendered.Width, Height = rendered.Height };
+        ReplaceLivePixels(layer, rendered);
     }
 }

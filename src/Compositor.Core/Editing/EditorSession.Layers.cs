@@ -195,6 +195,14 @@ public sealed partial class EditorSession
                 document.SiblingsOf(layer.Id)!.Remove(layer);
                 group.Children.Add(layer);
             }
+            // A clipped layer needs its base beneath it. Grouped away from the base, the folder takes over the clipping.
+            if (group.Children[0].Clipped)
+            {
+                foreach (var child in group.Children.TakeWhile(c => c.Clipped).ToList()) child.Clipped = false;
+                group.Clipped = siblings.IndexOf(group) > 0;
+            }
+            foreach (var list in document.AllLayers().Select(l => l.Children).Append(document.Layers))
+                if (list.Count > 0 && list[0].Clipped) list[0].Clipped = false;
             document.SetActive(group.Id);
         });
         InvalidateAll();
@@ -309,6 +317,9 @@ public sealed partial class EditorSession
                 var copy = layer.Clone();
                 copy.Visible = true;
                 if (i == 0 || single) { copy.Blend = BlendMode.Normal; copy.Opacity = 1; copy.Clipped = false; }
+                // When the bottom layer is itself clipped, its real base lies outside the merge: the layers above it
+                // were clipped to that base too, not to each other.
+                if (bottom.Clipped) copy.Clipped = false;
                 return copy;
             }).Where((copy, i) => roots[i].Visible).ToList();
             var pixels = DocumentRenderer.RenderLayers(document, rendered, area);

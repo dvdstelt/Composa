@@ -22,6 +22,8 @@ public sealed record FilterSettings
     /// <summary>Vignette, -100 (darken corners) … 100 (lighten corners).</summary>
     public double Vignette { get; init; }
     public uint Seed { get; init; } = 1;
+    /// <summary>Set for layers that fill the canvas: a blur then continues their edge colors instead of fading into transparency.</summary>
+    public bool ClampEdges { get; init; }
 
     public static string DisplayName(FilterKind kind) => kind switch
     {
@@ -44,6 +46,18 @@ public static unsafe class ImageFilters
     {
         switch (settings.Kind)
         {
+            case FilterKind.GaussianBlur when settings.ClampEdges && HasOpaqueBorder(source):
+            {
+                // A picture that is solid right up to its edges (a photo, a filled background) blurs as if its edge
+                // colors continued outwards. Spreading it into transparency would leave a see-through frame.
+                var sigma = (float)Math.Max(0.1, settings.Radius);
+                using var filter = SKImageFilter.CreateBlur(sigma, sigma, SKShaderTileMode.Clamp);
+                var result = Pixels.NewColor(source.Width, source.Height);
+                using var canvas = new SKCanvas(result);
+                using var paint = new SKPaint { ImageFilter = filter, BlendMode = SKBlendMode.Src };
+                canvas.DrawBitmap(source, 0, 0, paint);
+                return (result, 0, 0);
+            }
             case FilterKind.GaussianBlur:
             {
                 var sigma = (float)Math.Max(0.1, settings.Radius);
@@ -52,7 +66,7 @@ public static unsafe class ImageFilters
                 return (Draw(source, pad, pad, filter), pad, pad);
             }
             case FilterKind.MotionBlur:
-                return MotionBlur(source, settings.Radius, settings.Angle);
+                return MotionBlur(source, settings.Radius, settings.Angle, settings.ClampEdges && HasOpaqueBorder(source));
             case FilterKind.Sharpen:
                 return (Sharpen(source, settings.Radius, settings.Amount / 100 * 2), 0, 0);
             case FilterKind.AddNoise:
@@ -75,11 +89,23 @@ public static unsafe class ImageFilters
         return result;
     }
 
-    private static (SKBitmap, int, int) MotionBlur(SKBitmap source, double distance, double angle)
+    /// <summary>True when every pixel along the four edges is fully opaque.</summary>
+    private static bool HasOpaqueBorder(SKBitmap source)
+    {
+        var pixels = (byte*)source.GetPixels();
+        int w = source.Width, h = source.Height, stride = source.RowBytes;
+        for (var x = 0; x < w; x++)
+            if (pixels[x * 4 + 3] != 255 || pixels[(long)(h - 1) * stride + x * 4 + 3] != 255) return false;
+        for (var y = 0; y < h; y++)
+            if (pixels[(long)y * stride + 3] != 255 || pixels[(long)y * stride + (w - 1) * 4 + 3] != 255) return false;
+        return true;
+    }
+
+    private static (SKBitmap, int, int) MotionBlur(SKBitmap source, double distance, double angle, bool clamp)
     {
         var length = Math.Max(1, (int)Math.Round(distance));
         double radians = angle * Math.PI / 180, dx = Math.Cos(radians), dy = -Math.Sin(radians);
-        int padX = (int)Math.Ceiling(Math.Abs(dx) * length / 2) + 1, padY = (int)Math.Ceiling(Math.Abs(dy) * length / 2) + 1;
+        int padX = clamp ? 0 : (int)Math.Ceiling(Math.Abs(dx) * length / 2) + 1, padY = clamp ? 0 : (int)Math.Ceiling(Math.Abs(dy) * length / 2) + 1;
         int w = source.Width + padX * 2, h = source.Height + padY * 2;
         var result = Pixels.NewColor(w, h);
         var src = (byte*)source.GetPixels();
@@ -95,7 +121,8 @@ public static unsafe class ImageFilters
                 {
                     var t = samples == 1 ? 0 : (i / (double)(samples - 1) - 0.5) * length;
                     int sx = (int)Math.Round(x - padX + dx * t), sy = (int)Math.Round(y - padY + dy * t);
-                    if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
+                    if (clamp) { sx = Math.Clamp(sx, 0, sw - 1); sy = Math.Clamp(sy, 0, sh - 1); }
+                    else if (sx < 0 || sy < 0 || sx >= sw || sy >= sh) continue;
                     var p = src + (long)sy * srcStride + sx * 4;
                     r += p[0]; g += p[1]; b += p[2]; a += p[3];
                 }

@@ -44,7 +44,8 @@ public sealed partial class EditorSession
     /// <summary>Grows a pure-translation layer so its bitmap covers the whole canvas, making every canvas pixel paintable.</summary>
     public void EnsureCoversCanvas(Layer layer)
     {
-        if (layer.Pixels is not { } pixels || !layer.Transform.IsPureTranslation(pixels.Width, pixels.Height)) return;
+        if (layer.Pixels is not { } pixels) return;
+        if (!layer.Transform.IsPureTranslation(pixels.Width, pixels.Height)) { PadToCoverCanvas(layer); return; }
         int x = (int)layer.Transform.X, y = (int)layer.Transform.Y;
         var have = new SKRectI(x, y, x + pixels.Width, y + pixels.Height);
         var want = Geometry.Union(have, document.Bounds);
@@ -64,6 +65,48 @@ public sealed partial class EditorSession
             layer.Mask = grownMask;
         }
         layer.Transform = LayerTransform.Identity(want.Width, want.Height) with { X = want.Left, Y = want.Top };
+    }
+
+    /// <summary>
+    /// The same for a scaled, flipped or rotated layer: transparent source pixels are added around the bitmap until the
+    /// canvas is covered, and the placement is adjusted so that the existing pixels stay exactly where they are.
+    /// </summary>
+    private void PadToCoverCanvas(Layer layer)
+    {
+        var pixels = layer.Pixels!;
+        var t = layer.Transform;
+        if (t.Distort != null || !layer.Matrix.TryInvert(out var inverse)) return;
+        var needed = inverse.MapRect(new SKRect(0, 0, document.Width, document.Height));
+        int left = Math.Max(0, (int)Math.Ceiling(-needed.Left)), top = Math.Max(0, (int)Math.Ceiling(-needed.Top));
+        int right = Math.Max(0, (int)Math.Ceiling(needed.Right - pixels.Width)), bottom = Math.Max(0, (int)Math.Ceiling(needed.Bottom - pixels.Height));
+        if (left + top + right + bottom == 0) return;
+        long width = pixels.Width + left + right, height = pixels.Height + top + bottom;
+        if (width > Document.MaxSide || height > Document.MaxSide || width * height > IO.ImageFiles.MaxPixels * 2) return;
+
+        var grown = Pixels.NewColor((int)width, (int)height);
+        using (var canvas = new SKCanvas(grown)) canvas.DrawBitmap(pixels, left, top);
+        layer.Pixels = grown;
+        if (layer.Mask is { } mask)
+        {
+            var hidesAll = mask.GetPixel(0, 0).Alpha == 0 && mask.GetPixel(mask.Width - 1, mask.Height - 1).Alpha == 0;
+            var grownMask = Pixels.NewMask((int)width, (int)height, hidesAll ? (byte)0 : (byte)255);
+            using var canvas = new SKCanvas(grownMask);
+            using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
+            canvas.DrawBitmap(mask, new SKRect(left, top, left + pixels.Width, top + pixels.Height), paint);
+            layer.Mask = grownMask;
+        }
+
+        // In the unrotated frame the padding extends the box; flips swap which side it lands on.
+        double sx = t.Width / pixels.Width, sy = t.Height / pixels.Height;
+        double padLeft = (t.FlipHorizontal ? right : left) * sx, padTop = (t.FlipVertical ? bottom : top) * sy;
+        double x = t.X - padLeft, y = t.Y - padTop, w = width * sx, h = height * sy;
+        // The box turns about its center, which has just moved by delta; shifting the box by R·delta - delta keeps
+        // every existing pixel where it was.
+        double deltaX = x + w / 2 - (t.X + t.Width / 2), deltaY = y + h / 2 - (t.Y + t.Height / 2);
+        double radians = t.Rotation * Math.PI / 180, cos = Math.Cos(radians), sin = Math.Sin(radians);
+        x += deltaX * cos - deltaY * sin - deltaX;
+        y += deltaX * sin + deltaY * cos - deltaY;
+        layer.Transform = t with { X = x, Y = y, Width = w, Height = h };
     }
 
     /// <summary>original + (modified - original) × selection, for both color and mask bitmaps. Takes ownership of <paramref name="modified"/>.</summary>
@@ -167,7 +210,22 @@ public sealed partial class EditorSession
         return (ColorToMask(color), 0, 0);
     });
 
-    public void PreviewFilter(FilterSettings settings) => Preview(source =>
+    public void PreviewFilter(FilterSettings settings)
+    {
+        // Radii and distances are given in document pixels; a scaled-down photo has several source pixels to each.
+        if (previewLayer is { } target)
+        {
+            var matrix = TargetMatrix(target);
+            var scale = Math.Sqrt(Math.Abs(matrix.ScaleX * matrix.ScaleY - matrix.SkewX * matrix.SkewY));
+            if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3) settings = settings with { Radius = settings.Radius / scale };
+            // A floating layer's blur spreads past its edges; one that fills the canvas has nothing to spread into.
+            var bounds = target.Pixels != null ? target.Bounds : new SKRect(0, 0, document.Width, document.Height);
+            settings = settings with { ClampEdges = bounds.Left <= 0.5f && bounds.Top <= 0.5f && bounds.Right >= document.Width - 0.5f && bounds.Bottom >= document.Height - 0.5f };
+        }
+        PreviewFilterCore(settings);
+    }
+
+    private void PreviewFilterCore(FilterSettings settings) => Preview(source =>
     {
         if (source.ColorType != SKColorType.Alpha8) return ImageFilters.Run(source, settings);
         using var color = MaskToColor(source);

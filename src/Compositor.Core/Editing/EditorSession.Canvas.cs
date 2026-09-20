@@ -65,9 +65,52 @@ public sealed partial class EditorSession
                     {
                         // Unscaled layers are resampled so they stay paintable at full resolution.
                         int w = Math.Max(1, (int)Math.Round(pixels.Width * sx)), h = Math.Max(1, (int)Math.Round(pixels.Height * sy));
-                        layer.Pixels = Resample(pixels, w, h);
+                        // Live layers are redrawn from their settings, scaled along with the document.
+                        if (layer.Text is { } text && Math.Abs(sx - sy) < 1e-6)
+                        {
+                            layer.Text = text with { Size = Math.Clamp(text.Size * sy, 1, 4000) };
+                            var rendered = RenderText(layer.Text);
+                            (w, h) = (rendered.Width, rendered.Height);
+                            layer.Pixels = rendered;
+                        }
+                        else if (layer.Shape is { } shape)
+                        {
+                            layer.Shape = shape with { CornerRadius = shape.CornerRadius * Math.Min(sx, sy) };
+                            layer.Pixels = RenderShape(layer.Shape, w, h);
+                        }
+                        else
+                        {
+                            layer.Text = null; // Stretched unevenly, text can no longer be redrawn from its settings.
+                            layer.Pixels = Resample(pixels, w, h);
+                        }
                         if (layer.Mask != null) layer.Mask = Resample(layer.Mask, w, h);
                         layer.Transform = LayerTransform.Identity(w, h) with { X = Math.Round(t.X * sx), Y = Math.Round(t.Y * sy) };
+                    }
+                    else if (Math.Abs(sx - sy) > 1e-6 && (t.Rotation != 0 || t.Distort != null))
+                    {
+                        // Stretching a turned layer unevenly shears it, which a layer's placement cannot express, so
+                        // the layer is drawn out at its current placement and those pixels are resampled instead.
+                        var bounds = Geometry.RoundOut(layer.Bounds);
+                        var plain = layer.Clone();
+                        plain.Visible = true; plain.Opacity = 1; plain.Blend = BlendMode.Normal; plain.Clipped = false; plain.Mask = null;
+                        using var drawn = DocumentRenderer.RenderLayers(document, [plain], bounds);
+                        int w = Math.Max(1, (int)Math.Round(bounds.Width * sx)), h = Math.Max(1, (int)Math.Round(bounds.Height * sy));
+                        if (layer.Mask != null)
+                        {
+                            using var maskDrawn = Pixels.NewMask(bounds.Width, bounds.Height);
+                            using (var canvas = new SKCanvas(maskDrawn))
+                            {
+                                canvas.Translate(-bounds.Left, -bounds.Top);
+                                var maskMatrix = DocumentRenderer.MaskMatrix(layer);
+                                canvas.Concat(in maskMatrix);
+                                canvas.DrawImage(Pixels.ImageOf(layer.Mask), 0, 0, new SKSamplingOptions(SKFilterMode.Linear));
+                            }
+                            layer.Mask = Resample(maskDrawn, w, h);
+                        }
+                        layer.Pixels = Resample(drawn, w, h);
+                        layer.Shape = null;
+                        layer.Text = null;
+                        layer.Transform = LayerTransform.Identity(w, h) with { X = Math.Round(bounds.Left * sx), Y = Math.Round(bounds.Top * sy) };
                     }
                     else
                     {
@@ -101,7 +144,7 @@ public sealed partial class EditorSession
         return result;
     }
 
-    private static SKBitmap RemapDocumentMask(SKBitmap mask, int width, int height, SKMatrix matrix, byte fill)
+    internal static SKBitmap RemapDocumentMask(SKBitmap mask, int width, int height, SKMatrix matrix, byte fill)
     {
         var result = Pixels.NewMask(width, height, fill);
         using var canvas = new SKCanvas(result);

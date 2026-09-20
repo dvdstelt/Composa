@@ -13,6 +13,9 @@ public sealed class TransformEdit
 {
     private readonly EditorSession session;
     private readonly List<(Layer Layer, LayerTransform Start)> layers;
+    // Folder and adjustment masks live in document space; they follow a move so they stay over their content.
+    private readonly List<(Layer Layer, SKBitmap Start)> masks;
+    private readonly Dictionary<Layer, SKBitmap> movedMasks = [];
 
     /// <summary>The frame being manipulated: an unrotated rectangle plus a rotation about its center.</summary>
     public SKRect StartFrame { get; }
@@ -21,11 +24,13 @@ public sealed class TransformEdit
     public double Rotation { get; private set; }
     public IReadOnlyList<Layer> Layers => layers.Select(l => l.Layer).ToList();
 
-    internal TransformEdit(EditorSession session, List<Layer> targets)
+    internal TransformEdit(EditorSession session, List<Layer> targets, List<Layer> maskOwners)
     {
         this.session = session;
         layers = targets.Select(l => (l, l.Transform)).ToList();
-        if (layers.Count == 1)
+        masks = maskOwners.Select(l => (l, l.Mask!)).ToList();
+        if (layers.Count == 0) StartFrame = new SKRect(0, 0, session.Document.Width, session.Document.Height);
+        else if (layers.Count == 1)
         {
             var t = layers[0].Start;
             StartFrame = SKRect.Create((float)t.X, (float)t.Y, (float)t.Width, (float)t.Height);
@@ -134,8 +139,27 @@ public sealed class TransformEdit
         return Math.Round(degrees, 2);
     }
 
+    private void MoveMasks()
+    {
+        int dx = (int)Math.Round(Frame.MidX - StartFrame.MidX), dy = (int)Math.Round(Frame.MidY - StartFrame.MidY);
+        foreach (var (layer, start) in masks)
+        {
+            SKBitmap? moved = null;
+            if (dx != 0 || dy != 0)
+            {
+                // What slides in from outside takes the mask's corner value: hidden for a hide-all mask, revealed otherwise.
+                var fill = start.GetPixel(0, 0).Alpha;
+                moved = EditorSession.RemapDocumentMask(start, start.Width, start.Height, SKMatrix.CreateTranslation(dx, dy), fill);
+            }
+            layer.Mask = moved ?? start;
+            if (movedMasks.Remove(layer, out var previous)) { Rendering.Pixels.Invalidate(previous); previous.Dispose(); }
+            if (moved != null) movedMasks[layer] = moved;
+        }
+    }
+
     private SKRectI Area()
     {
+        if (masks.Count > 0) return session.Document.Bounds;
         var area = SKRectI.Empty;
         foreach (var (layer, _) in layers) area = Geometry.Union(area, session.AffectedArea(layer));
         return area;
@@ -143,6 +167,8 @@ public sealed class TransformEdit
 
     private void Update()
     {
+        MoveMasks();
+        if (layers.Count == 0) return;
         // A negative width or height means the frame was dragged through itself: a flip.
         bool flipX = Frame.Width < 0, flipY = Frame.Height < 0;
         var frame = Frame.Standardized;
@@ -178,7 +204,7 @@ public sealed class TransformEdit
     }
 
     /// <summary>True when any layer ended up somewhere other than where it started.</summary>
-    public bool HasChanges => layers.Any(l => !Same(l.Layer.Transform, l.Start));
+    public bool HasChanges => layers.Any(l => !Same(l.Layer.Transform, l.Start)) || masks.Any(m => !ReferenceEquals(m.Layer.Mask, m.Start));
 
     /// <summary>Record equality compares the distort array by reference, so it is compared separately.</summary>
     public static bool Same(LayerTransform a, LayerTransform b) =>
@@ -216,9 +242,10 @@ public sealed partial class EditorSession
     public TransformEdit? BeginTransform(string name = "Transform")
     {
         var targets = TransformTargets();
-        if (targets.Count == 0) return null;
+        var maskOwners = SelectedRoots().SelectMany(r => Document.Flatten([r])).Where(l => l.Pixels == null && l.Mask != null).Distinct().ToList();
+        if (targets.Count == 0 && maskOwners.Count == 0) return null;
         Begin(name);
-        return Transform = new TransformEdit(this, targets);
+        return Transform = new TransformEdit(this, targets, maskOwners);
     }
 
     public void CommitTransform()
@@ -252,16 +279,19 @@ public sealed partial class EditorSession
     private static void ReplaceLivePixels(Layer layer, SKBitmap pixels)
     {
         layer.Pixels = pixels;
+        // Freshly drawn pixels are only sharp when they sit on the pixel grid at their own size.
+        var t = layer.Transform;
+        if (t.Rotation == 0 && t.Distort == null && Math.Abs(t.Width - pixels.Width) < 1 && Math.Abs(t.Height - pixels.Height) < 1)
+            layer.Transform = t with { X = Math.Round(t.X), Y = Math.Round(t.Y), Width = pixels.Width, Height = pixels.Height };
         if (layer.Mask is { } mask && (mask.Width != pixels.Width || mask.Height != pixels.Height)) layer.Mask = Resample(mask, pixels.Width, pixels.Height);
     }
 
     /// <summary>Nudges the selected layers with the arrow keys.</summary>
     public void Nudge(int dx, int dy)
     {
-        var targets = TransformTargets();
-        if (targets.Count == 0) return;
-        Apply("Nudge", () => { foreach (var layer in targets) layer.Transform = layer.Transform.Translated(dx, dy); });
-        InvalidateAll();
+        if (BeginTransform("Nudge") is not { } edit) return;
+        edit.MoveBy(dx, dy);
+        CommitTransform();
     }
 
     /// <summary>Sets exact values from the transform inspector.</summary>

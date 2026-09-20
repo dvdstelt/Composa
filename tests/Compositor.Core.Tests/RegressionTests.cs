@@ -1,5 +1,6 @@
 using Compositor.Editing;
 using Compositor.Filters;
+using Compositor.Model;
 using Compositor.Painting;
 using Compositor.Rendering;
 using Compositor.Selections;
@@ -162,5 +163,129 @@ public class ContentAwareFillTests
         session.Undo();
         Assert.Equal(0, session.Composite().GetPixel(150, 50).Alpha);
         Assert.Equal(120, session.Document.Find(photo.Id)!.Pixels!.Width);
+    }
+}
+
+public class QaRegressionTests
+{
+    [Fact]
+    public void Painting_beyond_a_rotated_scaled_layer_grows_it_without_moving_its_pixels()
+    {
+        var session = EditorSession.NewCanvas(300, 200);
+        session.Document.Layers.Clear();
+        var layer = session.AddImageLayer("box", Solid(50, 30, SKColors.Red), new SKPoint(100, 100), fit: false);
+        layer.Transform = layer.Transform with { Width = 100, Height = 60, X = 50, Y = 70, Rotation = 30, FlipHorizontal = true };
+        session.InvalidateAll();
+        using var before = session.Flatten();
+        session.Tool = Tool.Brush;
+        session.Foreground = SKColors.Blue;
+        session.Brush = new BrushSettings { Size = 20, Hardness = 1 };
+        Assert.True(session.BeginStroke(new SKPoint(260, 30), out _));
+        session.EndStroke();
+        using var after = session.Flatten();
+        AssertColor(SKColors.Blue, after.GetPixel(260, 30), 6);
+        var moved = 0;
+        for (var y = 60; y < 150; y += 3) for (var x = 40; x < 170; x += 3)
+            if (Math.Abs(before.GetPixel(x, y).Alpha - after.GetPixel(x, y).Alpha) > 160) moved++; // Edge antialiasing may soften; nothing may shift.
+        Assert.True(moved <= 3, $"{moved} sampled pixels of the existing picture changed");
+    }
+
+    [Fact]
+    public void Blurring_a_canvas_filling_layer_keeps_its_edges_opaque()
+    {
+        var session = EditorSession.NewCanvas(120, 120, SKColors.White);
+        session.ApplyFilter(new FilterSettings { Kind = FilterKind.GaussianBlur, Radius = 8 });
+        Assert.Equal(255, session.Composite().GetPixel(0, 60).Alpha);
+        session.ApplyFilter(new FilterSettings { Kind = FilterKind.MotionBlur, Radius = 30, Angle = 20 });
+        Assert.Equal(255, session.Composite().GetPixel(0, 0).Alpha);
+        Assert.Equal(120, session.ActiveLayer!.Pixels!.Width);
+    }
+
+    [Fact]
+    public void Filter_radius_is_measured_in_document_pixels()
+    {
+        var session = EditorSession.NewCanvas(200, 200);
+        session.Document.Layers.Clear();
+        var big = Pixels.NewColor(800, 800);
+        using (var canvas = new SKCanvas(big)) { canvas.Clear(SKColors.White); using var black = new SKPaint { Color = SKColors.Black }; canvas.DrawRect(0, 0, 400, 800, black); }
+        session.AddImageLayer("photo", big);
+        session.ApplyFilter(new FilterSettings { Kind = FilterKind.GaussianBlur, Radius = 8 });
+        var nearEdge = session.Composite().GetPixel(108, 100).Red; // 8 document pixels past the edge: still clearly grey.
+        Assert.InRange(nearEdge, 150, 250);
+    }
+
+    [Fact]
+    public void Merging_or_grouping_clipped_layers_keeps_the_picture()
+    {
+        EditorSession Build(out Layer c2)
+        {
+            var s = EditorSession.NewCanvas(60, 60);
+            s.Document.Layers.Clear();
+            s.AddImageLayer("base", Solid(40, 40, SKColors.Red), new SKPoint(30, 30), fit: false);
+            var c1 = s.AddImageLayer("c1", Solid(10, 10, SKColors.Blue), new SKPoint(15, 15), fit: false);
+            s.ToggleClippingMask(c1);
+            c2 = s.AddImageLayer("c2", Solid(10, 10, SKColors.Lime), new SKPoint(45, 45), fit: false);
+            s.ToggleClippingMask(c2);
+            return s;
+        }
+        var merged = Build(out _);
+        merged.MergeLayers();
+        AssertColor(SKColors.Lime, merged.Composite().GetPixel(45, 45));
+        AssertColor(SKColors.Blue, merged.Composite().GetPixel(15, 15));
+
+        var grouped = Build(out var top);
+        grouped.SelectLayer(top.Id);
+        grouped.GroupSelectedLayers();
+        AssertColor(SKColors.Lime, grouped.Composite().GetPixel(45, 45));
+    }
+
+    [Fact]
+    public void A_folder_mask_moves_with_the_folder()
+    {
+        var session = EditorSession.NewCanvas(200, 100);
+        session.Document.Layers.Clear();
+        var box = session.AddImageLayer("box", Solid(30, 30, SKColors.Red), new SKPoint(35, 35), fit: false);
+        session.GroupSelectedLayers();
+        var folder = session.ActiveLayer!;
+        session.SelectRect(new SKRect(20, 20, 50, 50));
+        session.AddMask(folder);
+        session.Deselect();
+        session.EditingMask = false;
+        session.Nudge(100, 0);
+        AssertColor(SKColors.Red, session.Composite().GetPixel(135, 35));
+        session.Undo();
+        AssertColor(SKColors.Red, session.Composite().GetPixel(35, 35));
+        Assert.Equal(0, session.Composite().GetPixel(135, 35).Alpha);
+    }
+
+    [Fact]
+    public void Image_size_rescales_live_text_and_shapes()
+    {
+        var session = EditorSession.NewCanvas(400, 200, SKColors.White);
+        var text = session.AddText(new SKPoint(20, 20), new TextStyle { Text = "Hi", Size = 60, FontFamily = EditorSession.FontFamilies.FirstOrDefault() ?? "sans-serif" });
+        session.ShapeKind = ShapeKind.RoundedRectangle;
+        session.ShapeCornerRadius = 40;
+        var shape = session.AddShape(new SKRect(200, 50, 360, 150))!;
+        session.ResizeImage(200, 100);
+        Assert.Equal(30, session.Document.Find(text.Id)!.Text!.Size, 1);
+        Assert.Equal(20, session.Document.Find(shape.Id)!.Shape!.CornerRadius, 1);
+        Assert.Equal(80, session.Document.Find(shape.Id)!.Pixels!.Width);
+    }
+
+    [Fact]
+    public void Uneven_image_size_stretches_a_rotated_layer_like_the_flattened_picture()
+    {
+        var session = EditorSession.NewCanvas(120, 80, SKColors.White);
+        var layer = session.AddImageLayer("box", Solid(40, 20, SKColors.Red), new SKPoint(60, 40), fit: false);
+        layer.Transform = layer.Transform with { Rotation = 30 };
+        session.InvalidateAll();
+        using var before = session.Flatten();
+        using var expected = EditorSession.Resample(before, 240, 80);
+        session.ResizeImage(240, 80);
+        using var actual = session.Flatten();
+        var differing = 0;
+        for (var y = 0; y < 80; y += 2) for (var x = 0; x < 240; x += 2)
+            if (Math.Abs(expected.GetPixel(x, y).Green - actual.GetPixel(x, y).Green) > 60) differing++;
+        Assert.True(differing < 40, $"{differing} sampled pixels differ from a plain stretch");
     }
 }

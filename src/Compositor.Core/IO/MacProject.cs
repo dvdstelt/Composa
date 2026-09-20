@@ -155,6 +155,7 @@ public static class MacProject
     {
         "Multiply" => BlendMode.Multiply, "Screen" => BlendMode.Screen, "Overlay" => BlendMode.Overlay, "Darken" => BlendMode.Darken,
         "Lighten" => BlendMode.Lighten, "Difference" => BlendMode.Difference, "Color Dodge" => BlendMode.ColorDodge, "Color Burn" => BlendMode.ColorBurn,
+        "Soft Light" => BlendMode.SoftLight, "Hard Light" => BlendMode.HardLight, "Exclusion" => BlendMode.Exclusion,
         "Hue" => BlendMode.Hue, "Saturation" => BlendMode.Saturation, "Color" => BlendMode.Color, "Luminosity" => BlendMode.Luminosity,
         _ => BlendMode.Normal
     };
