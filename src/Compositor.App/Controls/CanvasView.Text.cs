@@ -120,7 +120,11 @@ public sealed partial class CanvasView
         TextEditingChanged?.Invoke();
     }
 
-    /// <summary>Keys while text is being typed. Everything is taken, so tool shortcuts cannot fire mid-sentence.</summary>
+    /// <summary>
+    /// Keys while text is being typed. Editing keys are acted on here. A key that may produce a character is left
+    /// unhandled on purpose: the X11 backend only sends text input for a key press nobody handled, so marking it
+    /// handled would swallow the letter. The window keeps tool shortcuts off while text is open instead.
+    /// </summary>
     private bool HandleTextKey(TextEditor editor, KeyEventArgs e)
     {
         if (session == null) return false;
@@ -162,8 +166,9 @@ public sealed partial class CanvasView
             case Key.X when control: _ = CopyText(editor, cut: true); return true;
             case Key.V when control: _ = PasteText(editor); return true;
         }
-        // Letters and digits arrive as text input; anything else is swallowed rather than switching tools.
-        return true;
+        // Ctrl and Alt combinations that mean nothing here are swallowed rather than reaching the menus. Everything
+        // else (letters, digits, space, punctuation, dead keys) is left for the text input that follows it.
+        return control || alt;
     }
 
     private async Task CopyText(TextEditor editor, bool cut)

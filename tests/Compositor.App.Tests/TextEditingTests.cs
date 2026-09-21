@@ -45,6 +45,34 @@ public class TextEditingTests
     }
 
     [AvaloniaFact]
+    public void Printable_keys_stay_unhandled_while_typing_so_the_platform_delivers_the_characters()
+    {
+        // X11 only sends text input for a key press nobody handled, so a handled letter would never be typed.
+        var handled = new Dictionary<Key, bool>();
+        window.AddHandler(InputElement.KeyDownEvent, (_, e) => handled[e.Key] = e.Handled, Avalonia.Interactivity.RoutingStrategies.Bubble, handledEventsToo: true);
+        Click(80, 120);
+        Assert.True(session.IsEditingText);
+        window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.None);
+        window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        window.KeyPressQwerty(PhysicalKey.Digit1, RawInputModifiers.None);
+        window.KeyPressQwerty(PhysicalKey.Period, RawInputModifiers.Shift);
+        window.KeyPressQwerty(PhysicalKey.A, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.D, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.Backspace, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(handled[Key.B]);                                        // Left for the text input that follows.
+        Assert.False(handled[Key.Space]);
+        Assert.False(handled[Key.D1]);
+        Assert.False(handled[Key.OemPeriod]);
+        Assert.True(handled[Key.A]);                                         // Ctrl+A selected all in the text.
+        Assert.True(handled[Key.D]);                                         // Ctrl+D swallowed: no deselect while typing.
+        Assert.True(handled[Key.Back]);
+        Assert.Equal(Tool.Text, session.Tool);                               // B did not switch to the Brush...
+        Assert.True(session.IsEditingText);                                  // ...and 1 did not change any opacity or end the edit.
+        Assert.Equal(1, session.ActiveLayer!.Opacity);
+    }
+
+    [AvaloniaFact]
     public void Clicking_starts_point_text_that_is_typed_live_and_committed_with_ctrl_enter()
     {
         Click(80, 120);

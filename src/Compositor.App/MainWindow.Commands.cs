@@ -363,6 +363,9 @@ public sealed partial class MainWindow
         if (focused is Control control && control.FindAncestorOfType<MenuItem>() != null) return;
 
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
+        // While text is being typed, letters are text, not tool keys or shortcuts; the key stays unhandled so the
+        // platform still delivers the character.
+        if (session?.IsEditingText == true) return;
         if (canvas.IsDragging) { e.Handled = true; return; }
 
         var gesture = commands.FirstOrDefault(c => c.Matches(e));
