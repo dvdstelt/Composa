@@ -16,6 +16,11 @@ public sealed record BrushSettings
     public double Opacity { get; init; } = 1;
     /// <summary>Distance between dabs as a fraction of the diameter.</summary>
     public double Spacing { get; init; } = 0.08;
+    /// <summary>
+    /// 0…100. The brush trails the pointer on a string of this length (in screen points) and only moves once the
+    /// pointer pulls it taut, so a shaky hand still draws a smooth line. 0 follows the pointer exactly.
+    /// </summary>
+    public double Smoothing { get; init; }
 }
 
 /// <summary>

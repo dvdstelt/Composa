@@ -15,8 +15,12 @@ public sealed partial class EditorSession
     private SKPoint? cloneSource;
     private SKPoint? cloneOffset;
     private SKPoint? lastStrokeEnd;
+    private SKPoint? smoothingAnchor;
+    private SKPoint? smoothingPointer;
 
     public bool IsStroking => stroke != null;
+    /// <summary>Screen pixels per document pixel, told by the canvas, so Smoothing feels the same at any zoom.</summary>
+    public double ViewZoom { get; set; } = 1;
     /// <summary>Lets a pen's pressure vary the brush size.</summary>
     public bool PressureSensitive { get; set; } = true;
     /// <summary>Where the Clone Stamp samples from, in document space.</summary>
@@ -98,7 +102,9 @@ public sealed partial class EditorSession
         SetTarget(layer, stroke.Working);
         Pixels.SetLive(stroke.Working, true);
         if (lineFromLast && lastStrokeEnd is { } from) stroke.AddPoint(strokeToLayer.MapPoint(from));
-        ContinueStroke(point);
+        // The first dab always lands; from here on Smoothing decides how the brush follows.
+        smoothingAnchor = smoothingPointer = point;
+        Paint(point, 1);
         if (lineFromLast) Invalidate(AffectedArea(layer));
         return true;
     }
@@ -106,7 +112,36 @@ public sealed partial class EditorSession
     public void ContinueStroke(SKPoint point, float pressure = 1)
     {
         if (stroke == null || strokeLayer == null) return;
-        var changed = stroke.AddPoint(strokeToLayer.MapPoint(point), PressureSensitive ? pressure : 1);
+        smoothingPointer = point;
+        if (Smoothed(point) is not { } painted) return;
+        Paint(painted, pressure);
+    }
+
+    /// <summary>
+    /// Where the brush actually is with Smoothing on: it trails the pointer on a string and only moves once the
+    /// pointer pulls that string taut, the model Photoshop uses. The string's length is in screen points, so it feels
+    /// the same however far the canvas is zoomed in. Null while the string is still slack, which is the whole point:
+    /// those jitters never reach the stroke.
+    /// </summary>
+    private SKPoint? Smoothed(SKPoint point)
+    {
+        if (!IsSmoothing || smoothingAnchor is not { } anchor) return point;
+        var radius = Brush.Smoothing / Math.Max(0.01, ViewZoom);
+        float dx = point.X - anchor.X, dy = point.Y - anchor.Y;
+        var distance = Math.Sqrt(dx * dx + dy * dy);
+        if (distance <= radius) return null;
+        var step = (float)((distance - radius) / distance);
+        var moved = new SKPoint(anchor.X + dx * step, anchor.Y + dy * step);
+        smoothingAnchor = moved;
+        return moved;
+    }
+
+    /// <summary>Smoothing is offered for Paint and Erase; healing, cloning and smearing keep their own feel.</summary>
+    private bool IsSmoothing => strokeMode is BrushMode.Paint or BrushMode.Erase && Brush.Smoothing > 0;
+
+    private void Paint(SKPoint point, float pressure)
+    {
+        var changed = stroke!.AddPoint(strokeToLayer.MapPoint(point), PressureSensitive ? pressure : 1);
         lastStrokeEnd = point;
         if (changed.IsEmpty) return;
         var area = Geometry.RoundOut(stroke.ToDocument.MapRect(SKRect.Create(changed.Left, changed.Top, changed.Width, changed.Height)));
@@ -120,6 +155,8 @@ public sealed partial class EditorSession
     {
         if (stroke == null || strokeLayer == null) return;
         var layer = strokeLayer;
+        // Smoothing leaves the brush short of the pointer; the stroke ends where the hand did.
+        if (IsSmoothing && smoothingPointer is { } pointer && smoothingAnchor is { } anchor && pointer != anchor) Paint(pointer, 1);
         if (stroke.Touched.IsEmpty)
         {
             SetTarget(layer, strokeOriginal!);
@@ -163,5 +200,6 @@ public sealed partial class EditorSession
         stroke = null;
         strokeLayer = null;
         strokeOriginal = null;
+        smoothingAnchor = smoothingPointer = null;
     }
 }

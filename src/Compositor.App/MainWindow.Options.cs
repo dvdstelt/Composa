@@ -42,6 +42,14 @@ public sealed partial class MainWindow
                     setOpacity = opacity.Set;
                     Add(opacity.Row);
                 }
+                Action<double>? setSmoothing = null;
+                if (s.Tool == Tool.Brush)
+                {
+                    // Healing, cloning and smearing keep their own feel; only Paint and Erase trail the pointer.
+                    var smoothing = Ui.SliderRow("Smoothing", s.Brush.Smoothing, 0, 100, v => s.Brush = s.Brush with { Smoothing = v }, 1, "0", 90);
+                    setSmoothing = smoothing.Set;
+                    Add(smoothing.Row);
+                }
                 if (s.Tool == Tool.CloneStamp)
                     Add(Ui.Check("Aligned", s.CloneAligned, v => s.CloneAligned = v), Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
                 refreshOptions = () =>
@@ -49,6 +57,7 @@ public sealed partial class MainWindow
                     size.Set(Math.Min(500, s.Brush.Size));
                     hardness.Set(s.Brush.Hardness * 100);
                     setOpacity?.Invoke(s.Brush.Opacity * 100);
+                    setSmoothing?.Invoke(s.Brush.Smoothing);
                 };
                 break;
             case Tool.Marquee or Tool.Lasso or Tool.Wand:

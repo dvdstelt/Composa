@@ -107,6 +107,43 @@ public class EditingTests
     }
 
     [Fact]
+    public void Smoothing_trails_the_pointer_and_catches_up_on_release()
+    {
+        var session = EditorSession.NewCanvas(200, 100, SKColors.White);
+        session.Tool = Tool.Brush;
+        session.Brush = new BrushSettings { Size = 10, Hardness = 1, Smoothing = 40 };
+        Assert.True(session.BeginStroke(new SKPoint(50, 50), out _));
+        // A jitter shorter than the string's length paints nothing at all.
+        session.ContinueStroke(new SKPoint(60, 58));
+        AssertColor(SKColors.Black, session.Composite().GetPixel(50, 50));
+        AssertColor(SKColors.White, session.Composite().GetPixel(60, 58));
+        // Pulled taut, the brush follows, staying a string's length behind the pointer.
+        session.ContinueStroke(new SKPoint(150, 50));
+        AssertColor(SKColors.Black, session.Composite().GetPixel(110, 50));
+        AssertColor(SKColors.White, session.Composite().GetPixel(130, 50));
+        // On release the stroke catches up to where the hand is.
+        session.EndStroke();
+        AssertColor(SKColors.Black, session.Composite().GetPixel(150, 50));
+        AssertColor(SKColors.Black, session.Composite().GetPixel(130, 50));
+        Assert.Equal("Brush", session.History.UndoName);
+
+        // The length is in screen points: zoomed in twice, the string covers half as many document pixels.
+        session.ViewZoom = 2;
+        session.BeginStroke(new SKPoint(50, 80), out _);
+        session.ContinueStroke(new SKPoint(100, 80));
+        AssertColor(SKColors.Black, session.Composite().GetPixel(80, 80));
+        AssertColor(SKColors.White, session.Composite().GetPixel(95, 80));
+        session.CancelStroke();
+
+        // Off, the brush follows the pointer exactly, as it always did.
+        session.Brush = session.Brush with { Smoothing = 0 };
+        session.BeginStroke(new SKPoint(50, 20), out _);
+        session.ContinueStroke(new SKPoint(60, 20));
+        AssertColor(SKColors.Black, session.Composite().GetPixel(60, 20));
+        session.EndStroke();
+    }
+
+    [Fact]
     public void Eraser_clears_and_painting_stays_inside_the_selection()
     {
         var session = EditorSession.NewCanvas(60, 60, SKColors.Red);

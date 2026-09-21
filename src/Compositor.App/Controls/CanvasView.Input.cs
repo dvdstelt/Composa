@@ -183,6 +183,7 @@ public sealed partial class CanvasView
             case Tool.Brush or Tool.SpotHealing or Tool.CloneStamp or Tool.Smear:
                 if (alt && session.Tool == Tool.CloneStamp) { session.SetCloneSource(pressDocument); InvalidateVisual(); break; }
                 if (alt && session.Tool == Tool.Brush) { PickColor(background: false); drag = Drag.Eyedropper; break; }
+                session.ViewZoom = UnitsPerPixel;
                 if (session.BeginStroke(pressDocument, out var problem, lineFromLast: shift && session.LastStrokeEnd != null)) drag = Drag.Stroke;
                 else if (problem != null) Problem?.Invoke(problem);
                 break;
@@ -242,6 +243,7 @@ public sealed partial class CanvasView
         {
             case Drag.Pan: PanBy(delta); break;
             case Drag.Stroke:
+                session.ViewZoom = UnitsPerPixel;
                 foreach (var p in e.GetIntermediatePoints(this))
                     session.ContinueStroke(ToDocument(p.Position), e.Pointer.Type == PointerType.Pen ? p.Properties.Pressure : 1);
                 break;
