@@ -143,10 +143,11 @@ public sealed partial class CanvasView : Control
         if (session == null || Bounds.Width < 10 || Bounds.Height < 10) { fitPending = true; return false; }
         fitPending = false;
         var document = session.Document;
-        var available = new Size(Math.Max(50, Bounds.Width - 48), Math.Max(50, Bounds.Height - 48));
+        var inset = RulerInset;
+        var available = new Size(Math.Max(50, Bounds.Width - inset - 48), Math.Max(50, Bounds.Height - inset - 48));
         zoom = Math.Min(available.Width * Scaling / document.Width, available.Height * Scaling / document.Height);
         zoom = Math.Clamp(Math.Min(zoom, 1.0 * Math.Max(1, Scaling)), 0.01, 64);
-        origin = new Point((Bounds.Width - document.Width * UnitsPerPixel) / 2, (Bounds.Height - document.Height * UnitsPerPixel) / 2);
+        origin = new Point(inset + (Bounds.Width - inset - document.Width * UnitsPerPixel) / 2, inset + (Bounds.Height - inset - document.Height * UnitsPerPixel) / 2);
         return true;
     }
 
@@ -234,6 +235,7 @@ public sealed partial class CanvasView : Control
         var documentRect = new SKRect(0, 0, session.Document.Width, session.Document.Height);
         var (cache, cacheSource, cacheTarget) = UpdateViewCache(view, size);
         var overlay = CaptureOverlay(view);
+        var rulers = CaptureRulers((float)Scaling);
         var grid = ShowPixelGrid && zoom >= 8;
         var nearest = zoom >= 1;
         var outline = selectionOutline;
@@ -260,6 +262,7 @@ public sealed partial class CanvasView : Control
             if (grid) DrawPixelGrid(canvas, view, documentRect, new SKRect(0, 0, (float)size.Width, (float)size.Height));
             if (outline != null) DrawAnts(canvas, outline, view, phase, scaling);
             overlay?.Invoke(canvas);
+            rulers?.Invoke(canvas);
         }));
     }
 

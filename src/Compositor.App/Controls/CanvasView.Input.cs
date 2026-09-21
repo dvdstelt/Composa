@@ -10,7 +10,7 @@ namespace Compositor.App.Controls;
 
 public sealed partial class CanvasView
 {
-    private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub, TextBox, TextSelect, TextResize }
+    private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub, TextBox, TextSelect, TextResize, Guide }
 
     private Drag drag;
     private MouseButton dragButton;
@@ -138,6 +138,10 @@ public sealed partial class CanvasView
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
 
+        // A press on a ruler drags a new guide out of it; with the Move tool a press on a guide moves it.
+        if (BeginGuideDrag(point.Position)) { InvalidateVisual(); return; }
+        if (OverRuler(point.Position)) return;
+
         switch (session.Tool)
         {
             case Tool.Move:
@@ -263,6 +267,7 @@ public sealed partial class CanvasView
                 break;
             case Drag.TextSelect: DragTextSelection(); break;
             case Drag.TextResize: DragTextBox(); break;
+            case Drag.Guide: DragGuide(); break;
             case Drag.None when session.Tool == Tool.Move:
                 UpdateMoveCursor(position);
                 break;
@@ -334,6 +339,7 @@ public sealed partial class CanvasView
                 if (!moved) ZoomTo(alt ? zoom / 1.5 : zoom * 1.5, pressScreen);
                 break;
             case Drag.TextBox: FinishTextBoxDrag(moved); break;
+            case Drag.Guide: FinishGuideDrag(e.GetPosition(this)); break;
         }
         InvalidateVisual();
     }
@@ -418,7 +424,7 @@ public sealed partial class CanvasView
         if (session == null) return;
         var start = cropStart;
         float left = start.Left, top = start.Top, right = start.Right, bottom = start.Bottom;
-        float px = SnapToCanvas(Snap(currentDocument.X), session.Document.Width), py = SnapToCanvas(Snap(currentDocument.Y), session.Document.Height);
+        float px = SnapToCanvas(Snap(currentDocument.X), horizontal: true), py = SnapToCanvas(Snap(currentDocument.Y), horizontal: false);
         if (handle == TransformHandle.Move)
         {
             float dx = Snap(currentDocument.X - pressDocument.X), dy = Snap(currentDocument.Y - pressDocument.Y);
@@ -453,13 +459,11 @@ public sealed partial class CanvasView
         cropRect = new SKRect(left, top, right, bottom).Standardized;
     }
 
-    private float SnapToCanvas(float value, int extent)
+    /// <summary>Crop edges snap to the View > Snap To targets (without centers); Ctrl bypasses snapping.</summary>
+    private float SnapToCanvas(float value, bool horizontal)
     {
-        var threshold = (float)(8 / UnitsPerPixel);
-        if (Math.Abs(value) < threshold) return 0;
-        if (Math.Abs(value - extent) < threshold) return extent;
-        if (Math.Abs(value - extent / 2f) < threshold) return extent / 2f;
-        return value;
+        if (session == null || !session.View.Snap || dragModifiers.HasFlag(KeyModifiers.Control)) return value;
+        return session.SnapCropEdge(value, horizontal, (float)(8 / UnitsPerPixel));
     }
 
     public void ApplyCrop()
@@ -536,17 +540,19 @@ public sealed partial class CanvasView
     private void UpdateMoveCursor(Point position)
     {
         var type = StandardCursorType.Arrow;
-        if (ShowTransformControls && CurrentFrame() is { } frame)
-            type = HitFrame(frame, position, allowRotate: true) switch
+        if (RulerAt(position) is { } axis) type = axis == GuideAxis.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth;
+        else if (ShowTransformControls && CurrentFrame() is { } frame && HitFrame(frame, position, allowRotate: true) is var hit && hit is not (TransformHandle.None or TransformHandle.Move))
+            type = hit switch
             {
                 TransformHandle.TopLeft or TransformHandle.BottomRight => StandardCursorType.TopLeftCorner,
                 TransformHandle.TopRight or TransformHandle.BottomLeft => StandardCursorType.TopRightCorner,
                 TransformHandle.Top or TransformHandle.Bottom => StandardCursorType.SizeNorthSouth,
                 TransformHandle.Left or TransformHandle.Right => StandardCursorType.SizeWestEast,
                 TransformHandle.Rotate => StandardCursorType.Cross,
-                TransformHandle.Move => StandardCursorType.SizeAll,
                 _ => StandardCursorType.Arrow
             };
+        else if (HitGuide(position) is { } guide) type = guide.Axis == GuideAxis.Vertical ? StandardCursorType.SizeWestEast : StandardCursorType.SizeNorthSouth;
+        else if (ShowTransformControls && CurrentFrame() is { } inside && HitFrame(inside, position, allowRotate: true) == TransformHandle.Move) type = StandardCursorType.SizeAll;
         Cursor = new Cursor(type);
     }
 
@@ -616,39 +622,18 @@ public sealed partial class CanvasView
         ToolStateChanged?.Invoke();
     }
 
-    /// <summary>Pulls a move onto the canvas's and other layers' edges and centers, recording the guides to draw.</summary>
+    /// <summary>Pulls a move onto the View > Snap To targets (canvas, layers, grid, guides), recording the lines to draw.</summary>
     private void SnapMove(TransformEdit edit, ref float dx, ref float dy)
     {
-        if (session == null) return;
+        if (session == null || !session.View.Snap) return;
         var threshold = (float)(6 / UnitsPerPixel);
         var rotate = SKMatrix.CreateRotationDegrees((float)edit.StartRotation, edit.StartFrame.MidX, edit.StartFrame.MidY);
         var box = rotate.MapRect(edit.StartFrame);
-        var document = session.Document;
-        var xs = new List<float> { 0, document.Width / 2f, document.Width };
-        var ys = new List<float> { 0, document.Height / 2f, document.Height };
         var moving = edit.Layers.Select(l => l.Id).ToHashSet();
-        foreach (var other in document.AllLayers().Where(l => l.Pixels != null && !moving.Contains(l.Id) && document.IsEffectivelyVisible(l)).Take(40))
-        {
-            var b = other.Bounds;
-            xs.AddRange([b.Left, b.MidX, b.Right]);
-            ys.AddRange([b.Top, b.MidY, b.Bottom]);
-        }
-        float bestX = threshold, bestY = threshold, snapX = float.NaN, snapY = float.NaN, addX = 0, addY = 0;
-        foreach (var edge in new[] { box.Left, box.MidX, box.Right })
-        foreach (var target in xs)
-        {
-            var d = Math.Abs(edge + dx - target);
-            if (d < bestX) { bestX = d; addX = target - (edge + dx); snapX = target; }
-        }
-        foreach (var edge in new[] { box.Top, box.MidY, box.Bottom })
-        foreach (var target in ys)
-        {
-            var d = Math.Abs(edge + dy - target);
-            if (d < bestY) { bestY = d; addY = target - (edge + dy); snapY = target; }
-        }
-        dx += addX; dy += addY;
-        if (!float.IsNaN(snapX)) guides.Add((new SKPoint(snapX, -100000), new SKPoint(snapX, 100000)));
-        if (!float.IsNaN(snapY)) guides.Add((new SKPoint(-100000, snapY), new SKPoint(100000, snapY)));
+        var (snappedX, snappedY, snapX, snapY) = session.SnapMove(box, moving, dx, dy, threshold);
+        dx = snappedX; dy = snappedY;
+        if (snapX is { } x) guides.Add((new SKPoint(x, -100000), new SKPoint(x, 100000)));
+        if (snapY is { } y) guides.Add((new SKPoint(-100000, y), new SKPoint(100000, y)));
     }
 
     // ---- Keyboard -----------------------------------------------------------------------------------------------

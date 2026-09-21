@@ -17,6 +17,8 @@ public sealed partial class CanvasView
         var tool = session.Tool;
         var phase = antsPhase;
 
+        CaptureGuidesAndGrid(steps, view, hair);
+
         // A line being dragged out: exactly between the two points, so the start never shifts.
         if (drag == Drag.Shape && session.ShapeKind == Model.ShapeKind.Line)
         {

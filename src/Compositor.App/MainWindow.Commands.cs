@@ -22,6 +22,7 @@ public sealed partial class MainWindow
     private readonly List<Command> commands = [];
     private readonly List<(MenuItem Item, Command Command)> menuItems = [];
     private MenuItem? undoItem, redoItem, mergeItem, clipItem;
+    private readonly List<(MenuItem Item, Func<ViewOptions, bool> Checked)> viewToggles = [];
     private Guid? optionsLayer;
     private int jpegQuality = 90;
     private MenuItem? recentMenu;
@@ -162,13 +163,41 @@ public sealed partial class MainWindow
 
         var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
         grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); };
+        // View options are flags on the session, so a checkmark follows the current tab.
+        MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None)
+        {
+            var item = Item(name, () =>
+            {
+                var rulersShown = session!.View.ShowRulers;
+                session.View = flip(session.View);
+                canvas.ViewOptionsChanged(rulersShown);
+            }, key, modifiers);
+            item.ToggleType = MenuItemToggleType.CheckBox;
+            viewToggles.Add((item, get));
+            return item;
+        }
         Top("_View",
             Item("Fit Canvas", canvas.Fit, Key.D0, ctrl),
             Item("Actual Pixels", () => canvas.ZoomTo(1), Key.D1, ctrl),
             Item("Zoom In", canvas.ZoomIn, Key.OemPlus, ctrl),
             Item("Zoom Out", canvas.ZoomOut, Key.OemMinus, ctrl),
             Line(), grid,
-            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); }, Key.H, ctrl));
+            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); }, Key.H, ctrl),
+            Line(),
+            ViewToggle("Rulers", v => v.ShowRulers, v => v with { ShowRulers = !v.ShowRulers }, Key.R, ctrl),
+            Sub("Show",
+                ViewToggle("Grid", v => v.ShowGrid, v => v with { ShowGrid = !v.ShowGrid }, Key.OemQuotes, ctrl),
+                ViewToggle("Guides", v => v.ShowGuides, v => v with { ShowGuides = !v.ShowGuides }, Key.OemSemicolon, ctrl)),
+            Line(),
+            ViewToggle("Snap", v => v.Snap, v => v with { Snap = !v.Snap }, Key.OemSemicolon, ctrl | shift),
+            Sub("Snap To",
+                ViewToggle("Guides", v => v.SnapToGuides, v => v with { SnapToGuides = !v.SnapToGuides }),
+                ViewToggle("Grid", v => v.SnapToGrid, v => v with { SnapToGrid = !v.SnapToGrid }),
+                ViewToggle("Layers", v => v.SnapToLayers, v => v with { SnapToLayers = !v.SnapToLayers }),
+                ViewToggle("Document Bounds", v => v.SnapToDocumentBounds, v => v with { SnapToDocumentBounds = !v.SnapToDocumentBounds })),
+            Line(),
+            ViewToggle("Lock Guides", v => v.LockGuides, v => v with { LockGuides = !v.LockGuides }, Key.OemSemicolon, ctrl | alt),
+            Item("Clear Guides", () => session!.ClearGuides(), enabled: () => session!.CanClearGuides));
         commands.Add(new Command("Zoom In", new KeyGesture(Key.Add, ctrl), canvas.ZoomIn, () => HasDocument));
         commands.Add(new Command("Zoom Out", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument));
 
@@ -192,6 +221,7 @@ public sealed partial class MainWindow
             recentMenu.IsEnabled = recentMenu.Items.Count > 0;
         }
         foreach (var (item, command) in menuItems) item.IsEnabled = command.Enabled?.Invoke() ?? true;
+        foreach (var (item, isChecked) in viewToggles) item.IsChecked = session != null && isChecked(session.View);
         if (session == null) return;
         undoItem!.Header = session.History.CanUndo ? $"Undo {session.History.UndoName}" : "Undo";
         redoItem!.Header = session.History.CanRedo ? $"Redo {session.History.RedoName}" : "Redo";
