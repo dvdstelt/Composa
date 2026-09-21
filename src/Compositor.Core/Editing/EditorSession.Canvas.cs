@@ -66,9 +66,9 @@ public sealed partial class EditorSession
                         // Unscaled layers are resampled so they stay paintable at full resolution.
                         int w = Math.Max(1, (int)Math.Round(pixels.Width * sx)), h = Math.Max(1, (int)Math.Round(pixels.Height * sy));
                         // Live layers are redrawn from their settings, scaled along with the document.
-                        if (layer.Text is { } text && Math.Abs(sx - sy) < 1e-6)
+                        if (layer.Text is { } text && (text.IsBox || Math.Abs(sx - sy) < 1e-6))
                         {
-                            layer.Text = text with { Size = Math.Clamp(text.Size * sy, 1, 4000) };
+                            layer.Text = text.Scaled(sx, sy);
                             var rendered = RenderText(layer.Text);
                             (w, h) = (rendered.Width, rendered.Height);
                             layer.Pixels = rendered;

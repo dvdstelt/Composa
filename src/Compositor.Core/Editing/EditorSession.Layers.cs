@@ -13,6 +13,7 @@ public sealed partial class EditorSession
     {
         if (document.Find(id) == null) return;
         SelectedEffect = null;
+        if (TextEdit != null && textLayer?.Id != id) FinishText();
         if (range && document.ActiveLayerId is { } anchor)
         {
             var order = document.AllLayers().Select(l => l.Id).ToList();

@@ -15,16 +15,60 @@ public enum TextAlignment { Left, Center, Right }
 /// <summary>Live text: kept as characters and redrawn sharp whenever it is edited or its layer is scaled.</summary>
 public sealed record TextStyle
 {
+    public const int MaxLength = 100_000;
+    public const double MinBox = 16, MaxBox = 30_000;
+
     public string Text { get; init; } = "";
     public string FontFamily { get; init; } = "Inter";
-    /// <summary>Font size in document pixels.</summary>
+    /// <summary>Font size in layer pixels.</summary>
     public double Size { get; init; } = 72;
     public uint Color { get; init; } = 0xFF000000;
     public bool Bold { get; init; }
     public bool Italic { get; init; }
     public TextAlignment Alignment { get; init; }
-    /// <summary>Line height as a multiple of the font's own spacing.</summary>
-    public double LineSpacing { get; init; } = 1;
+    /// <summary>Extra space after every character, in layer pixels.</summary>
+    public double Tracking { get; init; }
+    /// <summary>Baseline to baseline, in layer pixels, as Photoshop's Leading is. 0 is Auto: 120% of the font size.</summary>
+    public double Leading { get; init; }
+    /// <summary>Fixed paragraph bounds in layer pixels; text wraps inside them. Null is point text, which is as big as what is typed.</summary>
+    public double? BoxWidth { get; init; }
+    public double? BoxHeight { get; init; }
+
+    [System.Text.Json.Serialization.JsonIgnore] public double LineHeight => Leading > 0 ? Leading : Size * 1.2;
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsBox => BoxWidth != null && BoxHeight != null;
+
+    /// <summary>Every value inside its range, so a damaged file or a wild drag cannot ask for an impossible layout.</summary>
+    public TextStyle Clamped()
+    {
+        var text = Text.Length > MaxLength ? Text[..MaxLength] : Text;
+        var box = BoxWidth is { } w && BoxHeight is { } h && double.IsFinite(w) && double.IsFinite(h);
+        return this with
+        {
+            Text = text,
+            Size = double.IsFinite(Size) ? Math.Clamp(Size, 1, 2000) : 72,
+            Tracking = double.IsFinite(Tracking) ? Math.Clamp(Tracking, -100, 1000) : 0,
+            Leading = double.IsFinite(Leading) ? Math.Clamp(Leading, 0, 5000) : 0,
+            BoxWidth = box ? Math.Clamp(Math.Round(BoxWidth!.Value), MinBox, MaxBox) : null,
+            BoxHeight = box ? Math.Clamp(Math.Round(BoxHeight!.Value), MinBox, MaxBox) : null,
+            Color = Color | 0xFF000000
+        };
+    }
+
+    /// <summary>The same text drawn <paramref name="factor"/> times as large: size, spacing and box together.</summary>
+    public TextStyle Scaled(double factor) => Scaled(factor, factor);
+
+    public TextStyle Scaled(double horizontal, double vertical) => (this with
+    {
+        Size = Size * vertical, Tracking = Tracking * horizontal, Leading = Leading * vertical,
+        BoxWidth = BoxWidth * horizontal, BoxHeight = BoxHeight * vertical
+    }).Clamped();
+
+    /// <summary>A text layer's name: its first words on one line, so a paragraph never makes a Layers row taller.</summary>
+    public string LayerName()
+    {
+        var flattened = string.Join(' ', Text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        return flattened.Length == 0 ? "Text" : flattened.Length > 40 ? flattened[..40] : flattened;
+    }
 }
 
 /// <summary>

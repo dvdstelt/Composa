@@ -23,6 +23,9 @@ public sealed partial class EditorSession
 
     public bool CanEditPixels => EditableLayer != null;
 
+    /// <summary>Fill also recolors live text: a text layer with nothing selected takes the color as its own.</summary>
+    public bool CanFill => CanEditPixels || (!IsEditingMask && document.Selection == null && ActiveLayer?.Text != null);
+
     private SKBitmap Target(Layer layer) => IsEditingMask ? layer.Mask! : layer.Pixels!;
 
     private void SetTarget(Layer layer, SKBitmap bitmap)
@@ -137,6 +140,7 @@ public sealed partial class EditorSession
 
     public void Fill(SKColor color, string name = "Fill")
     {
+        if (!IsEditingMask && document.Selection == null && ActiveLayer is { Text: not null } text && RecolorText(text, color)) return;
         if (EditableLayer is not { } layer) return;
         Apply(name, () =>
         {

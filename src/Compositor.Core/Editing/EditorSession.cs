@@ -51,7 +51,17 @@ public sealed partial class EditorSession
     public string Title => FilePath != null ? Path.GetFileNameWithoutExtension(FilePath) : SuggestedName ?? "Untitled";
 
     // Tool state shared with the UI.
-    public Tool Tool { get; set; } = Tool.Move;
+    private Tool tool = Tool.Move;
+    /// <summary>The current tool. Leaving the Type tool finishes any text being typed.</summary>
+    public Tool Tool
+    {
+        get => tool;
+        set
+        {
+            if (value != Tool.Text && TextEdit != null) FinishText();
+            tool = value;
+        }
+    }
     public SKColor Foreground { get; set; } = SKColors.Black;
     public SKColor Background { get; set; } = SKColors.White;
     public BrushSettings Brush { get; set; } = new();
@@ -104,7 +114,8 @@ public sealed partial class EditorSession
     /// </summary>
     private void FinishInteraction()
     {
-        if (stroke != null) EndStroke();
+        if (TextEdit != null) FinishText();
+        else if (stroke != null) EndStroke();
         else if (floatLayer != null) EndMovePixels(keep: true);
         else if (previewLayer != null) CommitPreview();
         else if (Transform != null) CommitTransform();

@@ -57,6 +57,7 @@ public static class MacProject
                 layer.Transform = transform ?? LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
                 if (record.TryGetProperty("shape", out var shape) && shape.ValueKind == JsonValueKind.Object) layer.Shape = ReadShape(shape);
                 if (record.TryGetProperty("effects", out var effects) && effects.ValueKind == JsonValueKind.Object) layer.Effects = ReadEffects(effects);
+                if (record.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.Object) layer.Text = ReadText(text);
             }
             if (Text(record, "maskFile") is { } maskFile) layer.Mask = LoadMask(Resolve(folder, maskFile), layer, document);
             if (Guid.TryParse(Text(record, "parentID"), out var parent)) parents[id] = parent;
@@ -167,6 +168,27 @@ public static class MacProject
         var radius = Number(shape, "cornerRadius", 0);
         if (kind == ShapeKind.Rectangle && radius > 0) kind = ShapeKind.RoundedRectangle;
         return new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+    }
+
+    /// <summary>Editable text. The PostScript font name carries the family and, after a dash, the weight and slant.</summary>
+    private static TextStyle ReadText(JsonElement text)
+    {
+        var fontName = Text(text, "fontName") ?? "Helvetica";
+        var dash = fontName.IndexOf('-');
+        var family = dash > 0 ? fontName[..dash] : fontName;
+        var face = dash > 0 ? fontName[(dash + 1)..] : "";
+        // Camel-cased PostScript families ("HelveticaNeue") read back as spaced family names for fontconfig.
+        family = System.Text.RegularExpressions.Regex.Replace(family, "(?<=[a-z])(?=[A-Z])", " ");
+        var (boxWidth, boxHeight) = Pair(text, "boxSize");
+        return new TextStyle
+        {
+            Text = Text(text, "content") ?? "", FontFamily = family, Size = Number(text, "fontSize", 72),
+            Bold = face.Contains("Bold", StringComparison.OrdinalIgnoreCase), Italic = face.Contains("Italic", StringComparison.OrdinalIgnoreCase) || face.Contains("Oblique", StringComparison.OrdinalIgnoreCase),
+            Color = (uint)UnitColor(text),
+            Alignment = Text(text, "alignment") switch { "Center" => TextAlignment.Center, "Right" => TextAlignment.Right, _ => TextAlignment.Left },
+            Tracking = Number(text, "tracking", 0), Leading = Number(text, "leading", 0),
+            BoxWidth = boxWidth >= 1 && boxHeight >= 1 ? boxWidth : null, BoxHeight = boxWidth >= 1 && boxHeight >= 1 ? boxHeight : null
+        }.Clamped();
     }
 
     /// <summary>Stroke, drop shadow, color overlay and inner shadow, each optional; a missing <c>enabled</c> means shown.</summary>

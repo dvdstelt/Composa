@@ -35,7 +35,6 @@ public static class TextDialog
         var bold = Ui.Check("Bold", initial.Bold, v => Update(current with { Bold = v }));
         var italic = Ui.Check("Italic", initial.Italic, v => Update(current with { Italic = v }));
         var alignment = Ui.Combo(Enum.GetValues<TextAlignment>(), initial.Alignment, a => a.ToString(), a => Update(current with { Alignment = a }), 100);
-        var spacing = Ui.Number(initial.LineSpacing, 0.5, 4, v => Update(current with { LineSpacing = v }), 0.05, "0.00", 70);
 
         var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Background = new SolidColorBrush(new SKColor(initial.Color).ToAvalonia()), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
         swatch.PointerPressed += async (_, _) =>
@@ -47,7 +46,7 @@ public static class TextDialog
 
         var body = Ui.Column(12, box,
             Ui.Row(10, Ui.Label("Font", Palette.Secondary), font, Ui.Label("Size", Palette.Secondary), size, Ui.Label("px", Palette.Secondary)),
-            Ui.Row(14, bold, italic, Ui.Label("Align", Palette.Secondary), alignment, Ui.Label("Line spacing", Palette.Secondary), spacing, Ui.Label("Color", Palette.Secondary), swatch));
+            Ui.Row(14, bold, italic, Ui.Label("Align", Palette.Secondary), alignment, Ui.Label("Color", Palette.Secondary), swatch));
         var dialog = new DialogWindow(initial.Text.Length == 0 ? "Add Text" : "Edit Text", body);
         dialog.Opened += (_, _) => { box.Focus(); box.SelectAll(); if (current != initial) changed(current); };
         var accepted = await dialog.Ask(owner);
