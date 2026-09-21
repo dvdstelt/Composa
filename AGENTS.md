@@ -19,6 +19,7 @@ A Linux implementation of the macOS image editor [Compositor](https://github.com
 - Every user-visible change goes through `EditorSession.Begin`/`Commit`/`Cancel` (or `Apply`) so it is undoable, then raises `Invalidate`/`InvalidateAll` and `LayersChanged` as needed.
 - `DocumentRenderer.Render` splits large areas into bands rendered in parallel. Anything added to the render path must be a per-pixel operation that does not depend on neighbouring bands.
 - Never invalidate a visual or raise layout-affecting events from inside `CanvasView.Render`.
+- Avalonia's X11 backend sends text input only for a key press nobody marked handled. Key handlers must leave printable keys unhandled while text is being typed; the headless tests feed text directly, so check `e.Handled` in a test when touching key routing.
 - Layer lists are stored bottom to top; the Layers panel shows them reversed.
 - Layer effects are drawn from an image the renderer caches per (pixels, mask, effects); the image already has the mask applied, so `RenderUnit` must not apply the mask again when effects are present. `Layer.VisibleBounds` includes the effects' margin and is what invalidation uses.
 - Text layers are re-rendered from their `TextStyle` through `TextLayout` on every change. The layout's character positions are the caret geometry; keep drawing and layout in that one class so what is typed is what is rendered.
