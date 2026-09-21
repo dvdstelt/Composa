@@ -17,10 +17,10 @@ namespace Compositor.App;
 
 public sealed partial class MainWindow
 {
-    private sealed record Command(string Name, KeyGesture? Gesture, Action Run, Func<bool>? Enabled = null);
-
-    private readonly List<Command> commands = [];
-    private readonly List<(MenuItem Item, Command Command)> menuItems = [];
+    private readonly List<Shortcut> commands = [];
+    /// <summary>Keys that pick tools or act on the canvas without a menu entry; letters also work with Shift held.</summary>
+    private readonly List<Shortcut> toolKeys = [];
+    private readonly List<(MenuItem Item, Shortcut Command)> menuItems = [];
     private MenuItem? undoItem, redoItem, mergeItem, clipItem;
     private readonly List<(MenuItem Item, Func<ViewOptions, bool> Checked)> viewToggles = [];
     private Guid? optionsLayer;
@@ -42,14 +42,15 @@ public sealed partial class MainWindow
             menu.Items.Add(top);
             return top;
         }
-        MenuItem Item(string name, Action run, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, Func<bool>? enabled = null, bool needsDocument = true)
+        MenuItem Item(string name, Action run, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, Func<bool>? enabled = null, bool needsDocument = true, string? id = null)
         {
             var gesture = key == Key.None ? null : new KeyGesture(key, modifiers);
             var guard = needsDocument ? () => HasDocument && (enabled?.Invoke() ?? true) : enabled;
-            var command = new Command(name, gesture, run, guard);
+            var command = new Shortcut(id ?? name.TrimEnd('…'), name.TrimEnd('…'), "Menus", gesture, run, guard);
             commands.Add(command);
             var item = new MenuItem { Header = name, InputGesture = gesture };
             item.Click += (_, _) => Execute(command);
+            command.Item = item;
             menuItems.Add((item, command));
             return item;
         }
@@ -80,7 +81,7 @@ public sealed partial class MainWindow
 
         undoItem = Item("Undo", () => session!.Undo(), Key.Z, ctrl, () => session!.CanUndo);
         redoItem = Item("Redo", () => session!.Redo(), Key.Z, ctrl | shift, () => session!.CanRedo);
-        commands.Add(new Command("Redo", new KeyGesture(Key.Y, ctrl), () => session!.Redo(), () => HasDocument && session!.CanRedo));
+        commands.Add(new Shortcut("Redo (Ctrl+Y)", "Redo", "Menus", new KeyGesture(Key.Y, ctrl), () => session!.Redo(), () => HasDocument && session!.CanRedo, hidden: true));
         Top("_Edit", undoItem, redoItem, Line(),
             Item("Cut", () => _ = Cut(), Key.X, ctrl, () => session!.CanCopy),
             Item("Copy", () => _ = Copy(merged: false), Key.C, ctrl, () => session!.CanCopy),
@@ -90,7 +91,9 @@ public sealed partial class MainWindow
             Item("Fill with Foreground Color", () => session!.Fill(session.Foreground, "Fill"), Key.Back, alt, () => session!.CanFill),
             Item("Fill with Background Color", () => session!.Fill(session.Background, "Fill"), Key.Back, ctrl, () => session!.CanFill),
             Item("Clear", DeletePressed, Key.Delete),
-            Item("Content-Aware Fill", () => Busy(() => session!.ContentAwareFill()), Key.Back, shift, () => session!.Selection != null && session.CanEditPixels && !session.IsEditingMask));
+            Item("Content-Aware Fill", () => Busy(() => session!.ContentAwareFill()), Key.Back, shift, () => session!.Selection != null && session.CanEditPixels && !session.IsEditingMask),
+            Line(),
+            Item("Keyboard Shortcuts…", () => _ = ShowShortcuts(), needsDocument: false, id: "Keyboard Shortcuts (Edit menu)"));
 
         Top("_Select",
             Item("All", () => session!.SelectAll(), Key.A, ctrl),
@@ -131,7 +134,7 @@ public sealed partial class MainWindow
         clipItem = Item("Create Clipping Mask", () => session!.ToggleClippingMask(session.ActiveLayer!), Key.G, ctrl | alt, () => session!.ActiveLayer is { } l && session.CanClip(l));
         Top("_Layer",
             Item("New Layer", () => session!.AddBlankLayer(), Key.N, ctrl | shift),
-            Sub("New Adjustment Layer", Enum.GetValues<AdjustmentKind>().Select(kind => (object)Item(Adjustment.Create(kind).DisplayName + "…", () => _ = NewAdjustmentLayer(kind))).ToArray()),
+            Sub("New Adjustment Layer", Enum.GetValues<AdjustmentKind>().Select(kind => (object)Item(Adjustment.Create(kind).DisplayName + "…", () => _ = NewAdjustmentLayer(kind), id: "New " + Adjustment.Create(kind).DisplayName + " Layer")).ToArray()),
             Item("Edit Adjustment…", () => _ = EditAdjustmentLayer(session!.ActiveLayer!, false), enabled: () => session!.ActiveLayer?.IsAdjustment == true),
             Line(),
             Item("Transform Layer", () => { canvas.ShowTransformControls = true; SelectTool(Tool.Move); }, Key.T, ctrl),
@@ -151,7 +154,7 @@ public sealed partial class MainWindow
             mergeItem,
             Item("Flatten Image", () => session!.FlattenImage()),
             Line(),
-            Sub("Layer Effects", Enum.GetValues<LayerEffectKind>().Select(kind => (object)Item(LayerEffects.DisplayName(kind) + "…", () => _ = NewEffect(kind), enabled: () => session!.ActiveLayer?.Pixels != null))
+            Sub("Layer Effects", Enum.GetValues<LayerEffectKind>().Select(kind => (object)Item(LayerEffects.DisplayName(kind) + "…", () => _ = NewEffect(kind), enabled: () => session!.ActiveLayer?.Pixels != null, id: "Add " + LayerEffects.DisplayName(kind)))
                 .Append(Line()).Append(Item("Delete Effect", () => session!.RemoveSelectedEffect(), enabled: () => session!.SelectedEffect != null)).ToArray()),
             Item("Edit Text…", () => BeginTextEdit(session!.ActiveLayer!), enabled: () => session!.ActiveLayer?.Text != null),
             Item("Rasterize Layer", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.IsLive == true),
@@ -164,14 +167,14 @@ public sealed partial class MainWindow
         var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
         grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); };
         // View options are flags on the session, so a checkmark follows the current tab.
-        MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None)
+        MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, string? id = null)
         {
             var item = Item(name, () =>
             {
                 var rulersShown = session!.View.ShowRulers;
                 session.View = flip(session.View);
                 canvas.ViewOptionsChanged(rulersShown);
-            }, key, modifiers);
+            }, key, modifiers, id: id);
             item.ToggleType = MenuItemToggleType.CheckBox;
             viewToggles.Add((item, get));
             return item;
@@ -186,25 +189,114 @@ public sealed partial class MainWindow
             Line(),
             ViewToggle("Rulers", v => v.ShowRulers, v => v with { ShowRulers = !v.ShowRulers }, Key.R, ctrl),
             Sub("Show",
-                ViewToggle("Grid", v => v.ShowGrid, v => v with { ShowGrid = !v.ShowGrid }, Key.OemQuotes, ctrl),
-                ViewToggle("Guides", v => v.ShowGuides, v => v with { ShowGuides = !v.ShowGuides }, Key.OemSemicolon, ctrl)),
+                ViewToggle("Grid", v => v.ShowGrid, v => v with { ShowGrid = !v.ShowGrid }, Key.OemQuotes, ctrl, "Show Grid"),
+                ViewToggle("Guides", v => v.ShowGuides, v => v with { ShowGuides = !v.ShowGuides }, Key.OemSemicolon, ctrl, "Show Guides")),
             Line(),
             ViewToggle("Snap", v => v.Snap, v => v with { Snap = !v.Snap }, Key.OemSemicolon, ctrl | shift),
             Sub("Snap To",
-                ViewToggle("Guides", v => v.SnapToGuides, v => v with { SnapToGuides = !v.SnapToGuides }),
-                ViewToggle("Grid", v => v.SnapToGrid, v => v with { SnapToGrid = !v.SnapToGrid }),
-                ViewToggle("Layers", v => v.SnapToLayers, v => v with { SnapToLayers = !v.SnapToLayers }),
-                ViewToggle("Document Bounds", v => v.SnapToDocumentBounds, v => v with { SnapToDocumentBounds = !v.SnapToDocumentBounds })),
+                ViewToggle("Guides", v => v.SnapToGuides, v => v with { SnapToGuides = !v.SnapToGuides }, id: "Snap To Guides"),
+                ViewToggle("Grid", v => v.SnapToGrid, v => v with { SnapToGrid = !v.SnapToGrid }, id: "Snap To Grid"),
+                ViewToggle("Layers", v => v.SnapToLayers, v => v with { SnapToLayers = !v.SnapToLayers }, id: "Snap To Layers"),
+                ViewToggle("Document Bounds", v => v.SnapToDocumentBounds, v => v with { SnapToDocumentBounds = !v.SnapToDocumentBounds }, id: "Snap To Document Bounds")),
             Line(),
             ViewToggle("Lock Guides", v => v.LockGuides, v => v with { LockGuides = !v.LockGuides }, Key.OemSemicolon, ctrl | alt),
             Item("Clear Guides", () => session!.ClearGuides(), enabled: () => session!.CanClearGuides));
-        commands.Add(new Command("Zoom In", new KeyGesture(Key.Add, ctrl), canvas.ZoomIn, () => HasDocument));
-        commands.Add(new Command("Zoom Out", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument));
+        commands.Add(new Shortcut("Zoom In (keypad)", "Zoom In", "Menus", new KeyGesture(Key.Add, ctrl), canvas.ZoomIn, () => HasDocument, hidden: true));
+        commands.Add(new Shortcut("Zoom Out (keypad)", "Zoom Out", "Menus", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument, hidden: true));
 
-        Top("_Help", Item("Keyboard Shortcuts", () => _ = ShowShortcuts(), Key.F1, needsDocument: false), Item("About Compositor", () => _ = Prompts.Alert(this, "About Compositor",
+        Top("_Help", Item("Keyboard Shortcuts…", () => _ = ShowShortcuts(), Key.F1, needsDocument: false), Item("About Compositor", () => _ = Prompts.Alert(this, "About Compositor",
             "Compositor for Linux\n\nA layer-based image editor for compositing and retouching, built with .NET, Avalonia and Skia. " +
             "It is a from-scratch Linux implementation of the open-source macOS app Compositor by Robbie Tilton (MIT license)."), needsDocument: false));
+        BuildToolKeys();
+        ApplyShortcutOverrides();
         return menu;
+    }
+
+    /// <summary>The keys that pick tools and act on the canvas, kept as a table so the shortcuts window can rebind them.</summary>
+    private void BuildToolKeys()
+    {
+        void Key(string title, Avalonia.Input.Key key, Action run, KeyModifiers modifiers = KeyModifiers.None, bool hidden = false) =>
+            toolKeys.Add(new Shortcut(title, title, "Tools and Canvas", new KeyGesture(key, modifiers), run, hidden: hidden));
+        Key("Move tool", Avalonia.Input.Key.V, () => SelectTool(Tool.Move));
+        Key("Marquee tool (again switches Rectangle and Ellipse)", Avalonia.Input.Key.M, () =>
+        {
+            if (session!.Tool == Tool.Marquee) session.MarqueeKind = session.MarqueeKind == MarqueeKind.Rectangle ? MarqueeKind.Ellipse : MarqueeKind.Rectangle;
+            SelectTool(Tool.Marquee);
+        });
+        Key("Lasso tool (again switches Freehand and Polygonal)", Avalonia.Input.Key.L, () =>
+        {
+            if (session!.Tool == Tool.Lasso) session.LassoKind = session.LassoKind == LassoKind.Freehand ? LassoKind.Polygonal : LassoKind.Freehand;
+            SelectTool(Tool.Lasso);
+        });
+        Key("Magic tool", Avalonia.Input.Key.W, () => SelectTool(Tool.Wand));
+        Key("Crop tool", Avalonia.Input.Key.C, () => SelectTool(Tool.Crop));
+        Key("Brush tool", Avalonia.Input.Key.B, () => { session!.EraserMode = false; SelectTool(Tool.Brush); });
+        Key("Eraser", Avalonia.Input.Key.E, () => { session!.EraserMode = true; SelectTool(Tool.Brush); });
+        Key("Spot Healing Brush", Avalonia.Input.Key.J, () => SelectTool(Tool.SpotHealing));
+        Key("Clone Stamp", Avalonia.Input.Key.S, () => SelectTool(Tool.CloneStamp));
+        Key("Smear tool (again switches its mode)", Avalonia.Input.Key.R, () =>
+        {
+            if (session!.Tool == Tool.Smear) session.SmearMode = (SmearMode)(((int)session.SmearMode + 1) % 5);
+            SelectTool(Tool.Smear);
+        });
+        Key("Gradient tool", Avalonia.Input.Key.G, () => SelectTool(Tool.Gradient));
+        Key("Shape tool (again switches the shape)", Avalonia.Input.Key.U, () =>
+        {
+            if (session!.Tool == Tool.Shape) session.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % Enum.GetValues<ShapeKind>().Length);
+            SelectTool(Tool.Shape);
+        });
+        Key("Next shape", Avalonia.Input.Key.U, () => { session!.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % Enum.GetValues<ShapeKind>().Length); SelectTool(Tool.Shape); }, KeyModifiers.Shift);
+        Key("Type tool", Avalonia.Input.Key.T, () => SelectTool(Tool.Text));
+        Key("Eyedropper tool", Avalonia.Input.Key.I, () => SelectTool(Tool.Eyedropper));
+        Key("Hand tool", Avalonia.Input.Key.H, () => SelectTool(Tool.Hand));
+        Key("Zoom tool", Avalonia.Input.Key.Z, () => SelectTool(Tool.Zoom));
+        Key("Cycle tool mode", Avalonia.Input.Key.Tab, () => { session!.CycleToolMode(); SelectTool(session.Tool); });
+        Key("Swap foreground and background", Avalonia.Input.Key.X, () => { session!.SwapColors(); UpdateColors(); });
+        Key("Reset colors to black and white", Avalonia.Input.Key.D, () => { session!.ResetColors(); UpdateColors(); });
+        Key("Delete selection, layer or effect", Avalonia.Input.Key.Back, DeletePressed);
+        Key("Toggle painting on the mask", Avalonia.Input.Key.OemBackslash, ToggleMaskEditing);
+        Key("Toggle painting on the mask (pipe)", Avalonia.Input.Key.OemPipe, ToggleMaskEditing, hidden: true);
+    }
+
+    private void ToggleMaskEditing()
+    {
+        if (session?.ActiveLayer?.Mask == null) return;
+        session.EditingMask = !session.EditingMask;
+        session.NotifyLayersChanged();
+    }
+
+    /// <summary>Every shortcut the window lists, menus first.</summary>
+    private IReadOnlyList<Shortcut> AllShortcuts => commands.Concat(toolKeys).ToList();
+
+    /// <summary>Puts the keys saved in the settings on their commands.</summary>
+    private void ApplyShortcutOverrides()
+    {
+        foreach (var shortcut in AllShortcuts)
+        {
+            if (!settings.Shortcuts.TryGetValue(shortcut.Id, out var stored)) continue;
+            KeyGesture? gesture = null;
+            if (!string.IsNullOrEmpty(stored))
+            {
+                try { gesture = KeyGesture.Parse(stored); }
+                catch (Exception) { continue; } // A damaged entry keeps the default.
+            }
+            shortcut.Gesture = gesture;
+            if (shortcut.Item != null) shortcut.Item.InputGesture = gesture;
+        }
+    }
+
+    private async Task ShowShortcuts()
+    {
+        if (await ShortcutsDialog.Edit(this, AllShortcuts) is not { } chosen) return;
+        settings.Shortcuts.Clear();
+        foreach (var shortcut in AllShortcuts)
+        {
+            if (!chosen.TryGetValue(shortcut.Id, out var gesture)) continue;
+            shortcut.Gesture = gesture;
+            if (shortcut.Item != null) shortcut.Item.InputGesture = gesture;
+            if (!Equals(gesture, shortcut.Default)) settings.Shortcuts[shortcut.Id] = gesture?.ToString() ?? "";
+        }
+        settings.Save();
     }
 
     private void RefreshMenuState()
@@ -229,12 +321,12 @@ public sealed partial class MainWindow
         clipItem!.Header = session.ActiveLayer?.Clipped == true ? "Release Clipping Mask" : "Create Clipping Mask";
     }
 
-    private void Execute(Command command)
+    private void Execute(Shortcut command)
     {
         if (command.Enabled?.Invoke() == false || canvas.IsDragging) return;
         problem = null;
         try { command.Run(); }
-        catch (Exception error) { _ = Prompts.Alert(this, command.Name.TrimEnd('…'), error.Message); }
+        catch (Exception error) { _ = Prompts.Alert(this, command.Title, error.Message); }
         UpdateStatus();
     }
 
@@ -272,56 +364,18 @@ public sealed partial class MainWindow
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
         if (canvas.IsDragging) { e.Handled = true; return; }
 
-        var gesture = commands.FirstOrDefault(c => c.Gesture != null && c.Gesture.Key == e.Key && c.Gesture.KeyModifiers == e.KeyModifiers);
+        var gesture = commands.FirstOrDefault(c => c.Matches(e));
         if (gesture != null) { Execute(gesture); e.Handled = true; return; }
 
-        if (session == null || e.KeyModifiers is not (KeyModifiers.None or KeyModifiers.Shift)) return;
-        var shift = e.KeyModifiers == KeyModifiers.Shift;
+        if (session == null) return;
+        // Tool letters also work with Shift held (Shift+U has its own meaning, so an exact match wins).
+        var tool = toolKeys.FirstOrDefault(c => c.Matches(e))
+            ?? (e.KeyModifiers == KeyModifiers.Shift ? toolKeys.FirstOrDefault(c => c.Gesture is { KeyModifiers: KeyModifiers.None } g && g.Key == e.Key) : null);
+        if (tool == null) return;
         e.Handled = true;
-        switch (e.Key)
-        {
-            case Key.V: SelectTool(Tool.Move); break;
-            case Key.M:
-                if (session.Tool == Tool.Marquee) session.MarqueeKind = session.MarqueeKind == MarqueeKind.Rectangle ? MarqueeKind.Ellipse : MarqueeKind.Rectangle;
-                SelectTool(Tool.Marquee);
-                break;
-            case Key.L:
-                if (session.Tool == Tool.Lasso) session.LassoKind = session.LassoKind == LassoKind.Freehand ? LassoKind.Polygonal : LassoKind.Freehand;
-                SelectTool(Tool.Lasso);
-                break;
-            case Key.W: SelectTool(Tool.Wand); break;
-            case Key.C: SelectTool(Tool.Crop); break;
-            case Key.B: session.EraserMode = false; SelectTool(Tool.Brush); break;
-            case Key.E: session.EraserMode = true; SelectTool(Tool.Brush); break;
-            case Key.J: SelectTool(Tool.SpotHealing); break;
-            case Key.S: SelectTool(Tool.CloneStamp); break;
-            case Key.R:
-                if (session.Tool == Tool.Smear) session.SmearMode = (SmearMode)(((int)session.SmearMode + 1) % 5);
-                SelectTool(Tool.Smear);
-                break;
-            case Key.G: SelectTool(Tool.Gradient); break;
-            case Key.U:
-                if (shift || session.Tool == Tool.Shape) session.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % Enum.GetValues<ShapeKind>().Length);
-                SelectTool(Tool.Shape);
-                break;
-            case Key.Tab when !shift:
-                // Tab steps the current tool through its modes (Rectangle/Ellipse, Paint/Erase, Wand/Object, and so on).
-                session.CycleToolMode();
-                SelectTool(session.Tool);
-                break;
-            case Key.T: SelectTool(Tool.Text); break;
-            case Key.I: SelectTool(Tool.Eyedropper); break;
-            case Key.H: SelectTool(Tool.Hand); break;
-            case Key.Z: SelectTool(Tool.Zoom); break;
-            case Key.X: session.SwapColors(); UpdateColors(); break;
-            case Key.D: session.ResetColors(); UpdateColors(); break;
-            case Key.Back: DeletePressed(); break;
-            case Key.OemBackslash or Key.OemPipe when session.ActiveLayer?.Mask != null:
-                session.EditingMask = !session.EditingMask;
-                session.NotifyLayersChanged();
-                break;
-            default: e.Handled = false; break;
-        }
+        problem = null;
+        tool.Run();
+        UpdateStatus();
     }
 
     /// <summary>
@@ -664,15 +718,6 @@ public sealed partial class MainWindow
         Busy(() => session.ResizeImage(result.Width, result.Height, result.Resolution));
         canvas.Fit();
     }
-
-    private Task ShowShortcuts() => Prompts.Alert(this, "Keyboard Shortcuts",
-        "Tools: V Move · M Marquee · L Lasso · W Wand · C Crop · B Brush · E Eraser · J Spot Healing · S Clone Stamp · R Smear · G Gradient · U Shape · T Text · I Eyedropper · H Hand · Z Zoom\n\n" +
-        "Canvas: Space pan · Ctrl+wheel zoom · Ctrl+0 fit · Ctrl+1 100%\n\n" +
-        "Brushes: [ ] size · { } hardness · 1–0 opacity · Shift-click straight line · Alt-click pick color or clone source\n\n" +
-        "Colors: X swap · D reset · Alt+Backspace fill foreground · Ctrl+Backspace fill background\n\n" +
-        "Selection: Ctrl+A all · Ctrl+D deselect · Ctrl+Shift+I inverse · Shift add · Alt subtract · Shift+Backspace content-aware fill\n\n" +
-        "Layers: Ctrl+Shift+N new · Ctrl+J duplicate / via copy · Ctrl+G group · Ctrl+E merge · Ctrl+Alt+G clipping mask · Ctrl+[ ] reorder · \\ toggle mask editing · Alt-click eye to solo\n\n" +
-        "Image: Ctrl+L Levels · Ctrl+M Curves · Ctrl+U Hue/Saturation · Ctrl+I Invert");
 }
 
 internal static class SessionExtensions

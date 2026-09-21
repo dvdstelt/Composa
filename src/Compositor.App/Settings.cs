@@ -11,6 +11,8 @@ public sealed class Settings
     public bool Maximized { get; set; }
     public int JpegQuality { get; set; } = 90;
     public bool ShowPixelGrid { get; set; } = true;
+    /// <summary>Rebound shortcuts by command id: a gesture string, or empty for none. Missing entries keep the default.</summary>
+    public Dictionary<string, string> Shortcuts { get; set; } = [];
 
     private static string FilePath
     {
