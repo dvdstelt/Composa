@@ -211,7 +211,7 @@ public static class MacProject
         }.Clamped();
     }
 
-    /// <summary>Stroke, drop shadow, color overlay and inner shadow, each optional; a missing <c>enabled</c> means shown.</summary>
+    /// <summary>Stroke, drop shadow, color overlay, inner shadow and outer glow, each optional; a missing <c>enabled</c> means shown.</summary>
     private static LayerEffects? ReadEffects(JsonElement effects)
     {
         bool Enabled(JsonElement e) => !e.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False;
@@ -230,7 +230,9 @@ public static class MacProject
             ColorOverlay = effects.TryGetProperty("colorOverlay", out var overlay) && overlay.ValueKind == JsonValueKind.Object
                 ? new ColorOverlayEffect { Enabled = Enabled(overlay), Color = (uint)UnitColor(overlay), Opacity = Opacity(overlay, 1) }
                 : null,
-            InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null
+            InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null,
+            OuterGlow = effects.TryGetProperty("outerGlow", out var glow) && glow.ValueKind == JsonValueKind.Object
+                ? new OuterGlowEffect { Enabled = Enabled(glow), Size = Number(glow, "size", 20), Color = (uint)UnitColor(glow), Opacity = Opacity(glow, 0.75) } : null
         };
         return result.IsEmpty ? null : result.Clamped();
     }

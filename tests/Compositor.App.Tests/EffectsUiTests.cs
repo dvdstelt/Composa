@@ -37,13 +37,19 @@ public class EffectsUiTests
         session.Background = new SKColor(0x20, 0x60, 0xC0);
         session.AddEffect(layer, LayerEffectKind.DropShadow);
         session.AddEffect(layer, LayerEffectKind.Stroke);
-        session.SetEffects(layer, layer.Effects! with { Shadow = layer.Effects.Shadow! with { Distance = 18, Blur = 24, Opacity = 0.6 }, Stroke = layer.Effects.Stroke! with { Size = 8 } });
+        session.AddEffect(layer, LayerEffectKind.OuterGlow);
+        session.SetEffects(layer, layer.Effects! with
+        {
+            Shadow = layer.Effects.Shadow! with { Distance = 18, Blur = 24, Opacity = 0.6 }, Stroke = layer.Effects.Stroke! with { Size = 8 },
+            OuterGlow = layer.Effects.OuterGlow! with { Size = 30, Color = 0xFFFFD040 }
+        });
         Dispatcher.UIThread.RunJobs();
         Capture(window, "22-layer-effects");
 
         var panel = window.GetVisualDescendants().OfType<LayersPanel>().Single();
         var rows = panel.GetVisualDescendants().OfType<Border>().Where(b => b.Tag is ValueTuple<Layer, LayerEffectKind>).ToList();
-        Assert.Equal(2, rows.Count);
+        Assert.Equal(3, rows.Count);
+        Assert.Equal(LayerEffectKind.OuterGlow, ((ValueTuple<Layer, LayerEffectKind>)rows[^1].Tag!).Item2);
         var strokeRow = rows.Single(r => ((ValueTuple<Layer, LayerEffectKind>)r.Tag!).Item2 == LayerEffectKind.Stroke);
         var point = strokeRow.TranslatePoint(new Point(120, strokeRow.Bounds.Height / 2), window)!.Value;
         window.MouseDown(point, MouseButton.Left);

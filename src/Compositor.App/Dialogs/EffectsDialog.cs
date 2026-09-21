@@ -62,6 +62,12 @@ public static class EffectsDialog
                 rows.Children.Add(Swatch());
                 rows.Children.Add(Slider("Opacity", effects.ColorOverlay!.Opacity * 100, 0, 100, v => Set(effects with { ColorOverlay = effects.ColorOverlay! with { Opacity = v / 100 } })));
                 break;
+            case LayerEffectKind.OuterGlow:
+                var glow = effects.OuterGlow!;
+                rows.Children.Add(Swatch());
+                rows.Children.Add(Slider("Opacity", glow.Opacity * 100, 0, 100, v => Set(effects with { OuterGlow = effects.OuterGlow! with { Opacity = v / 100 } })));
+                rows.Children.Add(Slider("Size", glow.Size, 0, 250, v => Set(effects with { OuterGlow = effects.OuterGlow! with { Size = v } })));
+                break;
         }
         var dialog = new DialogWindow(LayerEffects.DisplayName(kind), rows);
         return await dialog.Ask(owner);

@@ -13,7 +13,7 @@ public sealed partial class EditorSession
 
     /// <summary>
     /// Adds an effect with its default settings and selects it. A new stroke or overlay takes the background color:
-    /// the foreground is usually what the layer is painted in. Leaves the edit open when <paramref name="commit"/> is false.
+    /// the foreground is usually what the layer is painted in. A glow starts white, as Photoshop's does. Leaves the edit open when <paramref name="commit"/> is false.
     /// </summary>
     public bool AddEffect(Layer layer, LayerEffectKind kind, bool commit = true)
     {
@@ -26,6 +26,7 @@ public sealed partial class EditorSession
             LayerEffectKind.Stroke => effects with { Stroke = new StrokeEffect { Color = background } },
             LayerEffectKind.DropShadow => effects with { Shadow = new ShadowEffect() },
             LayerEffectKind.ColorOverlay => effects with { ColorOverlay = new ColorOverlayEffect { Color = background } },
+            LayerEffectKind.OuterGlow => effects with { OuterGlow = new OuterGlowEffect() },
             _ => effects with { InnerShadow = new ShadowEffect { Distance = 10, Blur = 10 } }
         };
         Begin("Add " + LayerEffects.DisplayName(kind));

@@ -4,8 +4,8 @@ using SkiaSharp;
 namespace Compositor.Rendering;
 
 /// <summary>
-/// Draws a layer's effects around its pixels. The result is the layer as it should appear (shadow behind, stroke
-/// around, pixels on top, overlay and inner shadow over them) on a canvas grown by <c>Inset</c> pixels on every side,
+/// Draws a layer's effects around its pixels. The result is the layer as it should appear (shadow and glow behind,
+/// stroke around, pixels on top, overlay and inner shadow over them) on a canvas grown by <c>Inset</c> pixels on every side,
 /// so the caller places it by shifting the layer's own matrix by the same amount. The last few results are kept, so
 /// redrawing the canvas does not rebuild them.
 /// </summary>
@@ -95,6 +95,16 @@ public static class LayerEffectsRenderer
             var (dx, dy) = shadow.Offset;
             using var moved = Shifted(coverage, (float)dx, (float)dy, (float)(shadow.Blur / 2));
             Tint(canvas, moved, shadow.Color, shadow.Opacity);
+        }
+        if (visible.OuterGlow is { Opacity: > 0, Size: > 0 } glow)
+        {
+            // The shape softened on every side, with the shape itself cut out so a translucent layer is not lit from
+            // behind by its own glow. Half the size as sigma puts the visible edge of the glow about a size away.
+            using var soft = Shifted(coverage, 0, 0, (float)(glow.Size / 2));
+            using (var cutCanvas = new SKCanvas(soft))
+            using (var cut = new SKPaint { BlendMode = SKBlendMode.DstOut })
+                cutCanvas.DrawBitmap(coverage, 0, 0, cut);
+            Tint(canvas, soft, glow.Color, glow.Opacity);
         }
         // An outside stroke sits behind the layer's own pixels; an inside one is drawn over them, or the pixels would
         // simply cover it.
