@@ -71,6 +71,8 @@ public sealed partial class MainWindow : Window
         layers.EditTextRequested += layer => _ = EditText(default, layer);
         layers.EditAdjustmentRequested += layer => _ = EditAdjustmentLayer(layer, isNew: false);
         layers.NewAdjustmentRequested += kind => _ = NewAdjustmentLayer(kind);
+        layers.EditEffectRequested += (layer, kind) => _ = EditEffect(layer, kind);
+        layers.NewEffectRequested += kind => _ = NewEffect(kind);
 
         AddHandler(KeyDownEvent, OnWindowKeyDown, Avalonia.Interactivity.RoutingStrategies.Tunnel);
         AddHandler(KeyUpEvent, (_, e) => { if (!SwallowAlt(e)) canvas.HandleKeyUp(e); }, Avalonia.Interactivity.RoutingStrategies.Tunnel);

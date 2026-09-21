@@ -6,6 +6,7 @@ using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using Avalonia.VisualTree;
 using Compositor.Editing;
 using Compositor.Filters;
 using Compositor.Model;
@@ -43,6 +44,15 @@ public sealed class LayersPanel : UserControl
     public event Action<Layer>? EditAdjustmentRequested;
     public event Action<Layer>? EditTextRequested;
     public event Action<AdjustmentKind>? NewAdjustmentRequested;
+    /// <summary>Double-click on an effect row: open its settings.</summary>
+    public event Action<Layer, LayerEffectKind>? EditEffectRequested;
+    /// <summary>The footer's effects menu: add an effect to the active layer.</summary>
+    public event Action<LayerEffectKind>? NewEffectRequested;
+
+    // An effect row being Alt-dragged onto another layer.
+    private (Layer Layer, LayerEffectKind Kind)? effectDrag;
+    private Point effectDragStart;
+    private Border? effectDropRow;
 
     static LayersPanel() => Compositor.Rendering.Pixels.Invalidated += bitmap => Thumbnails.Remove(bitmap);
 
@@ -95,13 +105,23 @@ public sealed class LayersPanel : UserControl
         }
         var adjustButton = Ui.IconButton(Icons.Adjust, "New adjustment layer", () => { });
         adjustButton.Click += (_, _) => adjustmentMenu.Open(adjustButton);
+        var effectsMenu = new ContextMenu();
+        foreach (var kind in Enum.GetValues<LayerEffectKind>())
+        {
+            var item = new MenuItem { Header = LayerEffects.DisplayName(kind) + "…" };
+            item.Click += (_, _) => NewEffectRequested?.Invoke(kind);
+            effectsMenu.Items.Add(item);
+        }
+        var effectsButton = Ui.IconButton(Icons.Effects, "Layer effects: stroke, drop shadow, color overlay, inner shadow", () => { });
+        effectsButton.Click += (_, _) => { if (session?.ActiveLayer is { Pixels: not null }) effectsMenu.Open(effectsButton); };
 
         var footer = Ui.Row(2,
             Ui.IconButton(Icons.Plus, "New layer (Ctrl+Shift+N)", () => session?.AddBlankLayer()),
             Ui.IconButton(Icons.Folder, "Group selected layers (Ctrl+G)", () => session?.GroupSelectedLayers()),
             Ui.IconButton(Icons.Mask, "Add layer mask (Alt: hide all)", () => { if (session?.ActiveLayer is { } layer) session.AddMask(layer); }),
+            effectsButton,
             adjustButton,
-            Ui.IconButton(Icons.Trash, "Delete layer", () => DeleteLayerOrMask()));
+            Ui.IconButton(Icons.Trash, "Delete layer, mask or effect", () => DeleteLayerOrMask()));
         footer.HorizontalAlignment = HorizontalAlignment.Center;
         footer.Margin = new Thickness(0, 4);
 
@@ -142,9 +162,12 @@ public sealed class LayersPanel : UserControl
         }
     }
 
+    /// <summary>The trash button and Delete: a highlighted effect goes first, then the targeted mask, then the layers.</summary>
     public void DeleteLayerOrMask()
     {
-        if (session?.ActiveLayer is not { } layer) return;
+        if (session == null) return;
+        if (session.SelectedEffect != null) { session.RemoveSelectedEffect(); return; }
+        if (session.ActiveLayer is not { } layer) return;
         if (session.IsEditingMask) session.DeleteMask(layer); else session.DeleteSelectedLayers();
     }
 
@@ -200,6 +223,7 @@ public sealed class LayersPanel : UserControl
         {
             var layer = layers[i];
             rows.Children.Add(BuildRow(layer, depth, parentVisible));
+            if (layer.Effects is { } effects) foreach (var kind in effects.Kinds) rows.Children.Add(BuildEffectRow(layer, kind, depth, parentVisible && layer.Visible));
             if (layer.IsGroup && !layer.Collapsed) AddRows(layer.Children, depth + 1, parentVisible && layer.Visible);
         }
     }
@@ -304,6 +328,93 @@ public sealed class LayersPanel : UserControl
         return row;
     }
 
+    /// <summary>An effect belongs visually to its layer but has its own selection and visibility control.</summary>
+    private Control BuildEffectRow(Layer layer, LayerEffectKind kind, int depth, bool parentVisible)
+    {
+        var current = session!;
+        var enabled = layer.Effects!.IsEnabled(kind);
+        var selected = current.SelectedEffect is { } s && s.LayerId == layer.Id && s.Kind == kind;
+        var eye = new Button { Classes = { "flat" }, Width = 24, Height = 22, Padding = new Thickness(0), Content = Icons.Create(enabled ? Icons.Eye : Icons.EyeOff, 12, enabled ? Palette.Secondary : new SolidColorBrush(Color.Parse("#555555"))) };
+        ToolTip.SetTip(eye, enabled ? "Hide " + LayerEffects.DisplayName(kind).ToLowerInvariant() : "Show " + LayerEffects.DisplayName(kind).ToLowerInvariant());
+        eye.Click += (_, _) => current.ToggleEffect(layer, kind);
+        var name = Ui.Label(LayerEffects.DisplayName(kind), enabled ? Palette.Foreground : Palette.Secondary);
+        name.FontSize = 11.5;
+        var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(depth * 14 + 46, 0, 0, 0), Opacity = parentVisible ? 1 : 0.45, Children = { eye, name } };
+        var row = new Border
+        {
+            Child = content, Background = selected ? Palette.Selected : Brushes.Transparent, Padding = new Thickness(4, 1), Height = 24,
+            BorderBrush = Palette.Divider, BorderThickness = new Thickness(0, 0, 0, 1), Tag = (layer, kind)
+        };
+        ToolTip.SetTip(row, "Click to select, double-click to edit, Alt-drag onto another layer to copy the " + LayerEffects.DisplayName(kind).ToLowerInvariant());
+        row.PointerPressed += (_, e) =>
+        {
+            if (e.Source == eye || (e.Source as Control)?.FindAncestorOfType<Button>() == eye) return;
+            var properties = e.GetCurrentPoint(row).Properties;
+            if (!properties.IsLeftButtonPressed && !properties.IsRightButtonPressed) return;
+            if (current.Document.ActiveLayerId != layer.Id) current.SelectLayer(layer.Id);
+            current.SelectedEffect = (layer.Id, kind);
+            if (e.ClickCount == 2 && properties.IsLeftButtonPressed) { EditEffectRequested?.Invoke(layer, kind); e.Handled = true; return; }
+            if (properties.IsLeftButtonPressed && e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+            {
+                effectDrag = (layer, kind);
+                effectDragStart = e.GetPosition(rows);
+                e.Pointer.Capture(row);
+            }
+            Rebuild();
+            e.Handled = true;
+        };
+        row.PointerMoved += (_, e) => EffectDragMoved(e);
+        row.PointerReleased += (_, e) => EffectDragReleased(e);
+        row.PointerCaptureLost += (_, _) => { effectDrag = null; ClearEffectDrop(); };
+        var menu = new ContextMenu();
+        void Add(string header, Action action)
+        {
+            var item = new MenuItem { Header = header };
+            item.Click += (_, _) => action();
+            menu.Items.Add(item);
+        }
+        Add("Edit " + LayerEffects.DisplayName(kind) + "…", () => EditEffectRequested?.Invoke(layer, kind));
+        Add(enabled ? "Hide" : "Show", () => current.ToggleEffect(layer, kind));
+        Add("Delete", () => current.RemoveEffect(layer, kind));
+        row.ContextMenu = menu;
+        return row;
+    }
+
+    private void EffectDragMoved(PointerEventArgs e)
+    {
+        if (effectDrag == null || session == null) return;
+        if (!e.GetCurrentPoint(rows).Properties.IsLeftButtonPressed) { effectDrag = null; ClearEffectDrop(); return; }
+        var position = e.GetPosition(rows);
+        if (Math.Abs(position.Y - effectDragStart.Y) < 6 && effectDropRow == null) return;
+        ClearEffectDrop();
+        var target = rows.Children.OfType<Border>().FirstOrDefault(r => r.Tag is Layer && position.Y >= r.Bounds.Top && position.Y < r.Bounds.Bottom);
+        if (target?.Tag is Layer layer && session.CanCopyEffect(effectDrag.Value.Kind, effectDrag.Value.Layer, layer))
+        {
+            effectDropRow = target;
+            target.BorderBrush = Palette.Accent;
+            target.BorderThickness = new Thickness(1);
+        }
+    }
+
+    private void EffectDragReleased(PointerReleasedEventArgs e)
+    {
+        var drag = effectDrag;
+        var drop = effectDropRow;
+        effectDrag = null;
+        ClearEffectDrop();
+        e.Pointer.Capture(null);
+        if (drag == null || session == null || drop?.Tag is not Layer target) return;
+        session.CopyEffect(drag.Value.Kind, drag.Value.Layer, target);
+    }
+
+    private void ClearEffectDrop()
+    {
+        if (effectDropRow == null) return;
+        effectDropRow.BorderBrush = Palette.Divider;
+        effectDropRow.BorderThickness = new Thickness(0, 0, 0, 1);
+        effectDropRow = null;
+    }
+
     private static Border Thumb(Control child, bool highlighted, Action? click = null)
     {
         var border = new Border
@@ -372,6 +483,17 @@ public sealed class LayersPanel : UserControl
             Add("Select Mask", () => current.SelectLayerMask(layer));
         }
         if (layer.Pixels != null) Add("Select Pixels", () => current.SelectLayerPixels(layer));
+        if (layer.Pixels != null)
+        {
+            var effects = new MenuItem { Header = "Layer Effects" };
+            foreach (var kind in Enum.GetValues<LayerEffectKind>())
+            {
+                var item = new MenuItem { Header = LayerEffects.DisplayName(kind) + "…" };
+                item.Click += (_, _) => { if (!current.Document.SelectedLayerIds.Contains(layer.Id)) current.SelectLayer(layer.Id); if (layer.Effects?.Contains(kind) == true) EditEffectRequested?.Invoke(layer, kind); else NewEffectRequested?.Invoke(kind); };
+                effects.Items.Add(item);
+            }
+            menu.Items.Add(effects);
+        }
         if (layer.Text != null) Add("Edit Text…", () => EditTextRequested?.Invoke(layer));
         if (layer.IsLive) Add("Rasterize Layer", () => current.RasterizeShape(layer));
         menu.Items.Add(new Separator());
@@ -408,6 +530,7 @@ public sealed class LayersPanel : UserControl
         pressed = layer;
         pressPoint = e.GetPosition(rows);
         dragging = false;
+        if (session.SelectedEffect != null) { session.SelectedEffect = null; session.NotifyLayersChanged(); }
         var target = thumbnailTarget;
         thumbnailTarget = null;
         if (extend || range || !session.Document.SelectedLayerIds.Contains(layer.Id)) session.SelectLayer(layer.Id, extend, range);

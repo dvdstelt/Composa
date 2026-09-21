@@ -149,6 +149,8 @@ public sealed partial class MainWindow
             mergeItem,
             Item("Flatten Image", () => session!.FlattenImage()),
             Line(),
+            Sub("Layer Effects", Enum.GetValues<LayerEffectKind>().Select(kind => (object)Item(LayerEffects.DisplayName(kind) + "…", () => _ = NewEffect(kind), enabled: () => session!.ActiveLayer?.Pixels != null))
+                .Append(Line()).Append(Item("Delete Effect", () => session!.RemoveSelectedEffect(), enabled: () => session!.SelectedEffect != null)).ToArray()),
             Item("Edit Text…", () => _ = EditText(default, session!.ActiveLayer), enabled: () => session!.ActiveLayer?.Text != null),
             Item("Rasterize Layer", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.IsLive == true),
             Item("Rotate Layer 90° Clockwise", () => session!.RotateLayers(90)),
@@ -301,6 +303,7 @@ public sealed partial class MainWindow
     private void DeletePressed()
     {
         if (session == null) return;
+        if (session.SelectedEffect != null) { session.RemoveSelectedEffect(); return; }
         if (session.Selection != null && session.CanEditPixels) session.ClearSelection();
         else if (session.Selection == null) layers.DeleteLayerOrMask();
     }
@@ -574,6 +577,32 @@ public sealed partial class MainWindow
             target.Commit();
         }
         else target.Cancel();
+    }
+
+    /// <summary>Adds an effect to the active layer and opens its settings; cancelling the dialog takes the effect away again.</summary>
+    private async Task NewEffect(LayerEffectKind kind)
+    {
+        if (session == null) return;
+        var target = session;
+        if (target.ActiveLayer is not { Pixels: not null } layer) { ShowProblem("Select a layer with pixels to add an effect to."); return; }
+        if (layer.Effects?.Contains(kind) == true) { await EditEffect(layer, kind); return; }
+        target.AddEffect(layer, kind, commit: false);
+        if (await EffectsDialog.Edit(this, target, layer, kind)) target.Commit();
+        else { target.Cancel(); target.SelectedEffect = null; }
+        target.NotifyLayersChanged();
+    }
+
+    /// <summary>Edits one effect with a live preview; the dialog undoes as one step.</summary>
+    private async Task EditEffect(Layer layer, LayerEffectKind kind)
+    {
+        if (session == null || layer.Effects?.Contains(kind) != true) return;
+        var target = session;
+        var original = layer.Effects;
+        target.SelectedEffect = (layer.Id, kind);
+        target.Begin("Edit " + LayerEffects.DisplayName(kind));
+        if (await EffectsDialog.Edit(this, target, layer, kind) && layer.Effects != original) target.Commit();
+        else target.Cancel();
+        target.NotifyLayersChanged();
     }
 
     /// <summary>Adds text at a point, or edits an existing text layer, with the canvas updating as you type.</summary>
