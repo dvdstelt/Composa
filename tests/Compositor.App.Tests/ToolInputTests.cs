@@ -206,6 +206,17 @@ public class ToolInputTests
         session.SelectLayer(other.Id);
         Drag(new SKPoint(510, 120), new SKPoint(23, 120), RawInputModifiers.Control);
         Assert.Equal(0, other.Transform.X);                                  // 3 px short, snapped onto the canvas edge.
+
+        // The Type tool shows the move cursor too, instead of its I-beam, for as long as Ctrl is down.
+        window.SelectTool(Tool.Text);
+        window.MouseMove(At(200, 300), RawInputModifiers.None);
+        Assert.Equal("Ibeam", window.Canvas.Cursor?.ToString());
+        window.KeyPressQwerty(PhysicalKey.ControlLeft, RawInputModifiers.None);
+        window.MouseMove(At(202, 300), RawInputModifiers.Control);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.KeyReleaseQwerty(PhysicalKey.ControlLeft, RawInputModifiers.Control);
+        window.MouseMove(At(204, 300), RawInputModifiers.None);
+        Assert.Equal("Ibeam", window.Canvas.Cursor?.ToString());
     }
 
     [AvaloniaFact]

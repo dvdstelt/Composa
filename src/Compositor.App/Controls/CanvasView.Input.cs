@@ -603,7 +603,7 @@ public sealed partial class CanvasView
 
     private void SetControlHover(bool control)
     {
-        var hover = control && cursorInside && session != null && session.Tool is not (Tool.Move or Tool.Text) && session.TextEdit == null;
+        var hover = control && cursorInside && session != null && session.Tool != Tool.Move;
         if (hover == controlHover) return;
         controlHover = hover;
         UpdateCursor();

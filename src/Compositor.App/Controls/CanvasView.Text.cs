@@ -204,6 +204,7 @@ public sealed partial class CanvasView
 
     private void UpdateTextCursor(Point position)
     {
+        if (controlHover) return; // Ctrl is held: the move cursor is showing what a drag would do.
         var type = StandardCursorType.Ibeam;
         if (session?.TextEdit != null && TextBoxCorners() is { } corners)
             type = HitFrame(corners, position, allowRotate: false) switch
