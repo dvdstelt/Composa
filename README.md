@@ -4,6 +4,11 @@ A layer-based image editor for compositing and retouching, with Photoshop-style 
 
 The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal and Vision, so it cannot be compiled for Linux. This project rebuilds the same editor from scratch in C# with .NET 10, [Avalonia](https://avaloniaui.net/) and [SkiaSharp](https://github.com/mono/SkiaSharp). It runs on X11 and Wayland (through XWayland).
 
+> [!IMPORTANT]
+> This entire codebase was created by Claude Code Fable 5.1 in a single prompt. I ran it once and played around with it, but haven't looked at the code at all.
+> The prompt was `Create a version based on the code of Compositor. I'm going to bed. Don't ask questions and don't finish until you're done.`
+> There's still a lot of work to make this work on Linux, Windows and Mac. But I always really liked Photoshop and hopefully this can become my new tool in the future.
+
 ## Features
 
 ### Layers
