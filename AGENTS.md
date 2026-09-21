@@ -6,8 +6,8 @@ A Linux implementation of the macOS image editor [Compositor](https://github.com
 
 ## Layout
 
-- `src/Compositor.Core`: everything that is not UI. Document model, compositor, selections, brush engine, filters, adjustments, file IO and `EditorSession` (every editing command). It must never reference Avalonia.
-- `src/Compositor.App`: the Avalonia desktop app. UI is built in C# (no XAML). `CanvasView` owns viewport, overlays and pointer tools; `LayersPanel` the layer stack; `MainWindow.*` the menus, shortcuts, tabs, options bar and file handling.
+- `src/Compositor.Core`: everything that is not UI. Document model, compositor, selections, brush engine, filters, adjustments, text layout (`Text/TextLayout`, `Text/TextEditor`), layer effects (`Rendering/LayerEffectsRenderer`), file IO and `EditorSession` (every editing command, split into partial files by area). It must never reference Avalonia.
+- `src/Compositor.App`: the Avalonia desktop app. UI is built in C# (no XAML). `CanvasView` owns viewport, overlays and pointer tools (text editing in `CanvasView.Text`, rulers and guides in `CanvasView.Guides`); `LayersPanel` the layer stack and effect rows; `MainWindow.*` the menus, shortcuts (a `Shortcut` table for menu commands and tool keys, rebindable through `ShortcutsDialog`), tabs, options bar and file handling.
 - `tests/Compositor.Core.Tests`: xUnit tests that drive `EditorSession` directly.
 - `tests/Compositor.App.Tests`: Avalonia headless tests with real Skia rendering. They save screenshots to `artifacts/screenshots/` (git-ignored), which is the way to check UI changes visually without a display.
 
@@ -20,6 +20,10 @@ A Linux implementation of the macOS image editor [Compositor](https://github.com
 - `DocumentRenderer.Render` splits large areas into bands rendered in parallel. Anything added to the render path must be a per-pixel operation that does not depend on neighbouring bands.
 - Never invalidate a visual or raise layout-affecting events from inside `CanvasView.Render`.
 - Layer lists are stored bottom to top; the Layers panel shows them reversed.
+- Layer effects are drawn from an image the renderer caches per (pixels, mask, effects); the image already has the mask applied, so `RenderUnit` must not apply the mask again when effects are present. `Layer.VisibleBounds` includes the effects' margin and is what invalidation uses.
+- Text layers are re-rendered from their `TextStyle` through `TextLayout` on every change. The layout's character positions are the caret geometry; keep drawing and layout in that one class so what is typed is what is rendered.
+- `EditorSession.TextEdit` is an open edit (a `Begin` without `Commit`); anything that starts another edit or changes the tool or layer selection must go through `FinishText`, which `FinishInteraction` and `SelectLayer` already do.
+- View options (rulers, grid, guides, snapping) live on `EditorSession.View` and are carried from tab to tab like the tool settings; guides themselves are document data and undo with it.
 
 ## Commands
 

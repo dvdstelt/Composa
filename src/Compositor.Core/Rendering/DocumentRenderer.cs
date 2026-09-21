@@ -285,21 +285,45 @@ public static class DocumentRenderer
     private static void DrawPixels(Layer layer, SKCanvas canvas, double opacity, BlendMode blend, (SKBitmap Image, int Inset)? effects)
     {
         if (layer.Pixels == null) return;
+        using var paint = new SKPaint { BlendMode = blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(opacity)), IsAntialias = true };
+        void Draw(SKCanvas target)
+        {
+            if (effects is { } built)
+            {
+                // The effects image is the layer's pixels grown by the inset on every side, so it lands in the same place.
+                target.Save();
+                target.Translate(-built.Inset, -built.Inset);
+                DrawBitmap(target, built.Image, paint);
+                target.Restore();
+                // While a stroke is in progress the effects are those of the pixels at its start; the wet paint goes over them.
+                if (Pixels.IsLive(layer.Pixels) && (layer.Mask == null || !layer.MaskEnabled)) DrawBitmap(target, layer.Pixels, paint);
+            }
+            else DrawBitmap(target, layer.Pixels, paint);
+        }
+        var pixels = layer.Pixels;
+        var corners = layer.Transform.Distort == null ? null : layer.Transform.Corners(pixels.Width, pixels.Height);
+        if (corners != null && !Geometry.IsConvex(corners))
+        {
+            // A folded shape (a corner dragged past its neighbours) has no perspective that takes the image to it, so
+            // each half is taken there on its own, as two triangles meeting along the shape's diagonal.
+            var source = new SKPoint[] { new(0, 0), new(pixels.Width, 0), new(pixels.Width, pixels.Height), new(0, pixels.Height) };
+            foreach (var (i, j, k) in new[] { (0, 1, 2), (0, 2, 3) })
+            {
+                if (Geometry.Affine(source[i], source[j], source[k], corners[i], corners[j], corners[k]) is not { } affine) continue;
+                using var triangle = new SKPath();
+                triangle.AddPoly([corners[i], corners[j], corners[k]], close: true);
+                canvas.Save();
+                canvas.ClipPath(triangle, SKClipOperation.Intersect, antialias: false);
+                canvas.Concat(in affine);
+                Draw(canvas);
+                canvas.Restore();
+            }
+            return;
+        }
         var matrix = layer.Matrix;
         canvas.Save();
         canvas.Concat(in matrix);
-        using var paint = new SKPaint { BlendMode = blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(opacity)), IsAntialias = true };
-        if (effects is { } built)
-        {
-            // The effects image is the layer's pixels grown by the inset on every side, so it lands in the same place.
-            canvas.Save();
-            canvas.Translate(-built.Inset, -built.Inset);
-            DrawBitmap(canvas, built.Image, paint);
-            canvas.Restore();
-            // While a stroke is in progress the effects are those of the pixels at its start; the wet paint goes over them.
-            if (Pixels.IsLive(layer.Pixels) && (layer.Mask == null || !layer.MaskEnabled)) DrawBitmap(canvas, layer.Pixels, paint);
-        }
-        else DrawBitmap(canvas, layer.Pixels, paint);
+        Draw(canvas);
         canvas.Restore();
     }
 

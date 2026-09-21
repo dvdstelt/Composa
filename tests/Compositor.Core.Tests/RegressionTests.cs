@@ -288,4 +288,25 @@ public class QaRegressionTests
             if (Math.Abs(expected.GetPixel(x, y).Green - actual.GetPixel(x, y).Green) > 60) differing++;
         Assert.True(differing < 40, $"{differing} sampled pixels differ from a plain stretch");
     }
+
+    [Fact]
+    public void A_corner_dragged_past_its_neighbours_folds_the_layer_instead_of_breaking_it()
+    {
+        var session = EditorSession.NewCanvas(200, 200);
+        var layer = session.AddImageLayer("box", TestImages.Solid(100, 100, SKColors.Red), new SKPoint(150, 150)); // Centered: 100 to 200.
+        var edit = session.BeginTransform()!;
+        // The top-left corner goes far past the bottom-right one: the shape folds over itself.
+        edit.DistortCorner(0, new SKPoint(190, 190));
+        session.CommitTransform();
+        var corners = layer.Transform.Corners(100, 100);
+        Assert.False(Compositor.Model.Geometry.IsConvex(corners));
+        using var flat = session.Flatten();
+        // The two thin triangles along the right and bottom edges are painted; the fold's inside is not.
+        TestImages.AssertColor(SKColors.Red, flat.GetPixel(197, 150));
+        TestImages.AssertColor(SKColors.Red, flat.GetPixel(170, 197));
+        Assert.Equal(0, flat.GetPixel(150, 150).Alpha);
+        Assert.Equal(0, flat.GetPixel(60, 60).Alpha);
+        session.Undo();
+        TestImages.AssertColor(SKColors.Red, session.Composite().GetPixel(150, 150));
+    }
 }
