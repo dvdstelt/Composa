@@ -5,10 +5,21 @@ namespace Compositor.Model;
 
 public enum LayerKind { Raster, Group, Adjustment }
 
-public enum ShapeKind { Rectangle, RoundedRectangle, Ellipse }
+public enum ShapeKind { Rectangle, RoundedRectangle, Ellipse, Line }
 
 /// <summary>A live shape: redrawn at full sharpness whenever its layer is scaled.</summary>
-public sealed record ShapeStyle(ShapeKind Kind, uint Fill, double CornerRadius);
+public sealed record ShapeStyle(ShapeKind Kind, uint Fill, double CornerRadius)
+{
+    /// <summary>A line's thickness in layer pixels; other shapes ignore it.</summary>
+    public double LineWidth { get; init; }
+    /// <summary>A line's two ends as fractions of the layer's box (0 to 1), so a scaled line still runs between the same two places. Null runs corner to corner.</summary>
+    public double? StartX { get; init; }
+    public double? StartY { get; init; }
+    public double? EndX { get; init; }
+    public double? EndY { get; init; }
+
+    public static string DisplayName(ShapeKind kind) => kind == ShapeKind.RoundedRectangle ? "Rounded Rectangle" : kind.ToString();
+}
 
 public enum TextAlignment { Left, Center, Right }
 

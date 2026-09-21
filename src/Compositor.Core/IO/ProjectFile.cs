@@ -36,6 +36,8 @@ public static class ProjectFile
         public double Resolution { get; set; } = 72;
         public Guid? ActiveLayerId { get; set; }
         public List<LayerRecord> Layers { get; set; } = [];
+        /// <summary>Alignment guides; absent on version 1 files.</summary>
+        public List<Guide>? Guides { get; set; }
     }
 
     private sealed class LayerRecord
@@ -101,7 +103,8 @@ public static class ProjectFile
         var manifest = new Manifest
         {
             Width = document.Width, Height = document.Height, Resolution = document.Resolution,
-            ActiveLayerId = document.ActiveLayerId, Layers = document.Layers.Select(Record).ToList()
+            ActiveLayerId = document.ActiveLayerId, Layers = document.Layers.Select(Record).ToList(),
+            Guides = document.Guides.Count > 0 ? document.Guides.ToList() : null
         };
         using var manifestStream = zip.CreateEntry("manifest.json").Open();
         JsonSerializer.Serialize(manifestStream, manifest, Json);
@@ -166,6 +169,9 @@ public static class ProjectFile
         }
 
         foreach (var record in manifest.Layers) document.Layers.Add(Build(record, 0));
+        if (manifest.Guides != null)
+            foreach (var guide in manifest.Guides.Where(g => g.IsValid).Take(1000))
+                document.Guides.Add(guide.Id == Guid.Empty ? guide with { Id = Guid.NewGuid() } : guide);
         var active = manifest.ActiveLayerId is { } id && document.Find(id) != null ? id : document.Layers.LastOrDefault()?.Id;
         document.SetActive(active);
         return document;

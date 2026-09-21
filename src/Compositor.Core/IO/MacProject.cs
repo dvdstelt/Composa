@@ -29,6 +29,16 @@ public static class MacProject
         if (version > 8) throw new InvalidDataException($"This project uses format version {version}; versions 1–8 can be opened.");
 
         var document = new Document(Int(root, "width", 1), Int(root, "height", 1)) { Resolution = Math.Clamp(Number(root, "resolution", 72), 1, 9600) };
+        if (root.TryGetProperty("guides", out var guides) && guides.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var guide in guides.EnumerateArray().Take(1000))
+            {
+                var position = Number(guide, "position", double.NaN);
+                if (!double.IsFinite(position)) continue;
+                var axis = Text(guide, "axis") == "vertical" ? GuideAxis.Vertical : GuideAxis.Horizontal;
+                document.Guides.Add(new Guide(Guid.TryParse(Text(guide, "id"), out var guideId) ? guideId : Guid.NewGuid(), axis, position));
+            }
+        }
         if (!root.TryGetProperty("layers", out var records) || records.ValueKind != JsonValueKind.Array) return document;
 
         var layers = new Dictionary<Guid, Layer>();
@@ -164,10 +174,20 @@ public static class MacProject
 
     private static ShapeStyle ReadShape(JsonElement shape)
     {
-        var kind = Text(shape, "kind")?.ToLowerInvariant() switch { "ellipse" => ShapeKind.Ellipse, "roundedrectangle" or "rounded rectangle" => ShapeKind.RoundedRectangle, _ => ShapeKind.Rectangle };
+        var kind = Text(shape, "kind")?.ToLowerInvariant() switch { "ellipse" => ShapeKind.Ellipse, "line" => ShapeKind.Line, "roundedrectangle" or "rounded rectangle" => ShapeKind.RoundedRectangle, _ => ShapeKind.Rectangle };
         var radius = Number(shape, "cornerRadius", 0);
         if (kind == ShapeKind.Rectangle && radius > 0) kind = ShapeKind.RoundedRectangle;
-        return new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+        var style = new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+        if (kind != ShapeKind.Line) return style;
+        var (startX, startY) = Pair(shape, "start");
+        var (endX, endY) = Pair(shape, "end");
+        var hasEnds = shape.TryGetProperty("start", out _) && shape.TryGetProperty("end", out _);
+        return style with
+        {
+            LineWidth = Math.Clamp(Number(shape, "lineWidth", 4), 1, 5000),
+            StartX = hasEnds ? Math.Clamp(startX, 0, 1) : null, StartY = hasEnds ? Math.Clamp(startY, 0, 1) : null,
+            EndX = hasEnds ? Math.Clamp(endX, 0, 1) : null, EndY = hasEnds ? Math.Clamp(endY, 0, 1) : null
+        };
     }
 
     /// <summary>Editable text. The PostScript font name carries the family and, after a dash, the weight and slant.</summary>
