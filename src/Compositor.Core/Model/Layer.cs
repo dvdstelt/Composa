@@ -50,6 +50,8 @@ public sealed class Layer
     public Adjustment? Adjustment { get; set; }
     public ShapeStyle? Shape { get; set; }
     public TextStyle? Text { get; set; }
+    /// <summary>Stroke, shadows and overlay drawn around the pixels; null when the layer has none.</summary>
+    public LayerEffects? Effects { get; set; }
     /// <summary>Live layers (shapes and text) are regenerated from their settings; they take pixel edits only once rasterized.</summary>
     public bool IsLive => Shape != null || Text != null;
     /// <summary>Bottom-to-top children of a group.</summary>
@@ -65,6 +67,21 @@ public sealed class Layer
     /// <summary>Document-space bounds of the layer's pixels; empty for groups and adjustments.</summary>
     public SKRect Bounds => Pixels == null ? SKRect.Empty : Transform.Bounds(Pixels.Width, Pixels.Height);
 
+    /// <summary>How far the layer's effects reach beyond its pixels, in layer pixels.</summary>
+    public int EffectMargin => Pixels != null && Effects != null ? Effects.Margin() : 0;
+
+    /// <summary>The bounds of everything the layer draws: its pixels plus the room its effects take around them.</summary>
+    public SKRect VisibleBounds
+    {
+        get
+        {
+            if (Pixels == null) return SKRect.Empty;
+            var margin = EffectMargin;
+            if (margin == 0) return Bounds;
+            return Matrix.MapRect(new SKRect(-margin, -margin, Pixels.Width + margin, Pixels.Height + margin));
+        }
+    }
+
     /// <summary>A structural copy sharing the (immutable) bitmaps.</summary>
     public Layer Clone(bool newIds = false)
     {
@@ -72,7 +89,7 @@ public sealed class Layer
         {
             Id = newIds ? Guid.NewGuid() : Id, Name = Name, Kind = Kind, Visible = Visible, Opacity = Opacity, Blend = Blend,
             Pixels = Pixels, Transform = Transform, Mask = Mask, MaskEnabled = MaskEnabled, Clipped = Clipped,
-            Adjustment = Adjustment, Shape = Shape, Text = Text, Collapsed = Collapsed
+            Adjustment = Adjustment, Shape = Shape, Text = Text, Effects = Effects, Collapsed = Collapsed
         };
         foreach (var child in Children) copy.Children.Add(child.Clone(newIds));
         return copy;

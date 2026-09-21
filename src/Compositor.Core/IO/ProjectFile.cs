@@ -16,7 +16,7 @@ public static class ProjectFile
 {
     public const string Extension = ".compositor";
     public const string Format = "org.linuxcompositor.project";
-    public const int Version = 1;
+    public const int Version = 2;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -55,6 +55,7 @@ public static class ProjectFile
         public Adjustment? Adjustment { get; set; }
         public ShapeStyle? Shape { get; set; }
         public TextStyle? Text { get; set; }
+        public LayerEffects? Effects { get; set; }
         public List<LayerRecord>? Children { get; set; }
     }
 
@@ -93,7 +94,7 @@ public static class ProjectFile
             MaskEnabled = layer.Mask != null ? layer.MaskEnabled : null,
             Clipped = layer.Clipped ? true : null,
             Collapsed = layer.Collapsed ? true : null,
-            Adjustment = layer.Adjustment, Shape = layer.Shape, Text = layer.Text,
+            Adjustment = layer.Adjustment, Shape = layer.Shape, Text = layer.Text, Effects = layer.Effects,
             Children = layer.IsGroup ? layer.Children.Select(Record).ToList() : null
         };
 
@@ -154,6 +155,7 @@ public static class ProjectFile
             {
                 layer.Pixels = Fetch(record.ImageFile, mask: false);
                 layer.Transform = IsUsable(record.Transform) ? record.Transform! : LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
+                if (record.Effects is { } effects && !effects.IsEmpty) layer.Effects = effects.Clamped();
             }
             else if (record.Kind == LayerKind.Raster) throw new InvalidDataException($"Layer \"{record.Name}\" has no image.");
             if (record.Kind == LayerKind.Adjustment && record.Adjustment == null) throw new InvalidDataException($"Adjustment layer \"{record.Name}\" has no settings.");

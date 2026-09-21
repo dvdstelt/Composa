@@ -258,7 +258,7 @@ public sealed partial class EditorSession
     public SKRectI AffectedArea(Layer layer)
     {
         if (layer.Pixels == null) return document.Bounds;
-        var bounds = Geometry.RoundOut(layer.Bounds);
+        var bounds = Geometry.RoundOut(layer.VisibleBounds);
         bounds.Inflate(2, 2);
         // A clipping base also changes what its clipped layers show.
         var siblings = document.SiblingsOf(layer.Id);
@@ -266,7 +266,7 @@ public sealed partial class EditorSession
         {
             var index = siblings.IndexOf(layer);
             for (var i = index + 1; i < siblings.Count && siblings[i].Clipped; i++)
-                bounds = siblings[i].Pixels == null ? document.Bounds : Geometry.Union(bounds, Geometry.RoundOut(siblings[i].Bounds));
+                bounds = siblings[i].Pixels == null ? document.Bounds : Geometry.Union(bounds, Geometry.RoundOut(siblings[i].VisibleBounds));
         }
         return bounds;
     }

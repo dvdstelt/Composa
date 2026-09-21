@@ -8,7 +8,7 @@ namespace Compositor.IO;
 
 /// <summary>
 /// Reads projects saved by Compositor for macOS: a <c>.comp</c> package, which on Linux is an ordinary folder holding
-/// <c>manifest.json</c> and <c>images/</c> (format versions 1–7). Reading is tolerant: fields this app has no
+/// <c>manifest.json</c> and <c>images/</c> (format versions 1–8). Reading is tolerant: fields this app has no
 /// equivalent for are skipped rather than rejected.
 /// </summary>
 public static class MacProject
@@ -26,7 +26,7 @@ public static class MacProject
         var root = json.RootElement;
         if (Text(root, "format") != Format) throw new InvalidDataException("This is not a Compositor project.");
         var version = Int(root, "version", 1);
-        if (version > 7) throw new InvalidDataException($"This project uses format version {version}; versions 1–7 can be opened.");
+        if (version > 8) throw new InvalidDataException($"This project uses format version {version}; versions 1–8 can be opened.");
 
         var document = new Document(Int(root, "width", 1), Int(root, "height", 1)) { Resolution = Math.Clamp(Number(root, "resolution", 72), 1, 9600) };
         if (!root.TryGetProperty("layers", out var records) || records.ValueKind != JsonValueKind.Array) return document;
@@ -56,6 +56,7 @@ public static class MacProject
                     : Pixels.NewColor((int)Math.Clamp(transform?.Width ?? document.Width, 1, Document.MaxSide), (int)Math.Clamp(transform?.Height ?? document.Height, 1, Document.MaxSide));
                 layer.Transform = transform ?? LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
                 if (record.TryGetProperty("shape", out var shape) && shape.ValueKind == JsonValueKind.Object) layer.Shape = ReadShape(shape);
+                if (record.TryGetProperty("effects", out var effects) && effects.ValueKind == JsonValueKind.Object) layer.Effects = ReadEffects(effects);
             }
             if (Text(record, "maskFile") is { } maskFile) layer.Mask = LoadMask(Resolve(folder, maskFile), layer, document);
             if (Guid.TryParse(Text(record, "parentID"), out var parent)) parents[id] = parent;
@@ -166,6 +167,30 @@ public static class MacProject
         var radius = Number(shape, "cornerRadius", 0);
         if (kind == ShapeKind.Rectangle && radius > 0) kind = ShapeKind.RoundedRectangle;
         return new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+    }
+
+    /// <summary>Stroke, drop shadow, color overlay and inner shadow, each optional; a missing <c>enabled</c> means shown.</summary>
+    private static LayerEffects? ReadEffects(JsonElement effects)
+    {
+        bool Enabled(JsonElement e) => !e.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False;
+        double Opacity(JsonElement e, double fallback) => Math.Clamp(Number(e, "opacity", fallback), 0, 1);
+        ShadowEffect Shadow(JsonElement e, double distance, double blur) => new()
+        {
+            Enabled = Enabled(e), Angle = Number(e, "angle", 90), Distance = Number(e, "distance", distance), Blur = Number(e, "blur", blur),
+            Color = (uint)UnitColor(e), Opacity = Opacity(e, 0.5)
+        };
+        var result = new LayerEffects
+        {
+            Stroke = effects.TryGetProperty("stroke", out var stroke) && stroke.ValueKind == JsonValueKind.Object
+                ? new StrokeEffect { Enabled = Enabled(stroke), Size = Number(stroke, "size", 4), Color = (uint)UnitColor(stroke), Opacity = Opacity(stroke, 1), Inside = stroke.TryGetProperty("inside", out var inside) && inside.ValueKind == JsonValueKind.True }
+                : null,
+            Shadow = effects.TryGetProperty("shadow", out var shadow) && shadow.ValueKind == JsonValueKind.Object ? Shadow(shadow, 20, 20) : null,
+            ColorOverlay = effects.TryGetProperty("colorOverlay", out var overlay) && overlay.ValueKind == JsonValueKind.Object
+                ? new ColorOverlayEffect { Enabled = Enabled(overlay), Color = (uint)UnitColor(overlay), Opacity = Opacity(overlay, 1) }
+                : null,
+            InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null
+        };
+        return result.IsEmpty ? null : result.Clamped();
     }
 
     private static SKColor UnitColor(JsonElement color) => new(

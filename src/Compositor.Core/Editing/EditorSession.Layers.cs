@@ -12,6 +12,7 @@ public sealed partial class EditorSession
     public void SelectLayer(Guid id, bool extend = false, bool range = false)
     {
         if (document.Find(id) == null) return;
+        SelectedEffect = null;
         if (range && document.ActiveLayerId is { } anchor)
         {
             var order = document.AllLayers().Select(l => l.Id).ToList();
@@ -307,7 +308,7 @@ public sealed partial class EditorSession
             var bottom = roots[0];
             var area = document.Bounds;
             foreach (var layer in roots.SelectMany(r => Document.Flatten([r])).Where(l => l.Pixels != null))
-                area = Geometry.Union(area, Geometry.RoundOut(layer.Bounds));
+                area = Geometry.Union(area, Geometry.RoundOut(layer.VisibleBounds));
             area = Geometry.Intersect(area, new SKRectI(-Document.MaxSide, -Document.MaxSide, 2 * Document.MaxSide, 2 * Document.MaxSide));
 
             // The merged layer keeps the bottom layer's blend mode and opacity, so those are left out of the render.

@@ -142,7 +142,9 @@ public static class DocumentRenderer
             ApplyAdjustment(layer, tile);
             return;
         }
-        var hasMask = layer.Mask != null && layer.MaskEnabled;
+        // Effects are drawn from an image that already has the mask applied, so the mask is not applied again.
+        var effects = EffectsOf(layer);
+        var hasMask = layer.Mask != null && layer.MaskEnabled && effects == null;
         if (layer.IsGroup && !hasMask && layer.Opacity >= 1 && layer.Blend == BlendMode.Normal && clipped.Count == 0)
         {
             RenderNodes(layer.Children, tile, options); // Pass-through folder.
@@ -150,7 +152,7 @@ public static class DocumentRenderer
         }
         if (layer.Kind == LayerKind.Raster && !hasMask && clipped.Count == 0)
         {
-            DrawPixels(layer, tile.Canvas, layer.Opacity, layer.Blend);
+            DrawPixels(layer, tile.Canvas, layer.Opacity, layer.Blend, effects);
             return;
         }
 
@@ -170,7 +172,7 @@ public static class DocumentRenderer
 
         using var content = tile.Sibling();
         if (layer.IsGroup) RenderNodes(layer.Children, content, options);
-        else DrawPixels(layer, content.Canvas, 1, BlendMode.Normal);
+        else DrawPixels(layer, content.Canvas, 1, BlendMode.Normal, effects);
         if (hasMask) MultiplyByMask(layer, content);
 
         if (clipped.Count > 0)
@@ -185,9 +187,10 @@ public static class DocumentRenderer
             {
                 if (top.IsAdjustment) { ApplyAdjustment(top, content); continue; }
                 using var over = tile.Sibling();
+                var topEffects = EffectsOf(top);
                 if (top.IsGroup) RenderNodes(top.Children, over, options);
-                else DrawPixels(top, over.Canvas, 1, BlendMode.Normal);
-                if (top.Mask != null && top.MaskEnabled) MultiplyByMask(top, over);
+                else DrawPixels(top, over.Canvas, 1, BlendMode.Normal, topEffects);
+                if (top.Mask != null && top.MaskEnabled && topEffects == null) MultiplyByMask(top, over);
                 over.Canvas.Flush();
                 using var blend = new SKPaint { BlendMode = top.Blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(top.Opacity)) };
                 content.DrawRaw(over.Bitmap, blend);
@@ -275,14 +278,28 @@ public static class DocumentRenderer
         canvas.Restore();
     }
 
-    private static void DrawPixels(Layer layer, SKCanvas canvas, double opacity, BlendMode blend)
+    /// <summary>The layer's pixels with its effects drawn around them, or null when it has none (or they cannot be drawn).</summary>
+    private static (SKBitmap Image, int Inset)? EffectsOf(Layer layer) =>
+        layer.Pixels == null || layer.Effects == null ? null : LayerEffectsRenderer.Cached(layer.Pixels, layer.Mask != null && layer.MaskEnabled ? layer.Mask : null, layer.Effects);
+
+    private static void DrawPixels(Layer layer, SKCanvas canvas, double opacity, BlendMode blend, (SKBitmap Image, int Inset)? effects)
     {
         if (layer.Pixels == null) return;
         var matrix = layer.Matrix;
         canvas.Save();
         canvas.Concat(in matrix);
         using var paint = new SKPaint { BlendMode = blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(opacity)), IsAntialias = true };
-        DrawBitmap(canvas, layer.Pixels, paint);
+        if (effects is { } built)
+        {
+            // The effects image is the layer's pixels grown by the inset on every side, so it lands in the same place.
+            canvas.Save();
+            canvas.Translate(-built.Inset, -built.Inset);
+            DrawBitmap(canvas, built.Image, paint);
+            canvas.Restore();
+            // While a stroke is in progress the effects are those of the pixels at its start; the wet paint goes over them.
+            if (Pixels.IsLive(layer.Pixels) && (layer.Mask == null || !layer.MaskEnabled)) DrawBitmap(canvas, layer.Pixels, paint);
+        }
+        else DrawBitmap(canvas, layer.Pixels, paint);
         canvas.Restore();
     }
 
