@@ -23,6 +23,10 @@ public sealed partial class CanvasView
     private bool cursorInside;
     private SelectionMode dragMode;
     private KeyModifiers dragModifiers;
+    /// <summary>A Ctrl-drag with another tool is moving layers: Photoshop's temporary Move tool.</summary>
+    private bool temporaryMove;
+    /// <summary>Ctrl is held over the canvas with another tool, so the cursor promises a move.</summary>
+    private bool controlHover;
     private readonly List<SKPoint> polygon = [];
     private SKRect? cropRect;
     private SKRect cropStart;
@@ -75,6 +79,7 @@ public sealed partial class CanvasView
         if (drag != Drag.Gradient) SettleGradient(keep: true);
         // Text being typed stays open: only Escape, Ctrl+Enter or another action ends it.
         drag = Drag.None;
+        temporaryMove = false;
         polygon.Clear();
         guides.Clear();
         InvalidateVisual();
@@ -86,6 +91,7 @@ public sealed partial class CanvasView
         if (session != null)
         {
             if (spaceDown || drag == Drag.Pan) type = StandardCursorType.Hand;
+            else if (temporaryMove || (controlHover && drag == Drag.None)) type = StandardCursorType.Arrow;
             else type = session.Tool switch
             {
                 Tool.Hand => StandardCursorType.Hand,
@@ -142,7 +148,13 @@ public sealed partial class CanvasView
         if (BeginGuideDrag(point.Position)) { InvalidateVisual(); return; }
         if (OverRuler(point.Position)) return;
 
-        switch (session.Tool)
+        // Ctrl-drag moves the current layers whatever tool is chosen, as Photoshop's temporary Move tool does. Two
+        // Ctrl presses already mean something and keep it: the Marquee's Ctrl-drag inside a selection moves its
+        // pixels, and Ctrl on a crop frame's handles adjusts the crop without snapping.
+        var movingPixels = session.Tool == Tool.Marquee && session.CanMovePixels && InsideSelection(pressDocument);
+        var adjustingCrop = session.Tool == Tool.Crop && cropRect is { } cropFrame && HitFrame(Corners(cropFrame), point.Position, allowRotate: false) != TransformHandle.None;
+        if (control && session.Tool != Tool.Move && !movingPixels && !adjustingCrop) BeginTemporaryMove();
+        else switch (session.Tool)
         {
             case Tool.Move:
                 if (session.CanMovePixels && InsideSelection(pressDocument) && session.BeginMovePixels(duplicate: alt)) drag = Drag.MovePixels;
@@ -277,6 +289,11 @@ public sealed partial class CanvasView
                 UpdateTextCursor(position);
                 break;
         }
+        if (drag == Drag.None)
+        {
+            var hover = e.KeyModifiers.HasFlag(KeyModifiers.Control) && session.Tool is not (Tool.Move or Tool.Text);
+            if (hover != controlHover) { controlHover = hover; UpdateCursor(); }
+        }
         dragModifiers = e.KeyModifiers;
         InvalidateVisual();
     }
@@ -297,6 +314,8 @@ public sealed partial class CanvasView
         var moved = Distance(pressScreen, cursorScreen) > 2;
         var finished = drag;
         if (!(drag == Drag.Lasso && session.LassoKind == LassoKind.Polygonal)) drag = Drag.None;
+        var wasTemporaryMove = temporaryMove;
+        temporaryMove = false;
         e.Pointer.Capture(null);
 
         switch (finished)
@@ -343,6 +362,7 @@ public sealed partial class CanvasView
             case Drag.TextBox: FinishTextBoxDrag(moved); break;
             case Drag.Guide: FinishGuideDrag(e.GetPosition(this)); break;
         }
+        if (wasTemporaryMove) { controlHover = e.KeyModifiers.HasFlag(KeyModifiers.Control); UpdateCursor(); }
         InvalidateVisual();
     }
 
@@ -573,6 +593,29 @@ public sealed partial class CanvasView
         return null;
     }
 
+    /// <summary>
+    /// Ctrl-drag with any other tool moves the current layers without switching tools. Like a plain Move-tool drag, a
+    /// press on another layer's pixels that misses the current frame moves that layer instead; handles are not offered.
+    /// </summary>
+    private void BeginTemporaryMove()
+    {
+        if (session == null) return;
+        handle = TransformHandle.Move;
+        distortCorner = -1;
+        var frame = CurrentFrame();
+        var hit = LayerAt(pressDocument);
+        if (hit != null && !session.Document.SelectedLayerIds.Contains(hit.Id) && (frame == null || HitFrame(frame, pressScreen, allowRotate: false) == TransformHandle.None))
+            session.SelectLayer(hit.Id, extend: false);
+        if (session.BeginTransform("Move") == null)
+        {
+            Problem?.Invoke("Select a layer with pixels to move.");
+            return;
+        }
+        temporaryMove = true;
+        drag = Drag.Transform;
+        UpdateCursor();
+    }
+
     private void BeginMove(bool control, int clicks)
     {
         if (session == null) return;
@@ -610,7 +653,8 @@ public sealed partial class CanvasView
                 float dx = currentDocument.X - pressDocument.X, dy = currentDocument.Y - pressDocument.Y;
                 if (shift) { if (Math.Abs(dx) > Math.Abs(dy)) dy = 0; else dx = 0; }
                 dx = MathF.Round(dx); dy = MathF.Round(dy);
-                if (!control) SnapMove(edit, ref dx, ref dy);
+                // Ctrl is what started a temporary move, so it cannot also mean "no snapping" there.
+                if (!control || temporaryMove) SnapMove(edit, ref dx, ref dy);
                 edit.MoveBy(dx, dy);
                 break;
             case TransformHandle.Rotate:

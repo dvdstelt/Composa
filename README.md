@@ -24,6 +24,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 ### Transform
 - Non-destructive move, scale, rotate and flip: images keep their full resolution however small you make them
 - Free distort by Ctrl-dragging a corner
+- Ctrl-drag moves the current layer with any tool active, as Photoshop's temporary Move tool does
 - Transform several layers, or a whole folder, together
 - Snapping to canvas and layer edges and centers, with guides
 - Exact values for position, size and angle; arrow keys nudge (Shift for 10 px)
@@ -76,7 +77,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Photoshop files are opened, never written. Text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` files open (no PSB, CMYK or 16-bit).
 - There is no auto-update.
 
-Beyond the macOS app, this version adds Bold and Italic text, more blend modes (Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure and Invert adjustments.
+Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool, Bold and Italic text, more blend modes (Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure and Invert adjustments.
 
 ## Requirements
 
@@ -125,6 +126,7 @@ dotnet test
 | B E J S R | Brush, Eraser, Spot Healing, Clone Stamp, Smear |
 | G U T I H Z | Gradient, Shape, Type, Eyedropper, Hand, Zoom |
 | Tab | Switch the current tool's mode (Wand/Object, Paint/Erase, the shape, and so on) |
+| Ctrl+drag | Move the current layer with any tool |
 | Space, Ctrl+wheel | Pan, zoom at the cursor |
 | Ctrl+0, Ctrl+1 | Fit canvas, actual pixels |
 | [ ] and { } | Brush size and hardness |
