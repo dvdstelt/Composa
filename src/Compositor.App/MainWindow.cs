@@ -349,7 +349,7 @@ public sealed partial class MainWindow : Window
             {
                 var link = new Button { Classes = { "flat" }, Content = Ui.Label(Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)), Palette.Accent), HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(8, 3) };
                 ToolTip.SetTip(link, path);
-                link.Click += (_, _) => OpenPaths([path]);
+                link.Click += (_, _) => _ = OpenPaths([path]);
                 box.Children.Add(link);
             }
         }

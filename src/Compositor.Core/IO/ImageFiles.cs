@@ -7,7 +7,8 @@ public enum ExportFormat { Png, Jpeg, Webp }
 
 public static class ImageFiles
 {
-    public static readonly string[] ImportExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".heic", ".heif", ".avif", ".tif", ".tiff"];
+    /// <summary>What Open and Place accept. Photoshop files are among them; they take the <c>Psd.PsdImport</c> route rather than <see cref="Load(string)"/>.</summary>
+    public static readonly string[] ImportExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".heic", ".heif", ".avif", ".tif", ".tiff", ".psd"];
 
     public const long MaxPixels = 100_000_000;
 
