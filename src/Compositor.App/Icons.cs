@@ -41,6 +41,14 @@ public static class Icons
     public static readonly Icon ChevronRight = new("M9 6 L15 12 L9 18");
     public static readonly Icon ChevronDown = new("M6 9 L12 15 L18 9");
     public static readonly Icon ClipArrow = new("M7 5 V14 H16 M13 10.5 L16.5 14 L13 17.5");
+    public static readonly Icon Effects = new(null, "M12 2 L14.2 8.8 L21 11 L14.2 13.2 L12 20 L9.8 13.2 L3 11 L9.8 8.8 Z M19.5 16 L20.4 18.6 L23 19.5 L20.4 20.4 L19.5 23 L18.6 20.4 L16 19.5 L18.6 18.6 Z");
+    public static readonly Icon EyeOff = new("M3 3 L21 21 M10.6 5.3 C11 5.1 11.5 5 12 5 C15.5 5 19 6.5 22 12 C21.2 13.5 20.3 14.7 19.3 15.6 M6.6 6.6 C4.8 7.8 3.3 9.6 2 12 C5 17.5 8.5 19 12 19 C13.9 19 15.7 18.6 17.4 17.4 M9.9 9.9 A3 3 0 0 0 14.1 14.1");
+    public static readonly Icon ObjectSelect = new("M3 8 V3 H8 M16 3 H21 V8 M21 16 V21 H16 M8 21 H3 V16", "M10 7 L10 17 L12.7 14.4 L14.5 18.2 L16.4 17.3 L14.6 13.5 L18 13.5 Z");
+    public static readonly Icon Line = new("M4 20 L20 4");
+    public static readonly Icon AlignLeft = new("M4 6 H20 M4 10 H14 M4 14 H20 M4 18 H12");
+    public static readonly Icon AlignCenter = new("M4 6 H20 M7 10 H17 M4 14 H20 M8 18 H16");
+    public static readonly Icon AlignRight = new("M4 6 H20 M10 10 H20 M4 14 H20 M12 18 H20");
+    public static readonly Icon Ruler = new("M3 8 H21 V16 H3 Z M7 8 V12 M11 8 V14 M15 8 V12 M19 8 V14");
     public static readonly Icon Swap = new("M5 9 C5 6 7 5 10 5 H17 M14 2 L17 5 L14 8 M19 15 C19 18 17 19 14 19 H7 M10 16 L7 19 L10 22");
 
     public static Control Create(Icon icon, double size = 18, IBrush? brush = null)

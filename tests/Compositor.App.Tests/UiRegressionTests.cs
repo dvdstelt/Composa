@@ -40,12 +40,12 @@ public class UiRegressionTests
         window.MouseDown(at, MouseButton.Left);
         window.MouseUp(at, MouseButton.Left);
         Dispatcher.UIThread.RunJobs();
-        var dialog = Assert.Single(window.OwnedWindows);
-        Assert.IsType<TextBox>(dialog.FocusManager?.GetFocusedElement()).Text = "Goodbye";
-        Thread.Sleep(80);
+        Assert.True(session.IsEditingText);
+        window.KeyPressQwerty(PhysicalKey.A, RawInputModifiers.Control);
+        window.KeyTextInput("Goodbye");
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control);
         Dispatcher.UIThread.RunJobs();
-        dialog.Close(true);
-        Dispatcher.UIThread.RunJobs();
+        Assert.False(session.IsEditingText);
         Assert.Equal("Goodbye", session.Document.Find(layer.Id)!.Text!.Text);
         Assert.Equal("Edit Text", session.History.UndoName);
     }

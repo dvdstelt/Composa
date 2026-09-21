@@ -220,9 +220,23 @@ public static unsafe class ImageFilters
     /// </summary>
     private static SKBitmap RemoveBackground(SKBitmap source, double tolerance)
     {
+        using var background = Backdrop(source, (int)Math.Clamp(tolerance / 100 * 160, 2, 200));
+        using var soft = Selections.SelectionMask.Feather(background, 2);
+        var result = Pixels.Clone(source);
+        using var canvas = new SKCanvas(result);
+        using var paint = new SKPaint { BlendMode = SKBlendMode.DstOut };
+        canvas.DrawBitmap(soft, 0, 0, paint);
+        return result;
+    }
+
+    /// <summary>
+    /// The plain backdrop: every pixel connected to the image's edges whose color is within <paramref name="tol"/>
+    /// (0 to 255) of the edge color it grew from. White where the backdrop is.
+    /// </summary>
+    public static SKBitmap Backdrop(SKBitmap source, int tol)
+    {
         int w = source.Width, h = source.Height;
-        var tol = (int)Math.Clamp(tolerance / 100 * 160, 2, 200);
-        using var background = Pixels.NewMask(w, h);
+        var background = Pixels.NewMask(w, h);
         var seeds = new List<(int, int)>();
         var stepX = Math.Max(1, w / 24);
         var stepY = Math.Max(1, h / 24);
@@ -236,11 +250,6 @@ public static unsafe class ImageFilters
             var r = (byte*)region.GetPixels();
             for (var i = 0L; i < (long)h * region.RowBytes; i++) if (r[i] != 0) bg[i] = 255;
         }
-        using var soft = Selections.SelectionMask.Feather(background, 2);
-        var result = Pixels.Clone(source);
-        using var canvas = new SKCanvas(result);
-        using var paint = new SKPaint { BlendMode = SKBlendMode.DstOut };
-        canvas.DrawBitmap(soft, 0, 0, paint);
-        return result;
+        return background;
     }
 }

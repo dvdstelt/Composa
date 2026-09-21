@@ -23,6 +23,9 @@ public sealed partial class EditorSession
 
     public bool CanEditPixels => EditableLayer != null;
 
+    /// <summary>Fill also recolors live text: a text layer with nothing selected takes the color as its own.</summary>
+    public bool CanFill => CanEditPixels || (!IsEditingMask && document.Selection == null && ActiveLayer?.Text != null);
+
     private SKBitmap Target(Layer layer) => IsEditingMask ? layer.Mask! : layer.Pixels!;
 
     private void SetTarget(Layer layer, SKBitmap bitmap)
@@ -137,6 +140,7 @@ public sealed partial class EditorSession
 
     public void Fill(SKColor color, string name = "Fill")
     {
+        if (!IsEditingMask && document.Selection == null && ActiveLayer is { Text: not null } text && RecolorText(text, color)) return;
         if (EditableLayer is not { } layer) return;
         Apply(name, () =>
         {
@@ -389,6 +393,18 @@ public sealed partial class EditorSession
         var rect = new SKRect(0, 0, width, height);
         switch (style.Kind)
         {
+            case ShapeKind.Line:
+                // The ends sit where they were dragged, as fractions of the box; a line without stored ends runs corner
+                // to corner, inset by half its thickness so the stroke stays inside the layer.
+                var thickness = (float)Math.Max(1, style.LineWidth);
+                paint.Style = SKPaintStyle.Stroke;
+                paint.StrokeWidth = thickness;
+                paint.StrokeCap = SKStrokeCap.Round;
+                var inset = new SKPoint(Math.Min(thickness, width) / 2, Math.Min(thickness, height) / 2);
+                var from = style.StartX is { } sx && style.StartY is { } sy ? new SKPoint((float)(sx * width), (float)(sy * height)) : inset;
+                var to = style.EndX is { } ex && style.EndY is { } ey ? new SKPoint((float)(ex * width), (float)(ey * height)) : new SKPoint(width - inset.X, height - inset.Y);
+                canvas.DrawLine(from, to, paint);
+                break;
             case ShapeKind.Ellipse: canvas.DrawOval(rect, paint); break;
             case ShapeKind.RoundedRectangle:
                 var radius = (float)Math.Min(style.CornerRadius, Math.Min(width, height) / 2.0);
@@ -399,16 +415,41 @@ public sealed partial class EditorSession
         return pixels;
     }
 
-    /// <summary>Adds a live shape layer covering a document rectangle.</summary>
+    /// <summary>Adds a live shape layer covering a document rectangle (a line runs corner to corner).</summary>
     public Layer? AddShape(SKRect rect)
     {
+        if (ShapeKind == ShapeKind.Line) return AddLine(new SKPoint(rect.Left, rect.Top), new SKPoint(rect.Right, rect.Bottom));
         rect = SKRect.Create((float)Math.Round(rect.Left), (float)Math.Round(rect.Top), (float)Math.Round(rect.Width), (float)Math.Round(rect.Height));
         if (rect.Width < 1 || rect.Height < 1) return null;
         var style = new ShapeStyle(ShapeKind, (uint)Foreground, ShapeCornerRadius);
-        var layer = Layer.Raster(document.UniqueName(ShapeKind == ShapeKind.Ellipse ? "Ellipse" : "Rectangle"),
-            RenderShape(style, (int)rect.Width, (int)rect.Height), rect.Left, rect.Top);
+        return AddShapeLayer(style, rect, ShapeKind == ShapeKind.Ellipse ? "Ellipse" : "Rectangle");
+    }
+
+    /// <summary>Adds a live line between two document points, <see cref="ShapeLineWidth"/> thick with round ends.</summary>
+    public Layer? AddLine(SKPoint from, SKPoint to)
+    {
+        var thickness = Math.Clamp(ShapeLineWidth, 1, 5000);
+        if (!float.IsFinite(from.X) || !float.IsFinite(from.Y) || !float.IsFinite(to.X) || !float.IsFinite(to.Y)) return null;
+        // The layer is the box around the two ends with room for the stroke's thickness (and its round ends).
+        var half = (float)(thickness / 2);
+        var box = new SKRect(Math.Min(from.X, to.X) - half, Math.Min(from.Y, to.Y) - half, Math.Max(from.X, to.X) + half, Math.Max(from.Y, to.Y) + half);
+        box = SKRect.Create(MathF.Floor(box.Left), MathF.Floor(box.Top), MathF.Ceiling(box.Width), MathF.Ceiling(box.Height));
+        if (box.Width < 1 || box.Height < 1 || (from.X == to.X && from.Y == to.Y)) return null;
+        var style = new ShapeStyle(ShapeKind.Line, (uint)Foreground, 0)
+        {
+            LineWidth = thickness,
+            StartX = (from.X - box.Left) / box.Width, StartY = (from.Y - box.Top) / box.Height,
+            EndX = (to.X - box.Left) / box.Width, EndY = (to.Y - box.Top) / box.Height
+        };
+        return AddShapeLayer(style, box, "Line");
+    }
+
+    private Layer? AddShapeLayer(ShapeStyle style, SKRect rect, string stem)
+    {
+        if ((long)rect.Width * (long)rect.Height > IO.ImageFiles.MaxPixels) { Problem?.Invoke("That shape is too large. A shape can cover up to 100 megapixels."); return null; }
+        var layer = Layer.Raster(document.UniqueName(stem), RenderShape(style, (int)rect.Width, (int)rect.Height), rect.Left, rect.Top);
         layer.Shape = style;
-        Apply("Shape", () => document.InsertAboveActive(layer));
+        Apply(stem, () => document.InsertAboveActive(layer));
         Invalidate(AffectedArea(layer));
         LayersChanged?.Invoke();
         return layer;

@@ -16,7 +16,7 @@ public static class ProjectFile
 {
     public const string Extension = ".compositor";
     public const string Format = "org.linuxcompositor.project";
-    public const int Version = 1;
+    public const int Version = 2;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -36,6 +36,8 @@ public static class ProjectFile
         public double Resolution { get; set; } = 72;
         public Guid? ActiveLayerId { get; set; }
         public List<LayerRecord> Layers { get; set; } = [];
+        /// <summary>Alignment guides; absent on version 1 files.</summary>
+        public List<Guide>? Guides { get; set; }
     }
 
     private sealed class LayerRecord
@@ -55,6 +57,7 @@ public static class ProjectFile
         public Adjustment? Adjustment { get; set; }
         public ShapeStyle? Shape { get; set; }
         public TextStyle? Text { get; set; }
+        public LayerEffects? Effects { get; set; }
         public List<LayerRecord>? Children { get; set; }
     }
 
@@ -93,14 +96,15 @@ public static class ProjectFile
             MaskEnabled = layer.Mask != null ? layer.MaskEnabled : null,
             Clipped = layer.Clipped ? true : null,
             Collapsed = layer.Collapsed ? true : null,
-            Adjustment = layer.Adjustment, Shape = layer.Shape, Text = layer.Text,
+            Adjustment = layer.Adjustment, Shape = layer.Shape, Text = layer.Text, Effects = layer.Effects,
             Children = layer.IsGroup ? layer.Children.Select(Record).ToList() : null
         };
 
         var manifest = new Manifest
         {
             Width = document.Width, Height = document.Height, Resolution = document.Resolution,
-            ActiveLayerId = document.ActiveLayerId, Layers = document.Layers.Select(Record).ToList()
+            ActiveLayerId = document.ActiveLayerId, Layers = document.Layers.Select(Record).ToList(),
+            Guides = document.Guides.Count > 0 ? document.Guides.ToList() : null
         };
         using var manifestStream = zip.CreateEntry("manifest.json").Open();
         JsonSerializer.Serialize(manifestStream, manifest, Json);
@@ -154,6 +158,7 @@ public static class ProjectFile
             {
                 layer.Pixels = Fetch(record.ImageFile, mask: false);
                 layer.Transform = IsUsable(record.Transform) ? record.Transform! : LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
+                if (record.Effects is { } effects && !effects.IsEmpty) layer.Effects = effects.Clamped();
             }
             else if (record.Kind == LayerKind.Raster) throw new InvalidDataException($"Layer \"{record.Name}\" has no image.");
             if (record.Kind == LayerKind.Adjustment && record.Adjustment == null) throw new InvalidDataException($"Adjustment layer \"{record.Name}\" has no settings.");
@@ -164,6 +169,9 @@ public static class ProjectFile
         }
 
         foreach (var record in manifest.Layers) document.Layers.Add(Build(record, 0));
+        if (manifest.Guides != null)
+            foreach (var guide in manifest.Guides.Where(g => g.IsValid).Take(1000))
+                document.Guides.Add(guide.Id == Guid.Empty ? guide with { Id = Guid.NewGuid() } : guide);
         var active = manifest.ActiveLayerId is { } id && document.Find(id) != null ? id : document.Layers.LastOrDefault()?.Id;
         document.SetActive(active);
         return document;

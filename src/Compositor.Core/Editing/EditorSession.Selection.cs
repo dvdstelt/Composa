@@ -75,22 +75,45 @@ public sealed partial class EditorSession
         if (SelectionMask.FromLayer(document, layer, fromMask: true) is { } shape) Select(shape, mode, "Load Selection");
     }
 
+    /// <summary>
+    /// What selection-from-image tools read, at document size: every visible layer as shown on the canvas, or just the
+    /// active layer's own pixels (without its mask). The bitmap is owned by the caller when <c>Owned</c> is true.
+    /// </summary>
+    private (SKBitmap Source, bool Owned) SelectionSample()
+    {
+        if (SampleAllLayers || ActiveLayer is not { Pixels: not null } layer) return (Composite(), false);
+        var copy = layer.Clone();
+        copy.Visible = true; copy.Opacity = 1; copy.Blend = BlendMode.Normal; copy.Clipped = false; copy.Mask = null; copy.Effects = null;
+        return (DocumentRenderer.RenderLayers(document, [copy], document.Bounds), true);
+    }
+
     /// <summary>Magic Wand at a document point, sampling the active layer or the whole image.</summary>
     public void SelectWand(int x, int y, SelectionMode mode = SelectionMode.Replace)
     {
         if (x < 0 || y < 0 || x >= document.Width || y >= document.Height) return;
-        SKBitmap source;
-        var owned = false;
-        if (SampleAllLayers || ActiveLayer is not { Pixels: not null } layer) source = Composite();
-        else
-        {
-            var copy = layer.Clone();
-            copy.Visible = true; copy.Opacity = 1; copy.Blend = BlendMode.Normal; copy.Clipped = false; copy.Mask = null;
-            source = DocumentRenderer.RenderLayers(document, [copy], document.Bounds);
-            owned = true;
-        }
+        var (source, owned) = SelectionSample();
         var shape = MagicWand.Select(source, x, y, WandTolerance, WandContiguous);
         if (owned) source.Dispose();
         Select(shape, mode, "Magic Wand");
+    }
+
+    /// <summary>The Magic tool's Object mode: selects the object under the point. Landing on the backdrop deselects (in Replace mode).</summary>
+    public void SelectObject(int x, int y, SelectionMode mode = SelectionMode.Replace)
+    {
+        if (x < 0 || y < 0 || x >= document.Width || y >= document.Height) return;
+        var (source, owned) = SelectionSample();
+        var shape = ObjectSelection.Select(source, x, y, ObjectEdgeOffset);
+        if (owned) source.Dispose();
+        if (shape == null) { if (mode == SelectionMode.Replace) Deselect(); return; }
+        Select(shape, mode, "Object Selection");
+    }
+
+    /// <summary>Select > Subject: everything in the picture that is not the plain backdrop around it.</summary>
+    public bool SelectSubject(SelectionMode mode = SelectionMode.Replace)
+    {
+        var shape = ObjectSelection.Subject(Composite());
+        if (shape == null) return false;
+        Select(shape, mode, "Select Subject");
+        return true;
     }
 }

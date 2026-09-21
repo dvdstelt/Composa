@@ -16,6 +16,8 @@ public sealed class Document
     public HashSet<Guid> SelectedLayerIds { get; init; } = [];
     /// <summary>Alpha8 selection coverage at document size, or null when nothing is selected.</summary>
     public SKBitmap? Selection { get; set; }
+    /// <summary>User-placed alignment lines. Saved with the project; undo covers them.</summary>
+    public List<Guide> Guides { get; init; } = [];
 
     public Document(int width, int height)
     {
@@ -31,6 +33,7 @@ public sealed class Document
         var copy = new Document(Width, Height) { Resolution = Resolution, ActiveLayerId = ActiveLayerId, Selection = Selection };
         foreach (var layer in Layers) copy.Layers.Add(layer.Clone());
         foreach (var id in SelectedLayerIds) copy.SelectedLayerIds.Add(id);
+        copy.Guides.AddRange(Guides);
         return copy;
     }
 

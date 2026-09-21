@@ -39,6 +39,8 @@ public class SessionFuzzTests
             }
             if (session.Selection is { } s && (s.Handle == IntPtr.Zero || s.Width != session.Document.Width || s.Height != session.Document.Height)) throw new Exception($"bad selection after {what}");
             if (session.IsInteracting) throw new Exception($"edit left pending after {what}");
+            if (session.IsEditingText) throw new Exception($"text edit left open after {what}");
+            foreach (var guide in session.Guides) if (!guide.IsValid) throw new Exception($"bad guide after {what}");
             var c = session.Composite();
             if (c.Width != session.Document.Width) throw new Exception("composite size");
             using var view = Pixels.NewColor(80, 60);
@@ -50,8 +52,42 @@ public class SessionFuzzTests
             ("blank", () => session.AddBlankLayer()),
             ("image", () => { var b = Pixels.NewColor(random.Next(5, 120), random.Next(5, 90)); b.Erase(new SKColor((uint)random.Next() | 0xFF000000)); session.AddImageLayer("img", b, P(), random.Next(2) == 0); }),
             ("adjust-layer", () => session.AddAdjustmentLayer(Adjustment.Create((AdjustmentKind)random.Next(8)))),
-            ("shape", () => { session.ShapeKind = (ShapeKind)random.Next(3); session.AddShape(R()); }),
-            ("text", () => session.AddText(P(), new TextStyle { Text = "Ab\nc", Size = random.Next(6, 40) })),
+            ("shape", () => { session.ShapeKind = (ShapeKind)random.Next(4); session.ShapeLineWidth = random.Next(1, 12); session.AddShape(R()); }),
+            ("text", () => session.AddText(P(), new TextStyle { Text = "Ab\nc", Size = random.Next(6, 40), Tracking = random.Next(-2, 6), Leading = random.Next(2) == 0 ? 0 : random.Next(8, 60), BoxWidth = random.Next(2) == 0 ? null : random.Next(20, 120), BoxHeight = random.Next(2) == 0 ? null : random.Next(20, 90) })),
+            ("text-edit", () =>
+            {
+                var editor = random.Next(3) == 0 && session.Document.AllLayers().FirstOrDefault(l => l.Text != null) is { } live ? session.EditText(live) : random.Next(2) == 0 ? session.BeginText(P()) : session.BeginText(R());
+                if (editor == null) return;
+                for (var i = random.Next(4); i > 0; i--) editor.Insert(random.Next(3) == 0 ? "\n" : "word ");
+                if (random.Next(3) == 0) editor.ChangeStyle(st => st with { Size = random.Next(6, 60), Alignment = (TextAlignment)random.Next(3) });
+                if (random.Next(4) == 0) session.SetTextBox(random.Next(16, 200), random.Next(16, 120));
+                if (random.Next(4) == 0) editor.Undo();
+                if (random.Next(5) == 0) session.CancelText(); else session.FinishText();
+            }),
+            ("effects", () =>
+            {
+                if (Any() is not { Pixels: not null } l) return;
+                var kind = (LayerEffectKind)random.Next(4);
+                switch (random.Next(4))
+                {
+                    case 0: session.AddEffect(l, kind); break;
+                    case 1: session.ToggleEffect(l, kind); break;
+                    case 2: session.RemoveEffect(l, kind); break;
+                    default: session.Apply("Edit", () => session.SetEffects(l, new LayerEffects { Stroke = new StrokeEffect { Size = random.Next(0, 30), Inside = random.Next(2) == 0 }, Shadow = new ShadowEffect { Distance = random.Next(0, 40), Blur = random.Next(0, 30), Angle = random.Next(-180, 180) } })); break;
+                }
+            }),
+            ("guides", () =>
+            {
+                switch (random.Next(4))
+                {
+                    case 0: session.AddGuide((GuideAxis)random.Next(2), random.Next(-10, 200)); break;
+                    case 1: if (session.Guides.Count > 0) session.MoveGuide(session.Guides[random.Next(session.Guides.Count)].Id, random.Next(0, 200)); break;
+                    case 2: if (session.Guides.Count > 0) session.RemoveGuide(session.Guides[random.Next(session.Guides.Count)].Id); break;
+                    default: session.ClearGuides(); break;
+                }
+            }),
+            ("object-select", () => { session.SampleAllLayers = random.Next(2) == 0; session.ObjectEdgeOffset = random.Next(-4, 5); var p = P(); if (random.Next(3) == 0) session.SelectSubject((SelectionMode)random.Next(4)); else session.SelectObject((int)p.X, (int)p.Y, (SelectionMode)random.Next(4)); }),
+            ("cycle-mode", () => { session.Tool = (Tool)random.Next(15); session.CycleToolMode(); }),
             ("select-layer", () => { if (Any() is { } l) session.SelectLayer(l.Id, random.Next(3) == 0, random.Next(5) == 0); }),
             ("delete", () => { if (session.Document.AllLayers().Count() > 1) session.DeleteSelectedLayers(); }),
             ("duplicate", () => session.DuplicateSelectedLayers()),

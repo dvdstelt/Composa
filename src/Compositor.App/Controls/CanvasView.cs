@@ -40,7 +40,7 @@ public sealed partial class CanvasView : Control
         ClipToBounds = true;
         antsTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) =>
         {
-            if (session?.Selection == null && polygon.Count == 0) return;
+            if (session?.Selection == null && polygon.Count == 0 && session?.TextEdit == null) return;
             antsPhase = (antsPhase + 1) % 8;
             InvalidateVisual();
         });
@@ -60,8 +60,6 @@ public sealed partial class CanvasView : Control
     public event Action? ToolStateChanged;
     /// <summary>The document pixel under the pointer, or null once it leaves the canvas.</summary>
     public event Action<SKPointI?>? PointerAt;
-    /// <summary>Raised by the Text tool: where to put new text, or the text layer that was clicked.</summary>
-    public event Action<SKPoint, Layer?>? TextRequested;
 
     public bool ShowPixelGrid { get; set; } = true;
     public bool ShowTransformControls { get; set; } = true;
@@ -145,10 +143,11 @@ public sealed partial class CanvasView : Control
         if (session == null || Bounds.Width < 10 || Bounds.Height < 10) { fitPending = true; return false; }
         fitPending = false;
         var document = session.Document;
-        var available = new Size(Math.Max(50, Bounds.Width - 48), Math.Max(50, Bounds.Height - 48));
+        var inset = RulerInset;
+        var available = new Size(Math.Max(50, Bounds.Width - inset - 48), Math.Max(50, Bounds.Height - inset - 48));
         zoom = Math.Min(available.Width * Scaling / document.Width, available.Height * Scaling / document.Height);
         zoom = Math.Clamp(Math.Min(zoom, 1.0 * Math.Max(1, Scaling)), 0.01, 64);
-        origin = new Point((Bounds.Width - document.Width * UnitsPerPixel) / 2, (Bounds.Height - document.Height * UnitsPerPixel) / 2);
+        origin = new Point(inset + (Bounds.Width - inset - document.Width * UnitsPerPixel) / 2, inset + (Bounds.Height - inset - document.Height * UnitsPerPixel) / 2);
         return true;
     }
 
@@ -236,6 +235,7 @@ public sealed partial class CanvasView : Control
         var documentRect = new SKRect(0, 0, session.Document.Width, session.Document.Height);
         var (cache, cacheSource, cacheTarget) = UpdateViewCache(view, size);
         var overlay = CaptureOverlay(view);
+        var rulers = CaptureRulers((float)Scaling);
         var grid = ShowPixelGrid && zoom >= 8;
         var nearest = zoom >= 1;
         var outline = selectionOutline;
@@ -262,6 +262,7 @@ public sealed partial class CanvasView : Control
             if (grid) DrawPixelGrid(canvas, view, documentRect, new SKRect(0, 0, (float)size.Width, (float)size.Height));
             if (outline != null) DrawAnts(canvas, outline, view, phase, scaling);
             overlay?.Invoke(canvas);
+            rulers?.Invoke(canvas);
         }));
     }
 

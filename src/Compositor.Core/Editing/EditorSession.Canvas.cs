@@ -23,6 +23,7 @@ public sealed partial class EditorSession
                 else if (layer.Mask != null) layer.Mask = RemapDocumentMask(layer.Mask, rect.Width, rect.Height, shift, 255);
             }
             document.Selection = document.Selection == null ? null : SelectionMask.Remap(document.Selection, rect.Width, rect.Height, shift);
+            for (var i = 0; i < document.Guides.Count; i++) document.Guides[i] = document.Guides[i].Offset(-rect.Left, -rect.Top);
             document.Width = rect.Width;
             document.Height = rect.Height;
         });
@@ -66,16 +67,16 @@ public sealed partial class EditorSession
                         // Unscaled layers are resampled so they stay paintable at full resolution.
                         int w = Math.Max(1, (int)Math.Round(pixels.Width * sx)), h = Math.Max(1, (int)Math.Round(pixels.Height * sy));
                         // Live layers are redrawn from their settings, scaled along with the document.
-                        if (layer.Text is { } text && Math.Abs(sx - sy) < 1e-6)
+                        if (layer.Text is { } text && (text.IsBox || Math.Abs(sx - sy) < 1e-6))
                         {
-                            layer.Text = text with { Size = Math.Clamp(text.Size * sy, 1, 4000) };
+                            layer.Text = text.Scaled(sx, sy);
                             var rendered = RenderText(layer.Text);
                             (w, h) = (rendered.Width, rendered.Height);
                             layer.Pixels = rendered;
                         }
                         else if (layer.Shape is { } shape)
                         {
-                            layer.Shape = shape with { CornerRadius = shape.CornerRadius * Math.Min(sx, sy) };
+                            layer.Shape = shape with { CornerRadius = shape.CornerRadius * Math.Min(sx, sy), LineWidth = shape.LineWidth * Math.Min(sx, sy) };
                             layer.Pixels = RenderShape(layer.Shape, w, h);
                         }
                         else
@@ -124,6 +125,7 @@ public sealed partial class EditorSession
                 else if (layer.Mask != null) layer.Mask = RemapDocumentMask(layer.Mask, width, height, scale, 0);
             }
             document.Selection = document.Selection == null ? null : SelectionMask.Remap(document.Selection, width, height, scale);
+            for (var i = 0; i < document.Guides.Count; i++) document.Guides[i] = document.Guides[i].Scaled(sx, sy);
             document.Width = width;
             document.Height = height;
             if (resolution is { } dpi) document.Resolution = Math.Clamp(dpi, 1, 9600);
@@ -167,6 +169,7 @@ public sealed partial class EditorSession
                 else if (layer.Mask != null) layer.Mask = RemapDocumentMask(layer.Mask, document.Width, document.Height, mirror, 255);
             }
             if (document.Selection != null) document.Selection = SelectionMask.Remap(document.Selection, document.Width, document.Height, mirror);
+            for (var i = 0; i < document.Guides.Count; i++) document.Guides[i] = document.Guides[i].Mirrored(horizontally, (horizontally ? document.Width : document.Height) / 2.0);
         });
         InvalidateAll();
         LayersChanged?.Invoke();
@@ -195,6 +198,7 @@ public sealed partial class EditorSession
                 else if (layer.Mask != null) layer.Mask = RemapDocumentMask(layer.Mask, height, width, turn, 255);
             }
             if (document.Selection != null) document.Selection = SelectionMask.Remap(document.Selection, height, width, turn);
+            for (var i = 0; i < document.Guides.Count; i++) document.Guides[i] = document.Guides[i].Turned(clockwise, width, height);
             document.Width = height;
             document.Height = width;
         });

@@ -9,6 +9,8 @@ public enum Tool { Move, Marquee, Lasso, Wand, Crop, Brush, SpotHealing, CloneSt
 
 public enum MarqueeKind { Rectangle, Ellipse }
 public enum LassoKind { Freehand, Polygonal }
+/// <summary>The Magic tool's modes: Wand selects pixels of a similar color, Object traces the object under the click.</summary>
+public enum WandMode { Wand, Object }
 public enum SmearMode { Liquify, Blur, Smudge, Dodge, Burn }
 
 /// <summary>
@@ -51,7 +53,17 @@ public sealed partial class EditorSession
     public string Title => FilePath != null ? Path.GetFileNameWithoutExtension(FilePath) : SuggestedName ?? "Untitled";
 
     // Tool state shared with the UI.
-    public Tool Tool { get; set; } = Tool.Move;
+    private Tool tool = Tool.Move;
+    /// <summary>The current tool. Leaving the Type tool finishes any text being typed.</summary>
+    public Tool Tool
+    {
+        get => tool;
+        set
+        {
+            if (value != Tool.Text && TextEdit != null) FinishText();
+            tool = value;
+        }
+    }
     public SKColor Foreground { get; set; } = SKColors.Black;
     public SKColor Background { get; set; } = SKColors.White;
     public BrushSettings Brush { get; set; } = new();
@@ -62,10 +74,19 @@ public sealed partial class EditorSession
     public double Feather { get; set; }
     public int WandTolerance { get; set; } = 32;
     public bool WandContiguous { get; set; } = true;
+    public WandMode WandMode { get; set; }
+    /// <summary>Object mode: positive values tighten the detected outline inward, negative ones loosen it, in pixels.</summary>
+    public int ObjectEdgeOffset { get; set; }
     public bool SampleAllLayers { get; set; }
     public bool CloneAligned { get; set; } = true;
+    /// <summary>Pixels the selection bar's Expand, Contract and Feather buttons work by.</summary>
+    public int SelectionExpandAmount { get; set; } = 1;
+    public int SelectionContractAmount { get; set; } = 1;
+    public int SelectionFeatherAmount { get; set; } = 2;
     public ShapeKind ShapeKind { get; set; } = ShapeKind.Rectangle;
     public double ShapeCornerRadius { get; set; } = 24;
+    /// <summary>A Line shape's thickness in document pixels.</summary>
+    public double ShapeLineWidth { get; set; } = 4;
     /// <summary>The settings new text starts with; the color follows the foreground color.</summary>
     public TextStyle TextDefaults { get; set; } = new();
     public bool GradientToTransparent { get; set; }
@@ -104,7 +125,8 @@ public sealed partial class EditorSession
     /// </summary>
     private void FinishInteraction()
     {
-        if (stroke != null) EndStroke();
+        if (TextEdit != null) FinishText();
+        else if (stroke != null) EndStroke();
         else if (floatLayer != null) EndMovePixels(keep: true);
         else if (previewLayer != null) CommitPreview();
         else if (Transform != null) CommitTransform();
@@ -258,7 +280,7 @@ public sealed partial class EditorSession
     public SKRectI AffectedArea(Layer layer)
     {
         if (layer.Pixels == null) return document.Bounds;
-        var bounds = Geometry.RoundOut(layer.Bounds);
+        var bounds = Geometry.RoundOut(layer.VisibleBounds);
         bounds.Inflate(2, 2);
         // A clipping base also changes what its clipped layers show.
         var siblings = document.SiblingsOf(layer.Id);
@@ -266,7 +288,7 @@ public sealed partial class EditorSession
         {
             var index = siblings.IndexOf(layer);
             for (var i = index + 1; i < siblings.Count && siblings[i].Clipped; i++)
-                bounds = siblings[i].Pixels == null ? document.Bounds : Geometry.Union(bounds, Geometry.RoundOut(siblings[i].Bounds));
+                bounds = siblings[i].Pixels == null ? document.Bounds : Geometry.Union(bounds, Geometry.RoundOut(siblings[i].VisibleBounds));
         }
         return bounds;
     }
@@ -279,6 +301,26 @@ public sealed partial class EditorSession
     }
 
     public void SwapColors() => (Foreground, Background) = (Background, Foreground);
+
+    /// <summary>
+    /// Tab steps the current tool through its own modes, the setting at the left of its options bar. Tools without
+    /// modes (Move, Crop, Text, Eyedropper, Hand, Zoom) ignore it.
+    /// </summary>
+    public void CycleToolMode()
+    {
+        static T Next<T>(T value) where T : struct, Enum { var all = Enum.GetValues<T>(); return all[(Array.IndexOf(all, value) + 1) % all.Length]; }
+        switch (Tool)
+        {
+            case Tool.Marquee: MarqueeKind = Next(MarqueeKind); break;
+            case Tool.Lasso: LassoKind = Next(LassoKind); break;
+            case Tool.Wand: WandMode = Next(WandMode); break;
+            case Tool.Shape: ShapeKind = Next(ShapeKind); break;
+            case Tool.Brush: EraserMode = !EraserMode; break;
+            case Tool.Smear: SmearMode = Next(SmearMode); break;
+            case Tool.SpotHealing or Tool.CloneStamp: SampleAllLayers = !SampleAllLayers; break;
+            case Tool.Gradient: GradientRadial = !GradientRadial; break;
+        }
+    }
 
     public void ResetColors()
     {

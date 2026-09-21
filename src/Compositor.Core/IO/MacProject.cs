@@ -8,7 +8,7 @@ namespace Compositor.IO;
 
 /// <summary>
 /// Reads projects saved by Compositor for macOS: a <c>.comp</c> package, which on Linux is an ordinary folder holding
-/// <c>manifest.json</c> and <c>images/</c> (format versions 1–7). Reading is tolerant: fields this app has no
+/// <c>manifest.json</c> and <c>images/</c> (format versions 1–8). Reading is tolerant: fields this app has no
 /// equivalent for are skipped rather than rejected.
 /// </summary>
 public static class MacProject
@@ -26,9 +26,19 @@ public static class MacProject
         var root = json.RootElement;
         if (Text(root, "format") != Format) throw new InvalidDataException("This is not a Compositor project.");
         var version = Int(root, "version", 1);
-        if (version > 7) throw new InvalidDataException($"This project uses format version {version}; versions 1–7 can be opened.");
+        if (version > 8) throw new InvalidDataException($"This project uses format version {version}; versions 1–8 can be opened.");
 
         var document = new Document(Int(root, "width", 1), Int(root, "height", 1)) { Resolution = Math.Clamp(Number(root, "resolution", 72), 1, 9600) };
+        if (root.TryGetProperty("guides", out var guides) && guides.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var guide in guides.EnumerateArray().Take(1000))
+            {
+                var position = Number(guide, "position", double.NaN);
+                if (!double.IsFinite(position)) continue;
+                var axis = Text(guide, "axis") == "vertical" ? GuideAxis.Vertical : GuideAxis.Horizontal;
+                document.Guides.Add(new Guide(Guid.TryParse(Text(guide, "id"), out var guideId) ? guideId : Guid.NewGuid(), axis, position));
+            }
+        }
         if (!root.TryGetProperty("layers", out var records) || records.ValueKind != JsonValueKind.Array) return document;
 
         var layers = new Dictionary<Guid, Layer>();
@@ -56,6 +66,8 @@ public static class MacProject
                     : Pixels.NewColor((int)Math.Clamp(transform?.Width ?? document.Width, 1, Document.MaxSide), (int)Math.Clamp(transform?.Height ?? document.Height, 1, Document.MaxSide));
                 layer.Transform = transform ?? LayerTransform.Identity(layer.Pixels.Width, layer.Pixels.Height);
                 if (record.TryGetProperty("shape", out var shape) && shape.ValueKind == JsonValueKind.Object) layer.Shape = ReadShape(shape);
+                if (record.TryGetProperty("effects", out var effects) && effects.ValueKind == JsonValueKind.Object) layer.Effects = ReadEffects(effects);
+                if (record.TryGetProperty("text", out var text) && text.ValueKind == JsonValueKind.Object) layer.Text = ReadText(text);
             }
             if (Text(record, "maskFile") is { } maskFile) layer.Mask = LoadMask(Resolve(folder, maskFile), layer, document);
             if (Guid.TryParse(Text(record, "parentID"), out var parent)) parents[id] = parent;
@@ -162,10 +174,65 @@ public static class MacProject
 
     private static ShapeStyle ReadShape(JsonElement shape)
     {
-        var kind = Text(shape, "kind")?.ToLowerInvariant() switch { "ellipse" => ShapeKind.Ellipse, "roundedrectangle" or "rounded rectangle" => ShapeKind.RoundedRectangle, _ => ShapeKind.Rectangle };
+        var kind = Text(shape, "kind")?.ToLowerInvariant() switch { "ellipse" => ShapeKind.Ellipse, "line" => ShapeKind.Line, "roundedrectangle" or "rounded rectangle" => ShapeKind.RoundedRectangle, _ => ShapeKind.Rectangle };
         var radius = Number(shape, "cornerRadius", 0);
         if (kind == ShapeKind.Rectangle && radius > 0) kind = ShapeKind.RoundedRectangle;
-        return new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+        var style = new ShapeStyle(kind, (uint)UnitColor(shape), radius);
+        if (kind != ShapeKind.Line) return style;
+        var (startX, startY) = Pair(shape, "start");
+        var (endX, endY) = Pair(shape, "end");
+        var hasEnds = shape.TryGetProperty("start", out _) && shape.TryGetProperty("end", out _);
+        return style with
+        {
+            LineWidth = Math.Clamp(Number(shape, "lineWidth", 4), 1, 5000),
+            StartX = hasEnds ? Math.Clamp(startX, 0, 1) : null, StartY = hasEnds ? Math.Clamp(startY, 0, 1) : null,
+            EndX = hasEnds ? Math.Clamp(endX, 0, 1) : null, EndY = hasEnds ? Math.Clamp(endY, 0, 1) : null
+        };
+    }
+
+    /// <summary>Editable text. The PostScript font name carries the family and, after a dash, the weight and slant.</summary>
+    private static TextStyle ReadText(JsonElement text)
+    {
+        var fontName = Text(text, "fontName") ?? "Helvetica";
+        var dash = fontName.IndexOf('-');
+        var family = dash > 0 ? fontName[..dash] : fontName;
+        var face = dash > 0 ? fontName[(dash + 1)..] : "";
+        // Camel-cased PostScript families ("HelveticaNeue") read back as spaced family names for fontconfig.
+        family = System.Text.RegularExpressions.Regex.Replace(family, "(?<=[a-z])(?=[A-Z])", " ");
+        var (boxWidth, boxHeight) = Pair(text, "boxSize");
+        return new TextStyle
+        {
+            Text = Text(text, "content") ?? "", FontFamily = family, Size = Number(text, "fontSize", 72),
+            Bold = face.Contains("Bold", StringComparison.OrdinalIgnoreCase), Italic = face.Contains("Italic", StringComparison.OrdinalIgnoreCase) || face.Contains("Oblique", StringComparison.OrdinalIgnoreCase),
+            Color = (uint)UnitColor(text),
+            Alignment = Text(text, "alignment") switch { "Center" => TextAlignment.Center, "Right" => TextAlignment.Right, _ => TextAlignment.Left },
+            Tracking = Number(text, "tracking", 0), Leading = Number(text, "leading", 0),
+            BoxWidth = boxWidth >= 1 && boxHeight >= 1 ? boxWidth : null, BoxHeight = boxWidth >= 1 && boxHeight >= 1 ? boxHeight : null
+        }.Clamped();
+    }
+
+    /// <summary>Stroke, drop shadow, color overlay and inner shadow, each optional; a missing <c>enabled</c> means shown.</summary>
+    private static LayerEffects? ReadEffects(JsonElement effects)
+    {
+        bool Enabled(JsonElement e) => !e.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False;
+        double Opacity(JsonElement e, double fallback) => Math.Clamp(Number(e, "opacity", fallback), 0, 1);
+        ShadowEffect Shadow(JsonElement e, double distance, double blur) => new()
+        {
+            Enabled = Enabled(e), Angle = Number(e, "angle", 90), Distance = Number(e, "distance", distance), Blur = Number(e, "blur", blur),
+            Color = (uint)UnitColor(e), Opacity = Opacity(e, 0.5)
+        };
+        var result = new LayerEffects
+        {
+            Stroke = effects.TryGetProperty("stroke", out var stroke) && stroke.ValueKind == JsonValueKind.Object
+                ? new StrokeEffect { Enabled = Enabled(stroke), Size = Number(stroke, "size", 4), Color = (uint)UnitColor(stroke), Opacity = Opacity(stroke, 1), Inside = stroke.TryGetProperty("inside", out var inside) && inside.ValueKind == JsonValueKind.True }
+                : null,
+            Shadow = effects.TryGetProperty("shadow", out var shadow) && shadow.ValueKind == JsonValueKind.Object ? Shadow(shadow, 20, 20) : null,
+            ColorOverlay = effects.TryGetProperty("colorOverlay", out var overlay) && overlay.ValueKind == JsonValueKind.Object
+                ? new ColorOverlayEffect { Enabled = Enabled(overlay), Color = (uint)UnitColor(overlay), Opacity = Opacity(overlay, 1) }
+                : null,
+            InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null
+        };
+        return result.IsEmpty ? null : result.Clamped();
     }
 
     private static SKColor UnitColor(JsonElement color) => new(

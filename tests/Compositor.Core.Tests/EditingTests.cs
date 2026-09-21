@@ -458,7 +458,7 @@ public class TextLayerTests
         var style = new TextStyle { Text = "Hello\nWorld", Size = 40, Color = 0xFFFF0000, FontFamily = EditorSession.FontFamilies.FirstOrDefault() ?? "sans-serif" };
         var layer = session.AddText(new SKPoint(20, 20), style);
         Assert.NotNull(layer.Text);
-        Assert.Equal("Hello", layer.Name);
+        Assert.Equal("Hello World", layer.Name);
         using (var flat = session.Flatten())
         {
             var red = 0;

@@ -100,6 +100,35 @@ public static class Geometry
         return SKMatrix.CreateScale(1 / w, 1 / h).PostConcat(unit);
     }
 
+    /// <summary>A quad a perspective can take: no corner pulled past its neighbours, so it does not fold over itself.</summary>
+    public static bool IsConvex(SKPoint[] quad)
+    {
+        if (quad.Length != 4) return false;
+        var sign = 0;
+        for (var i = 0; i < 4; i++)
+        {
+            SKPoint a = quad[i], b = quad[(i + 1) % 4], c = quad[(i + 2) % 4];
+            var cross = (b.X - a.X) * (c.Y - b.Y) - (b.Y - a.Y) * (c.X - b.X);
+            if (Math.Abs(cross) < 1e-6) continue;
+            var current = cross > 0 ? 1 : -1;
+            if (sign == 0) sign = current;
+            else if (sign != current) return false;
+        }
+        return sign != 0;
+    }
+
+    /// <summary>The affine map taking three points onto three others, or null when the source triangle has no area.</summary>
+    public static SKMatrix? Affine(SKPoint s0, SKPoint s1, SKPoint s2, SKPoint d0, SKPoint d1, SKPoint d2)
+    {
+        double ux = s1.X - s0.X, uy = s1.Y - s0.Y, vx = s2.X - s0.X, vy = s2.Y - s0.Y;
+        double det = ux * vy - vx * uy;
+        if (Math.Abs(det) < 1e-9) return null;
+        double px = d1.X - d0.X, py = d1.Y - d0.Y, qx = d2.X - d0.X, qy = d2.Y - d0.Y;
+        double a = (px * vy - qx * uy) / det, c = (qx * ux - px * vx) / det;
+        double b = (py * vy - qy * uy) / det, d = (qy * ux - py * vx) / det;
+        return new SKMatrix((float)a, (float)c, (float)(d0.X - (a * s0.X + c * s0.Y)), (float)b, (float)d, (float)(d0.Y - (b * s0.X + d * s0.Y)), 0, 0, 1);
+    }
+
     public static SKRectI RoundOut(SKRect r) =>
         new((int)Math.Floor(r.Left), (int)Math.Floor(r.Top), (int)Math.Ceiling(r.Right), (int)Math.Ceiling(r.Bottom));
 
