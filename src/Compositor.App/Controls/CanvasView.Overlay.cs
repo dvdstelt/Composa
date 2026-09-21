@@ -114,6 +114,8 @@ public sealed partial class CanvasView
             });
         }
 
+        CaptureTextOverlay(steps, view, hair);
+
         if (guides.Count > 0)
         {
             var lines = guides.Select(g => (view.MapPoint(g.From), view.MapPoint(g.To))).ToArray();

@@ -10,7 +10,7 @@ namespace Compositor.App.Controls;
 
 public sealed partial class CanvasView
 {
-    private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub }
+    private enum Drag { None, Pan, Marquee, MoveSelection, MovePixels, Lasso, Crop, Stroke, Gradient, Shape, Transform, Eyedropper, ZoomScrub, TextBox, TextSelect, TextResize }
 
     private Drag drag;
     private MouseButton dragButton;
@@ -73,6 +73,7 @@ public sealed partial class CanvasView
             case Drag.Gradient: gradientPending = true; SettleGradient(keep: false); break;
         }
         if (drag != Drag.Gradient) SettleGradient(keep: true);
+        // Text being typed stays open: only Escape, Ctrl+Enter or another action ends it.
         drag = Drag.None;
         polygon.Clear();
         guides.Clear();
@@ -205,8 +206,7 @@ public sealed partial class CanvasView
                 drag = Drag.Shape;
                 break;
             case Tool.Text:
-                e.Pointer.Capture(null);
-                TextRequested?.Invoke(pressDocument, TextLayerAt(pressDocument));
+                BeginTextPress(shift, e.ClickCount);
                 break;
             case Tool.Eyedropper:
                 PickColor(alt);
@@ -260,8 +260,13 @@ public sealed partial class CanvasView
             case Drag.ZoomScrub:
                 if (Math.Abs(position.X - pressScreen.X) > 4) ZoomTo(scrubZoom * Math.Pow(2, (position.X - pressScreen.X) / 120), pressScreen);
                 break;
+            case Drag.TextSelect: DragTextSelection(); break;
+            case Drag.TextResize: DragTextBox(); break;
             case Drag.None when session.Tool == Tool.Move:
                 UpdateMoveCursor(position);
+                break;
+            case Drag.None when session.Tool == Tool.Text:
+                UpdateTextCursor(position);
                 break;
         }
         dragModifiers = e.KeyModifiers;
@@ -325,6 +330,7 @@ public sealed partial class CanvasView
             case Drag.ZoomScrub:
                 if (!moved) ZoomTo(alt ? zoom / 1.5 : zoom * 1.5, pressScreen);
                 break;
+            case Drag.TextBox: FinishTextBoxDrag(moved); break;
         }
         InvalidateVisual();
     }
@@ -556,19 +562,6 @@ public sealed partial class CanvasView
         return null;
     }
 
-    /// <summary>The topmost visible text layer whose box holds the point; the gaps between letters count too.</summary>
-    private Layer? TextLayerAt(SKPoint p)
-    {
-        if (session == null) return null;
-        foreach (var layer in session.Document.AllLayers().Reverse())
-        {
-            if (layer.Text == null || layer.Pixels == null || !session.Document.IsEffectivelyVisible(layer) || !layer.Matrix.TryInvert(out var inverse)) continue;
-            var local = inverse.MapPoint(p);
-            if (local.X >= 0 && local.Y >= 0 && local.X <= layer.Pixels.Width && local.Y <= layer.Pixels.Height) return layer;
-        }
-        return null;
-    }
-
     private void BeginMove(bool control, int clicks)
     {
         if (session == null) return;
@@ -669,6 +662,7 @@ public sealed partial class CanvasView
     public bool HandleKeyDown(KeyEventArgs e)
     {
         if (session == null) return false;
+        if (session.TextEdit is { } editor) return HandleTextKey(editor, e);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
         if (HasPendingGradient && drag == Drag.None)
         {

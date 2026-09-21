@@ -86,8 +86,8 @@ public sealed partial class MainWindow
             Item("Copy Merged", () => _ = Copy(merged: true), Key.C, ctrl | shift),
             Item("Paste", () => _ = Paste(), Key.V, ctrl),
             Line(),
-            Item("Fill with Foreground Color", () => session!.Fill(session.Foreground, "Fill"), Key.Back, alt, () => session!.CanEditPixels),
-            Item("Fill with Background Color", () => session!.Fill(session.Background, "Fill"), Key.Back, ctrl, () => session!.CanEditPixels),
+            Item("Fill with Foreground Color", () => session!.Fill(session.Foreground, "Fill"), Key.Back, alt, () => session!.CanFill),
+            Item("Fill with Background Color", () => session!.Fill(session.Background, "Fill"), Key.Back, ctrl, () => session!.CanFill),
             Item("Clear", DeletePressed, Key.Delete),
             Item("Content-Aware Fill", () => Busy(() => session!.ContentAwareFill()), Key.Back, shift, () => session!.Selection != null && session.CanEditPixels && !session.IsEditingMask));
 
@@ -151,7 +151,7 @@ public sealed partial class MainWindow
             Line(),
             Sub("Layer Effects", Enum.GetValues<LayerEffectKind>().Select(kind => (object)Item(LayerEffects.DisplayName(kind) + "…", () => _ = NewEffect(kind), enabled: () => session!.ActiveLayer?.Pixels != null))
                 .Append(Line()).Append(Item("Delete Effect", () => session!.RemoveSelectedEffect(), enabled: () => session!.SelectedEffect != null)).ToArray()),
-            Item("Edit Text…", () => _ = EditText(default, session!.ActiveLayer), enabled: () => session!.ActiveLayer?.Text != null),
+            Item("Edit Text…", () => BeginTextEdit(session!.ActiveLayer!), enabled: () => session!.ActiveLayer?.Text != null),
             Item("Rasterize Layer", () => session!.RasterizeShape(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.IsLive == true),
             Item("Rotate Layer 90° Clockwise", () => session!.RotateLayers(90)),
             Item("Rotate Layer 90° Counterclockwise", () => session!.RotateLayers(-90)),
@@ -603,31 +603,6 @@ public sealed partial class MainWindow
         if (await EffectsDialog.Edit(this, target, layer, kind) && layer.Effects != original) target.Commit();
         else target.Cancel();
         target.NotifyLayersChanged();
-    }
-
-    /// <summary>Adds text at a point, or edits an existing text layer, with the canvas updating as you type.</summary>
-    private async Task EditText(SKPoint at, Layer? existing)
-    {
-        if (session == null) return;
-        var target = session;
-        Layer layer;
-        var initial = existing?.Text ?? target.TextDefaults with { Text = "", Color = (uint)target.Foreground };
-        if (existing != null)
-        {
-            target.SelectLayer(existing.Id);
-            layer = existing;
-            target.Begin("Edit Text");
-        }
-        else layer = target.AddText(at, initial with { Text = "Text" }, commit: false);
-
-        var result = await TextDialog.Edit(this, initial, style => target.SetText(layer, style with { Text = style.Text.Length == 0 ? " " : style.Text }));
-        // Compared with the settings from before the dialog: the live preview has already written the newest ones into the layer.
-        if (result == null || result.Text.Trim().Length == 0 || (existing != null && result == initial)) { target.Cancel(); return; }
-        target.SetText(layer, result);
-        target.Commit();
-        target.TextDefaults = result with { Text = "" };
-        target.NotifyLayersChanged();
-        SelectTool(Tool.Move);
     }
 
     private async Task CanvasSize()

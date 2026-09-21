@@ -209,11 +209,22 @@ public sealed partial class EditorSession
         else TextDefaults = change(TextDefaults).Clamped() with { Text = "" };
     }
 
-    /// <summary>Resizes the open text's box (turning point text into a box of that size first), in layer pixels.</summary>
-    public void SetTextBox(double width, double height)
+    /// <summary>
+    /// Resizes the open text's box (turning point text into a box of that size first), in layer pixels. The point of
+    /// the layer at the anchor fractions (0 to 1 across its pixels) stays where it is, so dragging one edge leaves the
+    /// opposite one in place.
+    /// </summary>
+    public void SetTextBox(double width, double height, double anchorX = 0, double anchorY = 0)
     {
-        if (TextEdit is not { } editor) return;
+        if (TextEdit is not { } editor || textLayer is not { Pixels: { } old } layer) return;
+        var before = layer.Matrix.MapPoint((float)(anchorX * old.Width), (float)(anchorY * old.Height));
         editor.ChangeStyle(s => s with { BoxWidth = Math.Max(TextStyle.MinBox, Math.Round(width)), BoxHeight = Math.Max(TextStyle.MinBox, Math.Round(height)) });
+        if (layer.Pixels is not { } pixels || (anchorX == 0 && anchorY == 0)) return;
+        var after = layer.Matrix.MapPoint((float)(anchorX * pixels.Width), (float)(anchorY * pixels.Height));
+        if (Math.Abs(after.X - before.X) < 1e-3 && Math.Abs(after.Y - before.Y) < 1e-3) return;
+        var area = AffectedArea(layer);
+        layer.Transform = layer.Transform with { X = layer.Transform.X + before.X - after.X, Y = layer.Transform.Y + before.Y - after.Y };
+        Invalidate(Geometry.Union(area, AffectedArea(layer)));
     }
 
     /// <summary>Paints a text layer's letters in a color, keeping it editable text. Used by Fill with Foreground/Background.</summary>

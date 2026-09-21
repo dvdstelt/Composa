@@ -1,7 +1,10 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Layout;
 using Compositor.Editing;
 using Compositor.Model;
+using SkiaSharp;
+using TextAlignment = Compositor.Model.TextAlignment;
 
 namespace Compositor.App;
 
@@ -72,7 +75,8 @@ public sealed partial class MainWindow
                     Ui.Label("Fills with the foreground color", Palette.Secondary));
                 break;
             case Tool.Text:
-                Add(Title("Text"), Ui.Label("Click on the canvas to add text in the foreground color, or click existing text to edit it", Palette.Secondary));
+                Add(Title("Type"));
+                BuildTextFields(row);
                 break;
             case Tool.Crop:
                 Add(Title("Crop"));
@@ -95,6 +99,76 @@ public sealed partial class MainWindow
                 break;
         }
         optionsHost.Child = row;
+    }
+
+    /// <summary>The Type bar: font, size, style, color, alignment and spacing for the text being typed (or the next text).</summary>
+    private void BuildTextFields(StackPanel row)
+    {
+        var s = session!;
+        var updating = false;
+        void Change(Func<TextStyle, TextStyle> change)
+        {
+            if (updating) return;
+            var wasEditing = s.IsEditingText;
+            s.ChangeTextStyle(change);
+            if (!wasEditing && s.IsEditingText) { canvas.Focus(); RebuildOptions(); UpdateStatus(); }
+        }
+        var style = s.CurrentTextStyle;
+        var families = EditorSession.FontFamilies;
+        var family = families.Contains(style.FontFamily) ? style.FontFamily : families.FirstOrDefault(f => f.Contains("Sans", StringComparison.OrdinalIgnoreCase)) ?? families.FirstOrDefault() ?? style.FontFamily;
+        // A long font name is cut off rather than widening the bar.
+        var font = Ui.Combo(families, family, f => f, f => Change(st => st with { FontFamily = f }), 190);
+        font.MaxWidth = 190;
+        var size = Ui.Number(style.Size, 1, 2000, v => Change(st => st with { Size = v }), 1, "0.#", 64);
+        var bold = Ui.Check("Bold", style.Bold, v => Change(st => st with { Bold = v }));
+        var italic = Ui.Check("Italic", style.Italic, v => Change(st => st with { Italic = v }));
+        var swatch = new Border { Width = 34, Height = 22, CornerRadius = new Avalonia.CornerRadius(3), BorderBrush = Avalonia.Media.Brushes.White, BorderThickness = new Avalonia.Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+        ToolTip.SetTip(swatch, "Text color");
+        swatch.PointerPressed += async (_, _) =>
+        {
+            if (await Dialogs.Prompts.Color(this, "Text Color", new SKColor(s.CurrentTextStyle.Color)) is not { } picked) return;
+            Change(st => st with { Color = (uint)picked | 0xFF000000 });
+            // The text color is the foreground color: picking one in the Type bar moves the swatch too.
+            s.Foreground = picked;
+            UpdateColors();
+            refreshOptions?.Invoke();
+        };
+        var alignments = new Dictionary<TextAlignment, ToggleButton>();
+        var alignRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 2 };
+        foreach (var (alignment, icon) in new[] { (TextAlignment.Left, Icons.AlignLeft), (TextAlignment.Center, Icons.AlignCenter), (TextAlignment.Right, Icons.AlignRight) })
+        {
+            var button = new ToggleButton { Classes = { "tool" }, Width = 30, Height = 26, Content = Icons.Create(icon, 15), IsChecked = style.Alignment == alignment };
+            ToolTip.SetTip(button, "Align " + alignment.ToString().ToLowerInvariant());
+            button.Click += (_, _) => { Change(st => st with { Alignment = alignment }); refreshOptions?.Invoke(); };
+            alignments[alignment] = button;
+            alignRow.Children.Add(button);
+        }
+        var tracking = Ui.Number(style.Tracking, -100, 1000, v => Change(st => st with { Tracking = v }), 1, "0", 58);
+        ToolTip.SetTip(tracking, "Tracking: extra space after every character, in pixels");
+        var leading = Ui.Number(style.Leading, 0, 5000, v => Change(st => st with { Leading = v }), 1, "0", 58);
+        ToolTip.SetTip(leading, "Leading: line height baseline to baseline, in pixels. 0 is Auto: 120% of the size");
+        var done = Ui.TextButton("Done", () => { s.FinishText(); canvas.Focus(); RebuildOptions(); UpdateStatus(); }, accent: true);
+        var cancel = Ui.TextButton("Cancel", () => { s.CancelText(); canvas.Focus(); RebuildOptions(); UpdateStatus(); });
+        var edit = Ui.TextButton("Edit Text", () => { if (s.ActiveLayer is { Text: not null } layer) BeginTextEdit(layer); });
+        foreach (var button in new[] { done, cancel, edit }) button.MinWidth = 0;
+        row.Children.AddRange([font, Ui.Row(4, size, Ui.Label("px", Palette.Secondary)), bold, italic, swatch, alignRow,
+            Ui.Row(5, Ui.Label("Tracking", Palette.Secondary), tracking), Ui.Row(5, Ui.Label("Leading", Palette.Secondary), leading), Ui.Separator()]);
+        if (s.IsEditingText) row.Children.AddRange([done, cancel]);
+        else { edit.IsEnabled = s.ActiveLayer?.Text != null; row.Children.Add(edit); }
+        refreshOptions = () =>
+        {
+            var current = s.CurrentTextStyle;
+            updating = true;
+            size.Value = (decimal)current.Size;
+            tracking.Value = (decimal)current.Tracking;
+            leading.Value = (decimal)current.Leading;
+            bold.IsChecked = current.Bold;
+            italic.IsChecked = current.Italic;
+            swatch.Background = new Avalonia.Media.SolidColorBrush(new SKColor(current.Color).ToAvalonia());
+            foreach (var (alignment, button) in alignments) button.IsChecked = current.Alignment == alignment;
+            updating = false;
+        };
+        refreshOptions();
     }
 
     private static Button Flat(string text, Action action)

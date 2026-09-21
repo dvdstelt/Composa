@@ -40,7 +40,7 @@ public sealed partial class CanvasView : Control
         ClipToBounds = true;
         antsTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) =>
         {
-            if (session?.Selection == null && polygon.Count == 0) return;
+            if (session?.Selection == null && polygon.Count == 0 && session?.TextEdit == null) return;
             antsPhase = (antsPhase + 1) % 8;
             InvalidateVisual();
         });
@@ -60,8 +60,6 @@ public sealed partial class CanvasView : Control
     public event Action? ToolStateChanged;
     /// <summary>The document pixel under the pointer, or null once it leaves the canvas.</summary>
     public event Action<SKPointI?>? PointerAt;
-    /// <summary>Raised by the Text tool: where to put new text, or the text layer that was clicked.</summary>
-    public event Action<SKPoint, Layer?>? TextRequested;
 
     public bool ShowPixelGrid { get; set; } = true;
     public bool ShowTransformControls { get; set; } = true;
