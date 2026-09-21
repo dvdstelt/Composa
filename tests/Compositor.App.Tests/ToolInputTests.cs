@@ -165,7 +165,14 @@ public class ToolInputTests
         session.Brush = session.Brush with { Size = 10, Hardness = 1 };
         Dispatcher.UIThread.RunJobs();
 
-        // Holding Ctrl over the canvas promises a move with the four-way arrow; letting go brings the brush cursor back.
+        // Pressing Ctrl over the canvas promises a move with the four-way arrow at once, before the pointer moves;
+        // letting go brings the brush cursor back.
+        window.MouseMove(At(300, 200), RawInputModifiers.None);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
+        window.KeyPressQwerty(PhysicalKey.ControlLeft, RawInputModifiers.None);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.KeyReleaseQwerty(PhysicalKey.ControlLeft, RawInputModifiers.Control);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
         window.MouseMove(At(300, 200), RawInputModifiers.Control);
         Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
         window.MouseMove(At(302, 200), RawInputModifiers.None);

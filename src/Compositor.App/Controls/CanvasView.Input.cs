@@ -289,11 +289,7 @@ public sealed partial class CanvasView
                 UpdateTextCursor(position);
                 break;
         }
-        if (drag == Drag.None)
-        {
-            var hover = e.KeyModifiers.HasFlag(KeyModifiers.Control) && session.Tool is not (Tool.Move or Tool.Text);
-            if (hover != controlHover) { controlHover = hover; UpdateCursor(); }
-        }
+        if (drag == Drag.None) SetControlHover(e.KeyModifiers.HasFlag(KeyModifiers.Control));
         dragModifiers = e.KeyModifiers;
         InvalidateVisual();
     }
@@ -591,6 +587,27 @@ public sealed partial class CanvasView
             if (layer.Pixels.GetPixel(x, y).Alpha > 12) return layer;
         }
         return null;
+    }
+
+    /// <summary>
+    /// The window reports every key press and release, so the cursor changes the moment Ctrl goes down or up rather
+    /// than waiting for the pointer to move. The Ctrl key's own events carry the modifier state from before the key
+    /// changed, so the key itself decides.
+    /// </summary>
+    public void ModifierKeyChanged(Key key, KeyModifiers modifiers, bool down)
+    {
+        if (drag != Drag.None) return;
+        var control = key is Key.LeftCtrl or Key.RightCtrl ? down : modifiers.HasFlag(KeyModifiers.Control);
+        SetControlHover(control);
+    }
+
+    private void SetControlHover(bool control)
+    {
+        var hover = control && cursorInside && session != null && session.Tool is not (Tool.Move or Tool.Text) && session.TextEdit == null;
+        if (hover == controlHover) return;
+        controlHover = hover;
+        UpdateCursor();
+        InvalidateVisual(); // The brush outline comes and goes with the move cursor.
     }
 
     /// <summary>
