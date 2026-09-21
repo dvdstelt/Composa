@@ -17,8 +17,21 @@ public sealed partial class CanvasView
         var tool = session.Tool;
         var phase = antsPhase;
 
+        // A line being dragged out: exactly between the two points, so the start never shifts.
+        if (drag == Drag.Shape && session.ShapeKind == Model.ShapeKind.Line)
+        {
+            var shift = dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift);
+            SKPoint from = view.MapPoint(pressDocument), to = view.MapPoint(ConstrainAngle(pressDocument, currentDocument, shift));
+            var width = (float)Math.Max(1, session.ShapeLineWidth * UnitsPerPixel);
+            var color = session.Foreground;
+            steps.Add(canvas =>
+            {
+                using var paint = new SKPaint { Color = color, StrokeWidth = width, StrokeCap = SKStrokeCap.Round, Style = SKPaintStyle.Stroke, IsAntialias = true };
+                canvas.DrawLine(from, to, paint);
+            });
+        }
         // Shapes being dragged out.
-        if (drag is Drag.Marquee or Drag.Shape)
+        else if (drag is Drag.Marquee or Drag.Shape)
         {
             var shift = dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift);
             var alt = dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt);

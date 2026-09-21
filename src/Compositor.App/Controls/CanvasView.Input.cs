@@ -167,7 +167,8 @@ public sealed partial class CanvasView
                 }
                 break;
             case Tool.Wand:
-                session.SelectWand((int)Math.Floor(pressDocument.X), (int)Math.Floor(pressDocument.Y), ModeFor(e.KeyModifiers));
+                if (session.WandMode == WandMode.Object) session.SelectObject((int)Math.Floor(pressDocument.X), (int)Math.Floor(pressDocument.Y), ModeFor(e.KeyModifiers));
+                else session.SelectWand((int)Math.Floor(pressDocument.X), (int)Math.Floor(pressDocument.Y), ModeFor(e.KeyModifiers));
                 break;
             case Tool.Crop:
                 handle = cropRect is { } crop ? HitFrame(Corners(crop), point.Position, allowRotate: false) : TransformHandle.None;
@@ -325,7 +326,9 @@ public sealed partial class CanvasView
                 ToolStateChanged?.Invoke();
                 break;
             case Drag.Shape:
-                if (moved) session.AddShape(MarqueeRect(shift, alt));
+                if (!moved) break;
+                if (session.ShapeKind == ShapeKind.Line) session.AddLine(pressDocument, ConstrainAngle(pressDocument, currentDocument, shift));
+                else session.AddShape(MarqueeRect(shift, alt));
                 break;
             case Drag.ZoomScrub:
                 if (!moved) ZoomTo(alt ? zoom / 1.5 : zoom * 1.5, pressScreen);

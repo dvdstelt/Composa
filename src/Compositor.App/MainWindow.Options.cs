@@ -52,14 +52,40 @@ public sealed partial class MainWindow
                 };
                 break;
             case Tool.Marquee or Tool.Lasso or Tool.Wand:
-                Add(Title(s.Tool == Tool.Marquee ? "Marquee" : s.Tool == Tool.Lasso ? "Lasso" : "Magic Wand"));
+                Add(Title(s.Tool == Tool.Marquee ? "Marquee" : s.Tool == Tool.Lasso ? "Lasso" : "Magic"));
                 if (s.Tool == Tool.Marquee) Add(Ui.Combo(Enum.GetValues<MarqueeKind>(), s.MarqueeKind, v => v.ToString(), v => { s.MarqueeKind = v; SelectTool(Tool.Marquee); }, 110));
                 if (s.Tool == Tool.Lasso) Add(Ui.Combo(Enum.GetValues<LassoKind>(), s.LassoKind, v => v.ToString(), v => { s.LassoKind = v; SelectTool(Tool.Lasso); }, 110));
                 if (s.Tool == Tool.Wand)
-                    Add(Ui.SliderRow("Tolerance", s.WandTolerance, 0, 255, v => s.WandTolerance = (int)v, 1, "0", 120).Row,
-                        Ui.Check("Contiguous", s.WandContiguous, v => s.WandContiguous = v), Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
+                {
+                    var mode = Ui.Combo(Enum.GetValues<WandMode>(), s.WandMode, v => v.ToString(), v => { s.WandMode = v; SelectTool(Tool.Wand); }, 96);
+                    ToolTip.SetTip(mode, "Wand selects similar colors; Object traces the object under the click. Tab switches.");
+                    Add(mode);
+                    if (s.WandMode == WandMode.Wand)
+                        Add(Ui.SliderRow("Tolerance", s.WandTolerance, 0, 255, v => s.WandTolerance = (int)v, 1, "0", 120).Row, Ui.Check("Contiguous", s.WandContiguous, v => s.WandContiguous = v));
+                    else
+                    {
+                        var edge = Ui.Number(s.ObjectEdgeOffset, -10, 10, v => s.ObjectEdgeOffset = (int)v, 1, "0", 52);
+                        ToolTip.SetTip(edge, "Positive values tighten the detected outline inward; negative values loosen it outward");
+                        Add(Ui.Row(5, Ui.Label("Edge", Palette.Secondary), edge, Ui.Label("px", Palette.Secondary)));
+                    }
+                    Add(Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
+                }
                 else Add(Ui.SliderRow("Feather", s.Feather, 0, 100, v => s.Feather = v, 1, "0", 100).Row);
+                Add(Ui.Separator());
+                // Modify buttons with their amounts, as in the macOS tool bar; both need a selection.
+                Control Modify(string title, Func<int> get, Action<int> set, int max, Action apply)
+                {
+                    var button = Flat(title, apply);
+                    var amount = Ui.Number(get(), 1, max, v => set((int)v), 1, "0", 50);
+                    var pair = Ui.Row(3, button, amount);
+                    refreshOptions += () => button.IsEnabled = amount.IsEnabled = s.Selection != null;
+                    return pair;
+                }
+                Add(Modify("Expand", () => s.SelectionExpandAmount, v => s.SelectionExpandAmount = v, 500, () => s.ExpandSelection(s.SelectionExpandAmount)),
+                    Modify("Contract", () => s.SelectionContractAmount, v => s.SelectionContractAmount = v, 500, () => s.ContractSelection(s.SelectionContractAmount)),
+                    Modify("Feather", () => s.SelectionFeatherAmount, v => s.SelectionFeatherAmount = v, 250, () => s.FeatherSelection(s.SelectionFeatherAmount)));
                 Add(Ui.Separator(), Flat("Select All", s.SelectAll), Flat("Deselect", s.Deselect), Flat("Inverse", s.InvertSelection));
+                refreshOptions?.Invoke();
                 break;
             case Tool.Gradient:
                 Add(Title("Gradient"),
@@ -70,9 +96,10 @@ public sealed partial class MainWindow
                 refreshOptions = () => gradientOpacity.Set(s.GradientOpacity * 100);
                 break;
             case Tool.Shape:
-                Add(Title("Shape"), Ui.Combo(Enum.GetValues<ShapeKind>(), s.ShapeKind, v => v == ShapeKind.RoundedRectangle ? "Rounded Rectangle" : v.ToString(), v => s.ShapeKind = v, 160),
-                    Ui.SliderRow("Corner radius", s.ShapeCornerRadius, 0, 400, v => s.ShapeCornerRadius = v, 1, "0", 120).Row,
-                    Ui.Label("Fills with the foreground color", Palette.Secondary));
+                Add(Title("Shape"), Ui.Combo(Enum.GetValues<ShapeKind>(), s.ShapeKind, ShapeStyle.DisplayName, v => { s.ShapeKind = v; SelectTool(Tool.Shape); }, 160));
+                if (s.ShapeKind == ShapeKind.Line) Add(Ui.SliderRow("Width", s.ShapeLineWidth, 1, 100, v => s.ShapeLineWidth = v, 1, "0", 120).Row);
+                else if (s.ShapeKind == ShapeKind.RoundedRectangle) Add(Ui.SliderRow("Corner radius", s.ShapeCornerRadius, 0, 400, v => s.ShapeCornerRadius = v, 1, "0", 120).Row);
+                Add(Ui.Label(s.ShapeKind == ShapeKind.Line ? "Draws in the foreground color · Shift snaps to 45°" : "Fills with the foreground color", Palette.Secondary));
                 break;
             case Tool.Text:
                 Add(Title("Type"));

@@ -98,10 +98,11 @@ public sealed partial class MainWindow
             Line(),
             Item("Layer's Pixels", () => session!.SelectLayerPixels(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.Pixels != null),
             Item("Layer's Mask", () => session!.SelectLayerMask(session.ActiveLayer!), enabled: () => session!.ActiveLayer?.Mask != null),
+            Item("Subject", SelectSubject, Key.A, ctrl | alt),
             Line(),
-            Item("Expand…", () => _ = ModifySelection("Expand Selection", "Expand by", 4, v => session!.ExpandSelection((int)v)), enabled: () => session!.Selection != null),
-            Item("Contract…", () => _ = ModifySelection("Contract Selection", "Contract by", 4, v => session!.ContractSelection((int)v)), enabled: () => session!.Selection != null),
-            Item("Feather…", () => _ = ModifySelection("Feather Selection", "Feather radius", 8, v => session!.FeatherSelection((float)v)), Key.F6, shift, () => session!.Selection != null));
+            Item("Expand…", () => _ = ModifySelection("Expand Selection", "Expand by", () => session!.SelectionExpandAmount, 500, v => { session!.SelectionExpandAmount = v; session.ExpandSelection(v); }), enabled: () => session!.Selection != null),
+            Item("Contract…", () => _ = ModifySelection("Contract Selection", "Contract by", () => session!.SelectionContractAmount, 500, v => { session!.SelectionContractAmount = v; session.ContractSelection(v); }), enabled: () => session!.Selection != null),
+            Item("Feather…", () => _ = ModifySelection("Feather Selection", "Feather radius", () => session!.SelectionFeatherAmount, 250, v => { session!.SelectionFeatherAmount = v; session.FeatherSelection(v); }), Key.F6, shift, () => session!.Selection != null));
 
         Top("_Image",
             Item("Curves…", () => _ = Adjust(AdjustmentKind.Curves), Key.M, ctrl, () => session!.CanEditPixels),
@@ -270,8 +271,13 @@ public sealed partial class MainWindow
                 break;
             case Key.G: SelectTool(Tool.Gradient); break;
             case Key.U:
-                if (shift || session.Tool == Tool.Shape) session.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % 3);
+                if (shift || session.Tool == Tool.Shape) session.ShapeKind = (ShapeKind)(((int)session.ShapeKind + 1) % Enum.GetValues<ShapeKind>().Length);
                 SelectTool(Tool.Shape);
+                break;
+            case Key.Tab when !shift:
+                // Tab steps the current tool through its modes (Rectangle/Ellipse, Paint/Erase, Wand/Object, and so on).
+                session.CycleToolMode();
+                SelectTool(session.Tool);
                 break;
             case Key.T: SelectTool(Tool.Text); break;
             case Key.I: SelectTool(Tool.Eyedropper); break;
@@ -505,9 +511,17 @@ public sealed partial class MainWindow
 
     // ---- Dialog-driven edits ------------------------------------------------------------------------------------
 
-    private async Task ModifySelection(string title, string label, double initial, Action<double> apply)
+    private async Task ModifySelection(string title, string label, Func<int> initial, int max, Action<int> apply)
     {
-        if (await Prompts.Number(this, title, label, initial, 1, 500) is { } value) apply(value);
+        if (await Prompts.Number(this, title, label, initial(), 1, max) is { } value) apply((int)Math.Round(value));
+        refreshOptions?.Invoke();
+    }
+
+    /// <summary>Select > Subject: what the picture shows in front of its plain backdrop.</summary>
+    private void SelectSubject()
+    {
+        if (session == null) return;
+        if (!session.SelectSubject()) ShowProblem("No subject found: the picture has no plain backdrop to tell it apart from.");
     }
 
     private Histogram? HistogramOfActive()

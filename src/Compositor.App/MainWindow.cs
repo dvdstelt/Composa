@@ -144,6 +144,7 @@ public sealed partial class MainWindow : Window
         added.Problem += message => { if (added == session) ShowProblem(message); };
         added.LayersChanged += () => { if (added == session) OnSessionLayersChanged(); };
         added.TextChanged += () => { if (added == session) refreshOptions?.Invoke(); };
+        added.SelectionChanged += () => { if (added == session) refreshOptions?.Invoke(); };
         SetSession(added);
     }
 
@@ -273,10 +274,10 @@ public sealed partial class MainWindow : Window
     private static readonly (Tool Tool, Icons.Icon Icon, string Tip)[] ToolList =
     [
         (Tool.Move, Icons.Move, "Move / Transform (V)"), (Tool.Marquee, Icons.Marquee, "Marquee (M) · press again for Ellipse"),
-        (Tool.Lasso, Icons.Lasso, "Lasso (L) · press again for Polygonal"), (Tool.Wand, Icons.Wand, "Magic Wand (W)"), (Tool.Crop, Icons.Crop, "Crop (C)"),
+        (Tool.Lasso, Icons.Lasso, "Lasso (L) · press again for Polygonal"), (Tool.Wand, Icons.Wand, "Magic (W) · Tab switches Wand and Object"), (Tool.Crop, Icons.Crop, "Crop (C)"),
         (Tool.Brush, Icons.Brush, "Brush (B) · Eraser (E)"), (Tool.SpotHealing, Icons.Heal, "Spot Healing Brush (J)"),
         (Tool.CloneStamp, Icons.Stamp, "Clone Stamp (S) · Alt-click sets the source"), (Tool.Smear, Icons.Drop, "Smear: Liquify, Blur, Smudge, Dodge, Burn (R)"),
-        (Tool.Gradient, Icons.Gradient, "Gradient (G)"), (Tool.Shape, Icons.Shape, "Shape (U) · Shift+U switches shape"),
+        (Tool.Gradient, Icons.Gradient, "Gradient (G)"), (Tool.Shape, Icons.Shape, "Shape (U) · Shift+U or Tab steps through Rectangle, Rounded Rectangle, Ellipse and Line"),
         (Tool.Text, Icons.Text, "Type (T) · click for point text, drag a paragraph box, click text to edit it"), (Tool.Eyedropper, Icons.Eyedropper, "Eyedropper (I)"), (Tool.Hand, Icons.Hand, "Hand (H) · hold Space with any tool"), (Tool.Zoom, Icons.Zoom, "Zoom (Z)")
     ];
 
@@ -391,6 +392,8 @@ public sealed partial class MainWindow : Window
         toolButtons[Tool.Marquee].Content = Icons.Create(session.MarqueeKind == MarqueeKind.Ellipse ? Icons.MarqueeEllipse : Icons.Marquee, 19);
         toolButtons[Tool.Lasso].Content = Icons.Create(session.LassoKind == LassoKind.Polygonal ? Icons.PolygonLasso : Icons.Lasso, 19);
         toolButtons[Tool.Brush].Content = Icons.Create(session.EraserMode ? Icons.Eraser : Icons.Brush, 19);
+        toolButtons[Tool.Wand].Content = Icons.Create(session.WandMode == WandMode.Object ? Icons.ObjectSelect : Icons.Wand, 19);
+        toolButtons[Tool.Shape].Content = Icons.Create(session.ShapeKind == ShapeKind.Line ? Icons.Line : Icons.Shape, 19);
         canvas.ToolChanged();
         RebuildOptions();
         UpdateStatus();
@@ -416,14 +419,14 @@ public sealed partial class MainWindow : Window
         Tool.Move => "Drag to move · Handles resize (Shift free, Alt from center) · Outside a corner rotates · Ctrl-drag a corner distorts · Ctrl-click picks a layer · 1–0 opacity",
         Tool.Marquee => "Drag to select · Shift add · Alt subtract · Shift+Alt intersect · Drag inside to move · Delete clears · Ctrl+D deselect",
         Tool.Lasso => s.LassoKind == LassoKind.Freehand ? "Drag to select · Shift add · Alt subtract · Drag inside to move" : "Click corners · Click the start, double-click or Enter to close · Backspace removes a corner · Escape cancels",
-        Tool.Wand => "Click to select similar colors · Shift add · Alt subtract",
+        Tool.Wand => s.WandMode == WandMode.Object ? "Click an object to select its outline · Tab for Wand · Shift add · Alt subtract" : "Click to select similar colors · Tab for Object · Shift add · Alt subtract",
         Tool.Crop => "Drag to crop · Shift keeps proportions · Alt symmetric · Enter applies · Escape cancels",
         Tool.Brush => (s.EraserMode ? "Drag to erase" : "Drag to paint · Alt-click picks a color") + " · Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity",
         Tool.SpotHealing => "Drag over blemishes to heal · [ ] size",
         Tool.CloneStamp => "Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity",
         Tool.Smear => "Drag to " + (s.SmearMode == SmearMode.Liquify ? "push pixels" : s.SmearMode.ToString().ToLowerInvariant()) + " · [ ] size · 1–0 strength",
         Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels",
-        Tool.Shape => "Drag to draw a shape on a new layer · Shift square · Alt from center",
+        Tool.Shape => s.ShapeKind == ShapeKind.Line ? "Drag to draw a line on a new layer · Shift snaps to 45° · Tab for the next shape" : "Drag to draw a shape on a new layer · Shift square · Alt from center · Tab for the next shape",
         Tool.Text => s.IsEditingText ? "Type · Drag the box's handles to resize it · Alt+arrows tracking and leading · Ctrl+Enter finishes · Escape cancels" : "Click for point text · Drag a box for paragraph text · Click text to edit it",
         Tool.Eyedropper => "Click to pick the foreground color · Alt-click for the background",
         Tool.Hand => "Drag to pan · Ctrl+wheel zooms",
