@@ -165,6 +165,12 @@ public class ToolInputTests
         session.Brush = session.Brush with { Size = 10, Hardness = 1 };
         Dispatcher.UIThread.RunJobs();
 
+        // Holding Ctrl over the canvas promises a move with the four-way arrow; letting go brings the brush cursor back.
+        window.MouseMove(At(300, 200), RawInputModifiers.Control);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.MouseMove(At(302, 200), RawInputModifiers.None);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
+
         // With the Brush: the layer moves, nothing is painted, and the tool stays the Brush.
         Drag(new SKPoint(300, 200), new SKPoint(340, 230), RawInputModifiers.Control);
         Assert.Equal((290d, 180d), (layer.Transform.X, layer.Transform.Y));

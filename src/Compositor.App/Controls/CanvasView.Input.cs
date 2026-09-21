@@ -91,7 +91,7 @@ public sealed partial class CanvasView
         if (session != null)
         {
             if (spaceDown || drag == Drag.Pan) type = StandardCursorType.Hand;
-            else if (temporaryMove || (controlHover && drag == Drag.None)) type = StandardCursorType.Arrow;
+            else if (temporaryMove || (controlHover && drag == Drag.None)) type = StandardCursorType.SizeAll; // The four-way move arrow says what Ctrl will do.
             else type = session.Tool switch
             {
                 Tool.Hand => StandardCursorType.Hand,
