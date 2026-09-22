@@ -16,6 +16,12 @@ mkdir -p "$OUT"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 
+# Resolve the version once and hand it to every format, so they cannot disagree and so the restore
+# MinVer needs happens a single time.
+COMPOSA_VERSION="$(app_version)"
+export COMPOSA_VERSION
+echo "Building Composa $COMPOSA_VERSION for $RID"
+
 echo "==> tarball"
 "$HERE/tarball.sh" "$RID" "$OUT"
 
