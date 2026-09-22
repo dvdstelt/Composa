@@ -23,7 +23,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 
 ### Transform
 - Non-destructive move, scale, rotate and flip: images keep their full resolution however small you make them
-- Free distort by Ctrl-dragging a corner
+- Free distort by Ctrl-dragging a corner; the handles follow the corners, which keep distorting once the layer is distorted, and a corner dragged past the opposite edge folds the layer over itself
 - Ctrl-drag moves the current layer with any tool active, as Photoshop's temporary Move tool does
 - Auto Select picks the layer under the pointer, including one stacked on a selected background that covers the canvas; turn it off to drag the current layer from anywhere (Ctrl-click still picks)
 - Transform several layers, or a whole folder, together

@@ -512,7 +512,13 @@ public sealed partial class CanvasView
         if (session.Transform is { } edit) return edit.Corners();
         var targets = session.TransformTargets();
         if (targets.Count == 0) return null;
-        if (targets.Count == 1) return new TransformFrame(targets[0].Transform).Corners();
+        if (targets.Count == 1)
+        {
+            // A distorted layer's handles sit on its corners, wherever they were dragged to.
+            var target = targets[0];
+            if (target.Pixels != null && target.Transform.Distort != null) return target.Transform.Corners(target.Pixels.Width, target.Pixels.Height);
+            return new TransformFrame(target.Transform).Corners();
+        }
         var bounds = SKRect.Empty;
         foreach (var layer in targets) bounds = bounds.IsEmpty ? layer.Bounds : SKRect.Union(bounds, layer.Bounds);
         return Corners(bounds);
@@ -575,6 +581,9 @@ public sealed partial class CanvasView
     }
 
     /// <summary>The topmost visible layer with a non-transparent pixel under a document point.</summary>
+    /// <summary>Whether the one layer being transformed already has a corner pulled out of place.</summary>
+    private bool IsDistorted() => session?.TransformTargets() is [{ Pixels: not null, Transform.Distort: not null }];
+
     /// <summary>Whether <paramref name="layer"/> is painted above <paramref name="other"/>; layers are stored bottom to top.</summary>
     private bool IsAbove(Layer layer, Layer? other)
     {
@@ -658,8 +667,9 @@ public sealed partial class CanvasView
                 session.SelectLayer(hit.Id, extend: dragModifiers.HasFlag(KeyModifiers.Shift));
             handle = TransformHandle.Move;
         }
-        else if (control && handle is TransformHandle.TopLeft or TransformHandle.TopRight or TransformHandle.BottomRight or TransformHandle.BottomLeft)
+        else if ((control || IsDistorted()) && handle is TransformHandle.TopLeft or TransformHandle.TopRight or TransformHandle.BottomRight or TransformHandle.BottomLeft)
         {
+            // Ctrl-dragging a corner distorts, as in Photoshop; once a layer is distorted its corners keep distorting.
             distortCorner = handle switch { TransformHandle.TopLeft => 0, TransformHandle.TopRight => 1, TransformHandle.BottomRight => 2, _ => 3 };
         }
         if (session.BeginTransform(handle == TransformHandle.Move ? "Move" : handle == TransformHandle.Rotate ? "Rotate" : distortCorner >= 0 ? "Distort" : "Scale") == null)
