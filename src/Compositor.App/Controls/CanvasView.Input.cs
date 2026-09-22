@@ -575,6 +575,14 @@ public sealed partial class CanvasView
     }
 
     /// <summary>The topmost visible layer with a non-transparent pixel under a document point.</summary>
+    /// <summary>Whether <paramref name="layer"/> is painted above <paramref name="other"/>; layers are stored bottom to top.</summary>
+    private bool IsAbove(Layer layer, Layer? other)
+    {
+        if (session == null || other == null) return true;
+        var order = session.Document.AllLayers().ToList();
+        return order.IndexOf(layer) > order.IndexOf(other);
+    }
+
     private Layer? LayerAt(SKPoint p)
     {
         if (session == null) return null;
@@ -641,10 +649,12 @@ public sealed partial class CanvasView
         var onHandle = handle is not (TransformHandle.None or TransformHandle.Move);
         if (!onHandle)
         {
-            // Clicking pixels of another layer selects it (Ctrl-click or double-click always; otherwise only when the
-            // click misses the current selection's frame entirely).
+            // Clicking pixels of another layer selects it: Ctrl-click or double-click always; with Auto Select, also when
+            // the click misses the current frame or lands on a layer stacked above the active one. A selected background
+            // that covers the canvas contains every press, and keeping it would hide the layer painted on top.
             var hit = LayerAt(pressDocument);
-            if (hit != null && !session.Document.SelectedLayerIds.Contains(hit.Id) && (control || clicks >= 2 || handle == TransformHandle.None))
+            if (hit != null && !session.Document.SelectedLayerIds.Contains(hit.Id)
+                && (control || clicks >= 2 || (AutoSelect && (handle == TransformHandle.None || IsAbove(hit, session.ActiveLayer)))))
                 session.SelectLayer(hit.Id, extend: dragModifiers.HasFlag(KeyModifiers.Shift));
             handle = TransformHandle.Move;
         }

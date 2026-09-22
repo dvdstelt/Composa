@@ -152,6 +152,34 @@ public class ToolInputTests
     }
 
     [AvaloniaFact]
+    public void Auto_select_picks_a_layer_stacked_on_a_selected_background_and_can_be_turned_off()
+    {
+        var background = session.ActiveLayer!; // The white canvas covers every press.
+        var box = Rendering.Pixels.NewColor(100, 100);
+        box.Erase(SKColors.Red);
+        var layer = session.AddImageLayer("box", box, new SKPoint(300, 200));
+        session.SelectLayer(background.Id);
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+
+        Click(320, 220);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+        Click(20, 20);
+        Assert.Equal(background.Id, session.ActiveLayer!.Id);
+        Click(320, 220);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+
+        // Off, a press keeps the current layer wherever it lands; Ctrl-click still picks. (Each click lands somewhere
+        // new, because two at one spot make a double-click, which always picks.)
+        window.Canvas.AutoSelect = false;
+        session.SelectLayer(background.Id);
+        Click(360, 260);
+        Assert.Equal(background.Id, session.ActiveLayer!.Id);
+        Click(340, 240, RawInputModifiers.Control);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+    }
+
+    [AvaloniaFact]
     public void Ctrl_drag_moves_the_layer_with_any_tool_and_leaves_the_other_ctrl_drags_alone()
     {
         var box = Rendering.Pixels.NewColor(100, 100);

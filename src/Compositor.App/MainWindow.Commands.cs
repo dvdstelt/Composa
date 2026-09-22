@@ -168,7 +168,7 @@ public sealed partial class MainWindow
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 
         var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
-        grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); };
+        grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); RememberToolSettings(); };
         // View options are flags on the session, so a checkmark follows the current tab.
         MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, string? id = null)
         {
@@ -177,6 +177,7 @@ public sealed partial class MainWindow
                 var rulersShown = session!.View.ShowRulers;
                 session.View = flip(session.View);
                 canvas.ViewOptionsChanged(rulersShown);
+                RememberToolSettings();
             }, key, modifiers, id: id);
             item.ToggleType = MenuItemToggleType.CheckBox;
             viewToggles.Add((item, get));
@@ -188,7 +189,7 @@ public sealed partial class MainWindow
             Item("Zoom In", canvas.ZoomIn, Key.OemPlus, ctrl),
             Item("Zoom Out", canvas.ZoomOut, Key.OemMinus, ctrl),
             Line(), grid,
-            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); }, Key.H, ctrl),
+            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); RememberToolSettings(); }, Key.H, ctrl),
             Line(),
             ViewToggle("Rulers", v => v.ShowRulers, v => v with { ShowRulers = !v.ShowRulers }, Key.R, ctrl),
             Sub("Show",

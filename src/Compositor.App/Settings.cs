@@ -11,6 +11,10 @@ public sealed class Settings
     public bool Maximized { get; set; }
     public int JpegQuality { get; set; } = 90;
     public bool ShowPixelGrid { get; set; } = true;
+    /// <summary>Toggles that belong to the person rather than to a document, kept the way Photoshop keeps its tool options.</summary>
+    public bool ShowTransformControls { get; set; } = true;
+    public bool AutoSelect { get; set; } = true;
+    public Compositor.Editing.ViewOptions View { get; set; } = new();
     /// <summary>Rebound shortcuts by command id: a gesture string, or empty for none. Missing entries keep the default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 

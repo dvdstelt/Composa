@@ -63,6 +63,8 @@ public sealed partial class CanvasView : Control
 
     public bool ShowPixelGrid { get; set; } = true;
     public bool ShowTransformControls { get; set; } = true;
+    /// <summary>A Move-tool press selects the layer under the pointer. Off, it drags the active layer from anywhere and Ctrl-click picks.</summary>
+    public bool AutoSelect { get; set; } = true;
     public double Zoom => zoom;
 
     public EditorSession? Session
