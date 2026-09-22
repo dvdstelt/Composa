@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs a published build for the current user: binary, launcher, icon and the .composa file type.
+# Installs a published build for the current user: binary, launcher, icon and the .cmps file type.
 set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SOURCE="$HERE"

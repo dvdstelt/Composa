@@ -19,9 +19,9 @@ public class RecoveryTests
             session.Fill(SKColors.Red);
             await recovery.Save([session]);
             Assert.Equal(2, Directory.GetFiles(folder).Length);
-            var written = File.GetLastWriteTimeUtc(Directory.GetFiles(folder, "*.composa")[0]);
+            var written = File.GetLastWriteTimeUtc(Directory.GetFiles(folder, "*.cmps")[0]);
             await recovery.Save([session]);
-            Assert.Equal(written, File.GetLastWriteTimeUtc(Directory.GetFiles(folder, "*.composa")[0])); // Unchanged since: not rewritten.
+            Assert.Equal(written, File.GetLastWriteTimeUtc(Directory.GetFiles(folder, "*.cmps")[0])); // Unchanged since: not rewritten.
 
             // This process is alive, so its own copies are not "abandoned".
             Assert.Empty(recovery.FindAbandoned());

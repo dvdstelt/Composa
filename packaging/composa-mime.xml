@@ -2,6 +2,6 @@
 <mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
   <mime-type type="application/x-composa-project">
     <comment>Composa project</comment>
-    <glob pattern="*.composa"/>
+    <glob pattern="*.cmps"/>
   </mime-type>
 </mime-info>

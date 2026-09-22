@@ -14,7 +14,7 @@ namespace Composa.IO;
 /// </summary>
 public static class ProjectFile
 {
-    public const string Extension = ".composa";
+    public const string Extension = ".cmps";
     public const string Format = "org.composa.project";
     public const int Version = 2;
 
