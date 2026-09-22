@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Composa
+GenericName=Image Editor
+Comment=Layer-based image editor for compositing and retouching
+Exec=composa %F
+Icon=composa
+Terminal=false
+Categories=Graphics;2DGraphics;RasterGraphics;
+MimeType=application/x-composa-project;image/png;image/jpeg;image/webp;image/bmp;image/gif;
+StartupWMClass=composa

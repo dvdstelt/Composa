@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Composa.App/Composa.App.csproj" />
+    <Project Path="src/Composa.Core/Composa.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Composa.App.Tests/Composa.App.Tests.csproj" />
+    <Project Path="tests/Composa.Core.Tests/Composa.Core.Tests.csproj" />
+  </Folder>
+</Solution>
