@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.composa.Composa</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <name>Composa</name>
+  <summary>Layer-based image editor for compositing and retouching</summary>
+
+  <description>
+    <p>
+      Composa is a layer-based image editor for compositing and retouching, with Photoshop-style
+      tools and shortcuts. It is a from-scratch implementation of Compositor, Robbie Tilton's
+      open-source macOS app.
+    </p>
+    <p>Among what it offers:</p>
+    <ul>
+      <li>Layers with masks, clipping, blend modes, groups and layer effects</li>
+      <li>Selections: marquee, lasso, magic wand, object and subject selection, feathering</li>
+      <li>Brush, eraser, clone, heal, dodge, burn and sharpen, with pen pressure</li>
+      <li>Adjustments: levels, curves, hue and saturation, exposure, colour balance and more</li>
+      <li>Text layers, transforms, rulers, guides, grid and snapping</li>
+      <li>Opens Photoshop files and camera RAW; exports PNG, JPEG and WebP</li>
+      <li>Autosave with crash recovery</li>
+    </ul>
+  </description>
+
+  <developer id="io.github.dvdstelt">
+    <name>Dennis van der Stelt</name>
+  </developer>
+
+  <launchable type="desktop-id">composa.desktop</launchable>
+  <url type="homepage">https://github.com/dvdstelt/Composa</url>
+  <url type="bugtracker">https://github.com/dvdstelt/Composa/issues</url>
+
+  <provides>
+    <binary>composa</binary>
+  </provides>
+
+  <categories>
+    <category>Graphics</category>
+    <category>2DGraphics</category>
+    <category>RasterGraphics</category>
+  </categories>
+
+  <content_rating type="oars-1.1"/>
+
+  <!-- The release workflow prepends an entry here for each published version. -->
+  <releases>
+  </releases>
+</component>

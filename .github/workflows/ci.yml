@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # 22.04 rather than latest: a self-contained build links against the build machine's glibc, and
+    # 24.04 would produce binaries that refuse to start on Debian 12 or Ubuntu 22.04.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      # Screenshots are how a UI regression is inspected without a display, so they are worth
+      # keeping when something failed.
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots
+          path: artifacts/screenshots/
+          if-no-files-found: ignore
+
+  packaging:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install validators
+        run: sudo apt-get update && sudo apt-get install -y desktop-file-utils appstream
+
+      # A malformed desktop entry or metainfo file fails the build rather than shipping and
+      # quietly making the app invisible in a software centre.
+      - name: Validate desktop entry
+        run: desktop-file-validate packaging/composa.desktop
+
+      - name: Validate AppStream metainfo
+        run: appstreamcli validate packaging/composa.metainfo.xml
