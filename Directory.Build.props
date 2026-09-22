@@ -5,8 +5,28 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <Version>0.1.0-alpha.1</Version>
     <AvaloniaVersion>12.1.2</AvaloniaVersion>
     <SkiaSharpVersion>3.119.4</SkiaSharpVersion>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <Product>Composa</Product>
+    <Authors>Dennis van der Stelt</Authors>
+    <Company>Dennis van der Stelt</Company>
+    <Copyright>Copyright (c) 2026 Dennis van der Stelt</Copyright>
+    <RepositoryUrl>https://github.com/dvdstelt/Composa</RepositoryUrl>
+  </PropertyGroup>
+
+  <!--
+    The version comes from the nearest git tag, so a release is cut by tagging and nothing else.
+    An untagged commit builds as a pre-release of the next patch; the tag v0.2.0 builds as 0.2.0.
+    CI must check out with fetch-depth 0, or MinVer sees no tags and silently versions everything 0.0.0.
+  -->
+  <PropertyGroup>
+    <MinVerTagPrefix>v</MinVerTagPrefix>
+    <MinVerDefaultPreReleaseIdentifiers>alpha.0</MinVerDefaultPreReleaseIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MinVer" Version="6.0.0" PrivateAssets="all" />
+  </ItemGroup>
 </Project>
