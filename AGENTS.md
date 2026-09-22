@@ -1,15 +1,15 @@
-# Agent notes for Compositor for Linux
+# Agent notes for Composa
 
 ## What this is
 
-A Linux implementation of the macOS image editor [Compositor](https://github.com/robbietilton/Compositor). The upstream app is Swift on AppKit, SwiftUI, CoreImage, Metal and Vision, none of which exist on Linux, so nothing is shared at the source level: this repository reimplements the same feature set in C# on .NET 10, Avalonia 12 and SkiaSharp 3.
+Composa is a from-scratch implementation of the macOS image editor [Compositor](https://github.com/robbietilton/Compositor). The upstream app is Swift on AppKit, SwiftUI, CoreImage, Metal and Vision, none of which are portable, so nothing is shared at the source level: this repository reimplements the same feature set in C# on .NET 10, Avalonia 12 and SkiaSharp 3. It is built and tested on Linux today; Windows and macOS are planned, so keep new code free of platform assumptions.
 
 ## Layout
 
-- `src/Compositor.Core`: everything that is not UI. Document model, compositor, selections, brush engine, filters, adjustments, text layout (`Text/TextLayout`, `Text/TextEditor`), layer effects (`Rendering/LayerEffectsRenderer`), file IO (including the Photoshop reader in `IO/Psd`) and `EditorSession` (every editing command, split into partial files by area). It must never reference Avalonia.
-- `src/Compositor.App`: the Avalonia desktop app. UI is built in C# (no XAML). `CanvasView` owns viewport, overlays and pointer tools (text editing in `CanvasView.Text`, rulers and guides in `CanvasView.Guides`); `LayersPanel` the layer stack and effect rows; `MainWindow.*` the menus, shortcuts (a `Shortcut` table for menu commands and tool keys, rebindable through `ShortcutsDialog`), tabs, options bar and file handling.
-- `tests/Compositor.Core.Tests`: xUnit tests that drive `EditorSession` directly.
-- `tests/Compositor.App.Tests`: Avalonia headless tests with real Skia rendering. They save screenshots to `artifacts/screenshots/` (git-ignored), which is the way to check UI changes visually without a display.
+- `src/Composa.Core`: everything that is not UI. Document model, compositor, selections, brush engine, filters, adjustments, text layout (`Text/TextLayout`, `Text/TextEditor`), layer effects (`Rendering/LayerEffectsRenderer`), file IO (including the Photoshop reader in `IO/Psd`) and `EditorSession` (every editing command, split into partial files by area). It must never reference Avalonia.
+- `src/Composa.App`: the Avalonia desktop app. UI is built in C# (no XAML). `CanvasView` owns viewport, overlays and pointer tools (text editing in `CanvasView.Text`, rulers and guides in `CanvasView.Guides`); `LayersPanel` the layer stack and effect rows; `MainWindow.*` the menus, shortcuts (a `Shortcut` table for menu commands and tool keys, rebindable through `ShortcutsDialog`), tabs, options bar and file handling.
+- `tests/Composa.Core.Tests`: xUnit tests that drive `EditorSession` directly.
+- `tests/Composa.App.Tests`: Avalonia headless tests with real Skia rendering. They save screenshots to `artifacts/screenshots/` (git-ignored), which is the way to check UI changes visually without a display.
 
 ## Rules that keep the editor correct
 
@@ -28,13 +28,13 @@ A Linux implementation of the macOS image editor [Compositor](https://github.com
 - Blend modes Skia cannot draw (`BlendMode.IsCustom`) are composited per pixel by `Rendering/SeparableBlend` from a finished tile sibling, so they take the general path in `RenderUnit`, never the fast raster path. A new mode needs its function there, a display name (the macOS manifest reader matches on it), a key in `PsdImport.Blends` and a place in `BlendModeExtensions.Groups`, which is the menu order.
 - Camera RAW files go through `IO/RawImporter`: ImageMagick (LibRaw) decodes to a 16-bit PAM that `RawImage` parses, and `RawImage.Develop` builds one 16-bit-to-8-bit table per channel. The develop dialog previews from a sampled reduction; the import develops the full frame once, both off the UI thread.
 - Brush Smoothing is a string length in screen points, so `EditorSession.ViewZoom` must be set by the canvas before a stroke starts and while it runs; the first dab always lands, the last one catches up to the pointer on release.
-- The Photoshop reader (`IO/Psd`) is written from Adobe's published Photoshop File Formats Specification and must stay free of code taken from GPL readers. `PsdReader` only parses and decodes; `PsdImport` turns records into layers and the conversion report, and `PsdVector` and `PsdAdjustments` map shapes and adjustments. Photoshop is read, never written. `tests/Compositor.Core.Tests/PsdWriter.cs` builds fixture files and is shared into the app tests by source.
+- The Photoshop reader (`IO/Psd`) is written from Adobe's published Photoshop File Formats Specification and must stay free of code taken from GPL readers. `PsdReader` only parses and decodes; `PsdImport` turns records into layers and the conversion report, and `PsdVector` and `PsdAdjustments` map shapes and adjustments. Photoshop is read, never written. `tests/Composa.Core.Tests/PsdWriter.cs` builds fixture files and is shared into the app tests by source.
 
 ## Commands
 
 ```bash
 dotnet build
 dotnet test
-dotnet run --project src/Compositor.App
+dotnet run --project src/Composa.App
 scripts/publish.sh
 ```

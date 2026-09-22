@@ -1,8 +1,10 @@
-# Compositor for Linux
+# Composa
 
-A layer-based image editor for compositing and retouching, with Photoshop-style tools and shortcuts. It is a native Linux implementation of [Compositor](https://github.com/robbietilton/Compositor), Robbie Tilton's free and open-source macOS app.
+A layer-based image editor for compositing and retouching, with Photoshop-style tools and shortcuts. It is a from-scratch implementation of [Compositor](https://github.com/robbietilton/Compositor), Robbie Tilton's free and open-source macOS app.
 
-The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal and Vision, so it cannot be compiled for Linux. This project rebuilds the same editor from scratch in C# with .NET 10, [Avalonia](https://avaloniaui.net/) and [SkiaSharp](https://github.com/mono/SkiaSharp). It runs on X11 and Wayland (through XWayland).
+The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal and Vision, so it cannot be compiled for anything else. Composa rebuilds the same editor from scratch in C# with .NET 10, [Avalonia](https://avaloniaui.net/) and [SkiaSharp](https://github.com/mono/SkiaSharp), which run on Linux, Windows and macOS alike.
+
+Today Composa is built and tested on Linux only, on X11 and Wayland (through XWayland). Windows and macOS builds are planned; nothing in the code is Linux-specific by design, but neither has been run yet.
 
 > [!IMPORTANT]
 > This entire codebase was created by Claude Code Fable 5.1 in a single prompt. I ran it once and played around with it, but haven't looked at the code at all.
@@ -66,11 +68,11 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
 - Tool settings stick between launches: Auto Select, the transform controls, the pixel grid, rulers, guides, the grid, Snap and the Snap To options keep what you last set them to
-- Autosave for crash recovery: unsaved work is copied to `~/.cache/compositor/recovery` every two minutes and offered back after an unclean exit
+- Autosave for crash recovery: unsaved work is copied to `~/.cache/composa/recovery` every two minutes and offered back after an unclean exit
 
 ## Differences from the macOS app
 
-- Projects are saved as `.compositor` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
+- Projects are saved as `.cmps` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
 - Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent, so busy backgrounds defeat these here.
 - HEIC, AVIF and TIFF open only when ImageMagick (`magick` or `convert`) is installed, because Skia does not decode them itself.
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
@@ -86,25 +88,25 @@ Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool,
 
 ## Requirements
 
-- Linux x64 (arm64 should work by publishing with `scripts/publish.sh linux-arm64`)
+- Linux x64 (arm64 should work by publishing with `scripts/publish.sh linux-arm64`). Windows and macOS are not built yet.
 - To build: the .NET 10 SDK
 - Fontconfig and the usual X11 libraries, present on any desktop distribution
 
 ## Build and run
 
 ```bash
-dotnet run --project src/Compositor.App
+dotnet run --project src/Composa.App
 ```
 
 Open files straight from the command line:
 
 ```bash
-dotnet run --project src/Compositor.App -- photo.jpg project.compositor
+dotnet run --project src/Composa.App -- photo.jpg project.cmps
 ```
 
 ## Install
 
-Build a self-contained release (no .NET needed on the target machine) and install it for your user, with a launcher, icon and the `.compositor` file type:
+Build a self-contained release (no .NET needed on the target machine) and install it for your user, with a launcher, icon and the `.cmps` file type:
 
 ```bash
 scripts/publish.sh
@@ -120,8 +122,8 @@ scripts/install.sh
 dotnet test
 ```
 
-- `tests/Compositor.Core.Tests` drives the editor through `EditorSession`: compositing, selections, every brush mode, healing, filters, canvas operations, project files, the macOS importer, regressions found in review, and a fuzz test that runs thousands of random edits, undos and redos while checking the document stays consistent.
-- `tests/Compositor.App.Tests` runs the real window with Avalonia's headless platform and Skia rendering. Every tool, the layers panel, typing on the canvas, guides and the dialogs are driven with pointer, key and text events, and screenshots of the window and each dialog are written to `artifacts/screenshots/`, which is the way to review UI changes without a display.
+- `tests/Composa.Core.Tests` drives the editor through `EditorSession`: compositing, selections, every brush mode, healing, filters, canvas operations, project files, the macOS importer, regressions found in review, and a fuzz test that runs thousands of random edits, undos and redos while checking the document stays consistent.
+- `tests/Composa.App.Tests` runs the real window with Avalonia's headless platform and Skia rendering. Every tool, the layers panel, typing on the canvas, guides and the dialogs are driven with pointer, key and text events, and screenshots of the window and each dialog are written to `artifacts/screenshots/`, which is the way to review UI changes without a display.
 
 ## Shortcuts
 
