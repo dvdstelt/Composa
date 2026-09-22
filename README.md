@@ -86,34 +86,81 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 
 Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool, Bold and Italic text, Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure, Invert, Black & White and Color Balance adjustments.
 
+## Download
+
+Every release publishes these on the [releases page](https://github.com/dvdstelt/Composa/releases), for x86-64 and arm64. None of them needs .NET installed.
+
+| Format | For | Notes |
+| --- | --- | --- |
+| `.AppImage` | Any distribution | One file, no installation. Mark it executable and run it. |
+| `.deb` | Debian, Ubuntu, Mint, Pop!_OS | Installs the launcher, icons and the `.cmps` file type. |
+| `.rpm` | Fedora, RHEL, openSUSE | As above. |
+| `.tar.gz` | Anything else, or no root | Extract and run `install.sh` for a per-user install. |
+
+Check a download against the `sha256sums.txt` published with it:
+
+```bash
+sha256sum -c sha256sums.txt --ignore-missing
+```
+
+### AppImage
+
+```bash
+chmod +x Composa-*.AppImage && ./Composa-*.AppImage
+```
+
+### Debian, Ubuntu and derivatives
+
+```bash
+sudo apt install ./composa_*_amd64.deb
+```
+
+### Fedora, RHEL and openSUSE
+
+```bash
+sudo dnf install ./composa-*.x86_64.rpm
+```
+
+### Tarball, installed for one user
+
+```bash
+tar xzf composa-*-linux-x64.tar.gz && cd composa-*-linux-x64 && ./install.sh
+```
+
+That installs under `~/.local`, so it needs no root. Set `PREFIX` to install elsewhere.
+
+### ImageMagick
+
+The packages recommend rather than require ImageMagick, because it is needed only to open HEIC, AVIF, TIFF and camera RAW files. Install it if you want those; everything else works without it.
+
 ## Requirements
 
-- Linux x64 (arm64 should work by publishing with `scripts/publish.sh linux-arm64`). Windows and macOS are not built yet.
-- To build: the .NET 10 SDK
-- Fontconfig and the usual X11 libraries, present on any desktop distribution
+- Linux, x86-64 or arm64. Windows and macOS are not built yet.
+- Fontconfig and the usual X11 libraries, present on any desktop distribution. A downloaded build needs nothing else: .NET is bundled.
+- ImageMagick, optionally, to open HEIC, AVIF, TIFF and camera RAW.
+- To build from source: the .NET 10 SDK, plus `rpmbuild` if you want the `.rpm`.
 
-## Build and run
+## Build from source
+
+Build every package for the current architecture:
+```bash
+scripts/package/all.sh
+```
+Or just the portable tarball:
+```bash
+scripts/publish.sh
+```
+
+Run it straight from the checkout while developing:
 
 ```bash
 dotnet run --project src/Composa.App
 ```
 
-Open files straight from the command line:
+Open files from the command line:
 
 ```bash
 dotnet run --project src/Composa.App -- photo.jpg project.cmps
-```
-
-## Install
-
-Build a self-contained release (no .NET needed on the target machine) and install it for your user, with a launcher, icon and the `.cmps` file type:
-
-```bash
-scripts/publish.sh
-```
-
-```bash
-scripts/install.sh
 ```
 
 ## Tests
