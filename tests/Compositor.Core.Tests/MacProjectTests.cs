@@ -38,7 +38,19 @@ public class MacProjectTests
                     "levels": { "channel": "RGB", "ranges": [ { "black": 10, "gamma": 1.2, "white": 240, "outputBlack": 0, "outputWhite": 255 },
                       { "black": 0, "gamma": 1, "white": 255, "outputBlack": 0, "outputWhite": 255 }, { "black": 0, "gamma": 1, "white": 255, "outputBlack": 0, "outputWhite": 255 },
                       { "black": 0, "gamma": 1, "white": 255, "outputBlack": 0, "outputWhite": 255 } ] },
-                    "curves": { "channel": "RGB", "channels": [] } } }
+                    "curves": { "channel": "RGB", "channels": [] } } },
+                { "id": "{{Guid.NewGuid().ToString().ToUpperInvariant()}}", "name": "Balance", "isVisible": true,
+                  "transform": { "origin": [0, 0], "size": [40, 30], "rotation": 0, "flipX": false, "flipY": false, "sampling": "High quality" },
+                  "adjustment": { "kind": "Color Balance", "hue": 0, "saturation": 0, "lightness": 0, "colorize": false,
+                    "colorBalanceSettings": { "shadowCyanRed": 12, "shadowMagentaGreen": 0, "shadowYellowBlue": 0, "midCyanRed": 0, "midMagentaGreen": -8, "midYellowBlue": 0,
+                      "highlightCyanRed": 0, "highlightMagentaGreen": 0, "highlightYellowBlue": 25, "preserveLuminosity": false } } },
+                { "id": "{{Guid.NewGuid().ToString().ToUpperInvariant()}}", "name": "Mono", "isVisible": true,
+                  "transform": { "origin": [0, 0], "size": [40, 30], "rotation": 0, "flipX": false, "flipY": false, "sampling": "High quality" },
+                  "adjustment": { "kind": "Black & White", "hue": 0, "saturation": 0, "lightness": 0, "colorize": false,
+                    "blackWhiteSettings": { "reds": 55, "yellows": 60, "greens": 40, "cyans": 60, "blues": 20, "magentas": 80, "tint": true, "tintHue": 210, "tintSaturation": 15 } } },
+                { "id": "{{Guid.NewGuid().ToString().ToUpperInvariant()}}", "name": "Invert", "isVisible": true,
+                  "transform": { "origin": [0, 0], "size": [40, 30], "rotation": 0, "flipX": false, "flipY": false, "sampling": "High quality" },
+                  "adjustment": { "kind": "Invert", "hue": 0, "saturation": 0, "lightness": 0, "colorize": false } }
               ]
             }
             """);
@@ -46,7 +58,7 @@ public class MacProjectTests
             Assert.True(MacProject.IsProject(folder));
             var document = MacProject.Load(folder);
             Assert.Equal((40, 30, 300d), (document.Width, document.Height, document.Resolution));
-            Assert.Equal(2, document.Layers.Count);
+            Assert.Equal(5, document.Layers.Count);
             var folderLayer = document.Layers[0];
             Assert.True(folderLayer.IsGroup);
             Assert.Equal(["Photo", "Blank"], folderLayer.Children.Select(l => l.Name));
@@ -59,6 +71,11 @@ public class MacProjectTests
             Assert.Equal(BlendMode.LinearDodge, folderLayer.Children[1].Blend);
             var adjustment = Assert.IsType<LevelsAdjustment>(document.Layers[1].Adjustment);
             Assert.Equal(1.2, adjustment.Ranges[0].Gamma);
+            var balance = Assert.IsType<ColorBalanceAdjustment>(document.Layers[2].Adjustment);
+            Assert.Equal((12d, -8d, 25d, false), (balance.Shadows[0], balance.Midtones[1], balance.Highlights[2], balance.PreserveLuminosity));
+            var mono = Assert.IsType<BlackAndWhiteAdjustment>(document.Layers[3].Adjustment);
+            Assert.Equal((55d, true, 210d, 15d), (mono.Reds, mono.Tint, mono.TintHue, mono.TintSaturation));
+            Assert.IsType<InvertAdjustment>(document.Layers[4].Adjustment);
             Assert.Equal(blank, document.ActiveLayerId);
             using var flat = DocumentRenderer.Flatten(document);
             Assert.True(flat.GetPixel(15, 8).Alpha > 0);

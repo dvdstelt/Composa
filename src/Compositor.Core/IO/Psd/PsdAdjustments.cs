@@ -28,6 +28,8 @@ internal static class PsdAdjustments
             if (extra.TryGetValue("brit", out var brightness)) return BrightnessContrast(brightness);
             if (extra.TryGetValue("expA", out var exposure)) return Exposure(exposure);
             if (extra.ContainsKey("nvrt")) { approximate = false; return new InvertAdjustment(); }
+            if (extra.TryGetValue("blnc", out var balance)) { approximate = false; return ColorBalance(balance); }
+            if (extra.TryGetValue("blwh", out var blackWhite)) return BlackAndWhite(blackWhite, out approximate);
         }
         catch (PsdException) { }
         return null;
@@ -114,6 +116,44 @@ internal static class PsdAdjustments
         var cursor = new PsdCursor(data);
         double brightness = cursor.I16(), contrast = cursor.I16();
         return new BrightnessContrastAdjustment { Brightness = Math.Clamp(brightness / 1.5, -100, 100), Contrast = Math.Clamp(contrast, -100, 100) };
+    }
+
+    /// <summary>Nine signed shorts: cyan/red, magenta/green and yellow/blue for the shadows, midtones and highlights, then a preserve luminosity byte.</summary>
+    private static Adjustment? ColorBalance(byte[] data)
+    {
+        if (data.Length < 19) return null;
+        var cursor = new PsdCursor(data);
+        double[] Triple(ref PsdCursor c) => [Math.Clamp((int)c.I16(), -100, 100), Math.Clamp((int)c.I16(), -100, 100), Math.Clamp((int)c.I16(), -100, 100)];
+        var shadows = Triple(ref cursor);
+        var midtones = Triple(ref cursor);
+        var highlights = Triple(ref cursor);
+        return new ColorBalanceAdjustment { Shadows = shadows, Midtones = midtones, Highlights = highlights, PreserveLuminosity = cursor.U8() != 0 };
+    }
+
+    /// <summary>
+    /// A versioned descriptor: the six weights as longs under Photoshop's color keys, <c>useTint</c> and the tint as an
+    /// RGB color. The tint color becomes a hue and saturation here, so it is marked approximate.
+    /// </summary>
+    private static Adjustment? BlackAndWhite(byte[] data, out bool approximate)
+    {
+        approximate = false;
+        var items = PsdDescriptor.ReadVersioned(data);
+        if (items == null) return null;
+        double Weight(string key, double fallback) => Math.Clamp(PsdDescriptor.Number(items, key) ?? fallback, BlackAndWhiteAdjustment.MinWeight, BlackAndWhiteAdjustment.MaxWeight);
+        var result = new BlackAndWhiteAdjustment
+        {
+            Reds = Weight("Rd  ", 40), Yellows = Weight("Yllw", 60), Greens = Weight("Grn ", 40),
+            Cyans = Weight("Cyn ", 60), Blues = Weight("Bl  ", 20), Magentas = Weight("Mgnt", 80),
+            Tint = PsdDescriptor.Flag(items, "useTint") ?? false
+        };
+        if (result.Tint && PsdDescriptor.Color(PsdDescriptor.Child(items, "tintColor")) is { } tint)
+        {
+            approximate = true;
+            var color = new SkiaSharp.SKColor(tint);
+            ColorMath.RgbToHsl(color.Red / 255.0, color.Green / 255.0, color.Blue / 255.0, out var hue, out var saturation, out _);
+            result = result with { TintHue = hue, TintSaturation = Math.Round(saturation * 100) };
+        }
+        return result;
     }
 
     /// <summary>Version, then exposure, offset and gamma as 32-bit floats.</summary>

@@ -115,6 +115,8 @@ public sealed partial class MainWindow
             Item("Hue/Saturation…", () => _ = Adjust(AdjustmentKind.HueSaturation), Key.U, ctrl, () => session!.CanEditPixels),
             Item("Brightness/Contrast…", () => _ = Adjust(AdjustmentKind.BrightnessContrast), enabled: () => session!.CanEditPixels),
             Item("Exposure…", () => _ = Adjust(AdjustmentKind.Exposure), enabled: () => session!.CanEditPixels),
+            Item("Black & White…", () => _ = Adjust(AdjustmentKind.BlackAndWhite), enabled: () => session!.CanEditPixels),
+            Item("Color Balance…", () => _ = Adjust(AdjustmentKind.ColorBalance), enabled: () => session!.CanEditPixels),
             Item("Gradient Map…", () => _ = Adjust(AdjustmentKind.GradientMap), enabled: () => session!.CanEditPixels),
             Item("Grain…", () => _ = Adjust(AdjustmentKind.Grain), enabled: () => session!.CanEditPixels),
             Item("Invert", () => session!.Adjust(new InvertAdjustment()), Key.I, ctrl, () => session!.CanEditPixels),
