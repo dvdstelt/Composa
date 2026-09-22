@@ -209,7 +209,7 @@ public sealed partial class MainWindow
         commands.Add(new Shortcut("Zoom Out (keypad)", "Zoom Out", "Menus", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument, hidden: true));
 
         Top("_Help", Item("Keyboard Shortcuts…", () => _ = ShowShortcuts(), Key.F1, needsDocument: false), Item("About Composa", () => _ = Prompts.Alert(this, "About Composa",
-            "Composa\n\nA layer-based image editor for compositing and retouching, built with .NET, Avalonia and Skia. " +
+            $"Composa {AppInfo.Version}\n\nA layer-based image editor for compositing and retouching, built with .NET, Avalonia and Skia. " +
             "It is a from-scratch implementation of the open-source macOS app Compositor by Robbie Tilton (MIT license)."), needsDocument: false));
         BuildToolKeys();
         ApplyShortcutOverrides();

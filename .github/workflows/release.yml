@@ -1,0 +1,73 @@
+name: Release
+
+# Publishing a release on GitHub is the trigger, and GitHub creates the tag itself, so a release
+# never depends on a tag being pushed from a terminal. MinVer then derives the version from that
+# tag, which is why every checkout below needs the full history.
+on:
+  release:
+    types: [published]
+  workflow_dispatch: # For rehearsing the build without publishing anything.
+
+permissions:
+  contents: write # Needed to attach artifacts to the release.
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false # Never interrupt a release build half-way.
+
+jobs:
+  linux:
+    # 22.04 rather than latest: a self-contained build links against the build machine's glibc, and
+    # 24.04 would produce binaries that refuse to start on Debian 12 or Ubuntu 22.04.
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [linux-x64]
+        # linux-arm64 joins this matrix in Phase 1, built on a ubuntu-22.04-arm runner rather than
+        # cross-compiled, so the packaging tools and the glibc floor behave the same on both.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build tarball
+        run: scripts/publish.sh ${{ matrix.rid }}
+
+      # AppImage, .deb and .rpm are added here in Phase 1, all packed from one staging tree so a
+      # layout bug is fixed once rather than three times.
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: composa-${{ matrix.rid }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+
+  # Windows artifacts arrive in Phase 3 and macOS in Phase 4. They are deliberately absent rather
+  # than stubbed, so a green run means every artifact this workflow claims to build was built.
+
+  publish:
+    needs: [linux]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Collect artifacts and checksum them
+        run: |
+          mkdir -p upload
+          find artifacts -type f -exec mv {} upload/ \;
+          cd upload
+          sha256sum * > sha256sums.txt
+          cat sha256sums.txt
+
+      - name: Attach to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" upload/* --clobber --repo "${{ github.repository }}"
