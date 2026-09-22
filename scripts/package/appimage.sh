@@ -8,15 +8,15 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 RID="${1:?usage: appimage.sh <rid> <staging-dir> <output-dir>}"
-STAGE="${2:?}"
-OUT="${3:?}"
+STAGE="$(abspath "${2:?}")"
+OUT="$(ensure_dir "${3:?}")"
 VERSION="$(app_version)"
 ARCH="$(rpm_arch "$RID")" # AppImage spells architectures the way rpm does.
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 APPDIR="$WORK/$APP_NAME.AppDir"
-mkdir -p "$APPDIR" "$OUT"
+mkdir -p "$APPDIR"
 
 cp -a "$STAGE"/. "$APPDIR"/
 

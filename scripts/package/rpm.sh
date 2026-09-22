@@ -6,14 +6,14 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 RID="${1:?usage: rpm.sh <rid> <staging-dir> <output-dir>}"
-STAGE="$(cd "${2:?}" && pwd)"
-OUT="${3:?}"
+STAGE="$(abspath "${2:?}")"
+OUT="$(ensure_dir "${3:?}")"
 VERSION="$(app_version)"
 ARCH="$(rpm_arch "$RID")"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-mkdir -p "$WORK"/{BUILD,RPMS,SPECS} "$OUT"
+mkdir -p "$WORK"/{BUILD,RPMS,SPECS}
 
 cat > "$WORK/SPECS/$APP.spec" <<SPEC
 # The payload is an already-published self-contained build, so none of RPM's post-processing

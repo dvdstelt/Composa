@@ -11,8 +11,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$HERE/common.sh"
 
 RID="${1:-linux-x64}"
-OUT="${2:-$BUILD}"
-mkdir -p "$OUT"
+OUT="$(ensure_dir "${2:-$BUILD}")"
 STAGE="$(mktemp -d)"
 trap 'rm -rf "$STAGE"' EXIT
 

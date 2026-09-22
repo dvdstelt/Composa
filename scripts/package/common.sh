@@ -52,3 +52,13 @@ app_version() {
 deb_version() { echo "${1/-/\~}"; }
 rpm_version() { echo "${1%%-*}"; }
 rpm_release() { case "$1" in *-*) echo "0.${1#*-}" ;; *) echo 1 ;; esac; }
+
+# Paths given on the command line may be relative, and several of these scripts cd elsewhere before
+# using them. Resolving once up front is the difference between writing the package where it was
+# asked for and writing it into whatever directory happened to be current.
+abspath() {
+  cd "$1" 2>/dev/null && pwd || { echo "common.sh: no such directory: $1" >&2; return 1; }
+}
+
+# For an output directory, which may not exist yet.
+ensure_dir() { mkdir -p "$1" && abspath "$1"; }
