@@ -3,6 +3,7 @@
     <OutputType>WinExe</OutputType>
     <AssemblyName>composa</AssemblyName>
     <RootNamespace>Composa.App</RootNamespace>
+    <ApplicationIcon>../../packaging/icons/composa.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <ItemGroup>
