@@ -343,6 +343,14 @@ public sealed partial class MainWindow
         finally { Cursor = previous; }
     }
 
+    private async Task<T> Busy<T>(Func<Task<T>> action)
+    {
+        var previous = Cursor;
+        Cursor = new Cursor(StandardCursorType.Wait);
+        try { return await action(); }
+        finally { Cursor = previous; }
+    }
+
     private void OnSessionLayersChanged()
     {
         if (session?.Tool != Tool.Move) return;
@@ -408,8 +416,10 @@ public sealed partial class MainWindow
     // ---- Files --------------------------------------------------------------------------------------------------
 
     private static readonly FilePickerFileType ProjectType = new("Compositor project") { Patterns = ["*" + ProjectFile.Extension] };
-    private static readonly FilePickerFileType ImageType = new("Images") { Patterns = ImageFiles.ImportExtensions.Select(e => "*" + e).ToArray() };
-    private static readonly FilePickerFileType AnyOpenable = new("Projects and images") { Patterns = ImageFiles.ImportExtensions.Select(e => "*" + e).Append("*" + ProjectFile.Extension).ToArray() };
+    private static readonly string[] ImageExtensions = [.. ImageFiles.ImportExtensions, .. RawImporter.Extensions];
+    private static readonly FilePickerFileType ImageType = new("Images") { Patterns = ImageExtensions.Select(e => "*" + e).ToArray() };
+    private static readonly FilePickerFileType RawType = new("Camera RAW") { Patterns = RawImporter.Extensions.Select(e => "*" + e).ToArray() };
+    private static readonly FilePickerFileType AnyOpenable = new("Projects and images") { Patterns = ImageExtensions.Select(e => "*" + e).Append("*" + ProjectFile.Extension).ToArray() };
 
     private async Task NewCanvas()
     {
@@ -419,7 +429,7 @@ public sealed partial class MainWindow
 
     private async Task Open()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType, RawType] });
         await OpenPaths(files.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
@@ -450,7 +460,8 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var pixels = ImageFiles.Load(path);
+                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path) : ImageFiles.Load(path);
+                    if (pixels == null) continue;
                     var document = new Document(pixels.Width, pixels.Height);
                     var layer = Layer.Raster(Path.GetFileNameWithoutExtension(path), pixels);
                     document.Layers.Add(layer);
@@ -492,11 +503,29 @@ public sealed partial class MainWindow
                     if (target != session) { import.Discard(); continue; }
                     session.PlacePhotoshop(import, name, at);
                 }
+                else if (RawImporter.IsRaw(path))
+                {
+                    var target = session;
+                    if (await DevelopRaw(path) is not { } developed) continue;
+                    if (target != session) { developed.Dispose(); continue; }
+                    session.AddImageLayer(name, developed, at);
+                }
                 else session.AddImageLayer(name, ImageFiles.Load(path), at);
             }
             catch (Exception error) { _ = Prompts.Alert(this, "Import couldn't finish", error.Message); }
         }
         SelectTool(Tool.Move);
+    }
+
+    /// <summary>
+    /// Decodes a camera RAW file off the UI thread, puts the develop sheet up and develops the full frame with what was
+    /// chosen. Null means the import was cancelled.
+    /// </summary>
+    private async Task<SKBitmap?> DevelopRaw(string path)
+    {
+        var raw = await Busy(() => Task.Run(() => RawImporter.Decode(path)));
+        if (await RawDevelopDialog.Show(this, Path.GetFileName(path), raw) is not { } settings) return null;
+        return await Busy(() => Task.Run(() => raw.Develop(settings)));
     }
 
     /// <summary>Reads a Photoshop file and, when anything has to be converted, asks before going on. Null means the user declined.</summary>

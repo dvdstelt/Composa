@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Compositor.App.Dialogs;
 using Compositor.Filters;
 using SkiaSharp;
@@ -49,6 +50,36 @@ public class DialogTests
         Capture(window, "17-image-size");
         _ = Prompts.Color(window, "Foreground Color", new SKColor(0x20, 0xC0, 0xFF));
         Capture(window, "18-color");
+        _ = AdjustmentDialogs.Edit(window, new BlackAndWhiteAdjustment { Tint = true }, _ => { }, histogram, SKColors.Black, SKColors.White);
+        Capture(window, "27-black-white");
+        _ = AdjustmentDialogs.Edit(window, new ColorBalanceAdjustment(), _ => { }, histogram, SKColors.Black, SKColors.White);
+        Capture(window, "28-color-balance");
+    }
+
+    [AvaloniaFact]
+    public void Raw_develop_dialog_previews_the_frame_and_returns_the_settings()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var samples = new ushort[320 * 200 * 3];
+        for (var y = 0; y < 200; y++) for (var x = 0; x < 320; x++)
+        {
+            var i = (y * 320 + x) * 3;
+            samples[i] = (ushort)(x * 204); samples[i + 1] = (ushort)(y * 327); samples[i + 2] = (ushort)(65535 - x * 204);
+        }
+        var raw = new Compositor.IO.RawImage(320, 200, samples);
+        var task = RawDevelopDialog.Show(window, "IMG_0001.CR2", raw);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = window.OwnedWindows.Last();
+        // The preview develops on a worker; give it time to land.
+        for (var i = 0; i < 50 && dialog.GetVisualDescendants().OfType<Image>().First().Source == null; i++) { Thread.Sleep(20); Dispatcher.UIThread.RunJobs(); }
+        var image = dialog.GetVisualDescendants().OfType<Image>().First();
+        Assert.NotNull(image.Source);
+        var exposure = dialog.GetVisualDescendants().OfType<Slider>().First();
+        exposure.Value = 1.5;
+        Dispatcher.UIThread.RunJobs();
+        Capture(window, "29-raw-develop");
+        Assert.Null(task.Result); // Capture closes the dialog, which counts as Cancel.
     }
 }
 
