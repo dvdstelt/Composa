@@ -12,6 +12,26 @@ public class PsdTests
 {
     private static PsdImport Load(PsdWriter writer) => PsdImport.Load(writer.Build());
 
+    [Theory]
+    [InlineData("lbrn", BlendMode.LinearBurn)]
+    [InlineData("lddg", BlendMode.LinearDodge)]
+    [InlineData("vLit", BlendMode.VividLight)]
+    [InlineData("lLit", BlendMode.LinearLight)]
+    [InlineData("pLit", BlendMode.PinLight)]
+    [InlineData("hMix", BlendMode.HardMix)]
+    [InlineData("fsub", BlendMode.Subtract)]
+    [InlineData("fdiv", BlendMode.Divide)]
+    [InlineData("hLit", BlendMode.HardLight)]
+    public void Photoshops_remaining_blend_modes_keep_their_mode(string key, BlendMode expected)
+    {
+        var writer = new PsdWriter { Width = 10, Height = 10 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Background", Image = Solid(10, 10, SKColors.Red) });
+        writer.Layers.Add(new PsdWriterLayer { Name = "Blended", Image = Solid(10, 10, SKColors.Blue), Blend = key });
+        var import = Load(writer);
+        Assert.Equal(expected, import.Layers[1].Blend);
+        Assert.Empty(import.Conversions);
+    }
+
     [Fact]
     public void Layers_folders_names_visibility_opacity_and_blend_modes_come_across()
     {
@@ -20,7 +40,7 @@ public class PsdTests
         writer.Layers.Add(new PsdWriterLayer { Name = "</Layer group>", EmptyWidth = 0 }.With("lsct", PsdWriter.Section(3)));
         writer.Layers.Add(new PsdWriterLayer { Name = "Child", Image = Solid(20, 20, SKColors.Blue), Left = 10, Top = 10, Opacity = 128, Blend = "mul " }.With("iOpa", PsdWriter.FillOpacity(128)));
         writer.Layers.Add(new PsdWriterLayer { Name = "Folder", Opacity = 200, Blend = "pass" }.With("lsct", PsdWriter.Section(1)));
-        writer.Layers.Add(new PsdWriterLayer { Name = "Old name", Image = Solid(5, 5, SKColors.Green), Left = 50, Top = 50, Hidden = true, Blend = "lbrn" }.With("luni", PsdWriter.Unicode("Ünïcode ✓")));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Old name", Image = Solid(5, 5, SKColors.Green), Left = 50, Top = 50, Hidden = true, Blend = "diss" }.With("luni", PsdWriter.Unicode("Ünïcode ✓")));
 
         var import = Load(writer);
         Assert.Equal((100, 80, 300d), (import.Width, import.Height, import.Resolution));
@@ -39,7 +59,7 @@ public class PsdTests
         Assert.Equal(BlendMode.Normal, top.Blend);
         var conversion = Assert.Single(import.Conversions);
         Assert.Equal("Ünïcode ✓", conversion.LayerName);
-        Assert.Contains("lbrn", conversion.Message);
+        Assert.Contains("diss", conversion.Message);
 
         var document = import.ToDocument();
         Assert.Equal(top.Id, document.ActiveLayerId);

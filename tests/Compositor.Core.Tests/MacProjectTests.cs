@@ -28,7 +28,7 @@ public class MacProjectTests
                   "opacity": 0.5, "blendMode": "Color Dodge",
                   "transform": { "origin": [10, 5], "size": [20, 10], "rotation": 0, "flipX": true, "flipY": false, "sampling": "High quality" } },
                 { "id": "{{blank.ToString().ToUpperInvariant()}}", "name": "Blank", "isVisible": false, "parentID": "{{group.ToString().ToUpperInvariant()}}",
-                  "maskSourceID": "{{photo.ToString().ToUpperInvariant()}}",
+                  "blendMode": "Linear Dodge (Add)", "maskSourceID": "{{photo.ToString().ToUpperInvariant()}}",
                   "transform": { "origin": [0, 0], "size": [40, 30], "rotation": 0, "flipX": false, "flipY": false, "sampling": "High quality" } },
                 { "id": "{{group.ToString().ToUpperInvariant()}}", "name": "Folder", "isVisible": true, "isGroup": true,
                   "transform": { "origin": [0, 0], "size": [40, 30], "rotation": 0, "flipX": false, "flipY": false, "sampling": "High quality" } },
@@ -56,6 +56,7 @@ public class MacProjectTests
             Assert.Equal((20, 10), (loadedPhoto.Mask!.Width, loadedPhoto.Mask.Height));
             Assert.True(folderLayer.Children[1].Clipped);
             Assert.False(folderLayer.Children[1].Visible);
+            Assert.Equal(BlendMode.LinearDodge, folderLayer.Children[1].Blend);
             var adjustment = Assert.IsType<LevelsAdjustment>(document.Layers[1].Adjustment);
             Assert.Equal(1.2, adjustment.Ranges[0].Gamma);
             Assert.Equal(blank, document.ActiveLayerId);

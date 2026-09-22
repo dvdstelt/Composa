@@ -163,14 +163,7 @@ public static class MacProject
         return (0, 0);
     }
 
-    private static BlendMode ReadBlend(string? name) => name switch
-    {
-        "Multiply" => BlendMode.Multiply, "Screen" => BlendMode.Screen, "Overlay" => BlendMode.Overlay, "Darken" => BlendMode.Darken,
-        "Lighten" => BlendMode.Lighten, "Difference" => BlendMode.Difference, "Color Dodge" => BlendMode.ColorDodge, "Color Burn" => BlendMode.ColorBurn,
-        "Soft Light" => BlendMode.SoftLight, "Hard Light" => BlendMode.HardLight, "Exclusion" => BlendMode.Exclusion,
-        "Hue" => BlendMode.Hue, "Saturation" => BlendMode.Saturation, "Color" => BlendMode.Color, "Luminosity" => BlendMode.Luminosity,
-        _ => BlendMode.Normal
-    };
+    private static BlendMode ReadBlend(string? name) => BlendModeExtensions.FromDisplayName(name);
 
     private static ShapeStyle ReadShape(JsonElement shape)
     {

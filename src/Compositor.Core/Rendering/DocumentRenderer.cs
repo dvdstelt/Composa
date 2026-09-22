@@ -150,7 +150,7 @@ public static class DocumentRenderer
             RenderNodes(layer.Children, tile, options); // Pass-through folder.
             return;
         }
-        if (layer.Kind == LayerKind.Raster && !hasMask && clipped.Count == 0)
+        if (layer.Kind == LayerKind.Raster && !hasMask && clipped.Count == 0 && !layer.Blend.IsCustom())
         {
             DrawPixels(layer, tile.Canvas, layer.Opacity, layer.Blend, effects);
             return;
@@ -192,6 +192,7 @@ public static class DocumentRenderer
                 else DrawPixels(top, over.Canvas, 1, BlendMode.Normal, topEffects);
                 if (top.Mask != null && top.MaskEnabled && topEffects == null) MultiplyByMask(top, over);
                 over.Canvas.Flush();
+                if (top.Blend.IsCustom()) { content.Canvas.Flush(); SeparableBlend.Composite(content.Bitmap, over.Bitmap, top.Blend, top.Opacity); continue; }
                 using var blend = new SKPaint { BlendMode = top.Blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(top.Opacity)) };
                 content.DrawRaw(over.Bitmap, blend);
             }
@@ -200,6 +201,13 @@ public static class DocumentRenderer
         }
 
         content.Canvas.Flush();
+        if (layer.Blend.IsCustom())
+        {
+            // Skia has no equivalent for these modes, so the layer's finished content is combined by hand.
+            tile.Canvas.Flush();
+            SeparableBlend.Composite(tile.Bitmap, content.Bitmap, layer.Blend, layer.Opacity);
+            return;
+        }
         using var paint = new SKPaint { BlendMode = layer.Blend.ToSkia(), Color = SKColors.White.WithAlpha(ToByte(layer.Opacity)) };
         tile.DrawRaw(content.Bitmap, paint);
     }

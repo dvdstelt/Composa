@@ -49,6 +49,9 @@ public sealed class LayersPanel : UserControl
     /// <summary>The footer's effects menu: add an effect to the active layer.</summary>
     public event Action<LayerEffectKind>? NewEffectRequested;
 
+    /// <summary>The blend mode at each index of the blend menu; null for the lines between groups.</summary>
+    private readonly List<BlendMode?> blendAt = [];
+
     // An effect row being Alt-dragged onto another layer.
     private (Layer Layer, LayerEffectKind Kind)? effectDrag;
     private Point effectDragStart;
@@ -58,12 +61,19 @@ public sealed class LayersPanel : UserControl
 
     public LayersPanel()
     {
-        var modes = Enum.GetValues<BlendMode>();
-        blend = new ComboBox { ItemsSource = modes.Select(m => m.DisplayName()).ToList(), HorizontalAlignment = HorizontalAlignment.Stretch };
+        // Grouped as Photoshop groups them (darkening, lightening, contrast, comparative, component) with a line between,
+        // so the long list stays readable. The lines are disabled items, which the keyboard and the pointer skip.
+        var items = new List<object>();
+        for (var group = 0; group < BlendModeExtensions.Groups.Length; group++)
+        {
+            if (group > 0) { items.Add(new ComboBoxItem { Content = Ui.Separator(false), IsEnabled = false, Padding = new Thickness(0, 4), MinHeight = 0 }); blendAt.Add(null); }
+            foreach (var mode in BlendModeExtensions.Groups[group]) { items.Add(new ComboBoxItem { Content = mode.DisplayName() }); blendAt.Add(mode); }
+        }
+        blend = new ComboBox { ItemsSource = items, HorizontalAlignment = HorizontalAlignment.Stretch };
         blend.SelectionChanged += (_, _) =>
         {
-            if (updating || session?.ActiveLayer is not { } layer || blend.SelectedIndex < 0) return;
-            foreach (var target in session.SelectedRoots()) session.SetBlend(target, modes[blend.SelectedIndex]);
+            if (updating || session?.ActiveLayer is not { } layer || blend.SelectedIndex < 0 || blendAt[blend.SelectedIndex] is not { } mode) return;
+            foreach (var target in session.SelectedRoots()) session.SetBlend(target, mode);
         };
         opacity = new Slider { Minimum = 0, Maximum = 100, Value = 100, VerticalAlignment = VerticalAlignment.Center };
         opacity.ValueChanged += (_, e) =>
@@ -209,7 +219,7 @@ public sealed class LayersPanel : UserControl
         updating = true;
         var active = session?.ActiveLayer;
         blend.IsEnabled = opacity.IsEnabled = active != null;
-        blend.SelectedIndex = active != null ? (int)active.Blend : 0;
+        blend.SelectedIndex = blendAt.IndexOf(active?.Blend ?? BlendMode.Normal);
         if (!opacityDragging) opacity.Value = (active?.Opacity ?? 1) * 100;
         opacityText.Text = $"{Math.Round(opacity.Value)}%";
         updating = false;
