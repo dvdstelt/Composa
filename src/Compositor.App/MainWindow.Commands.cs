@@ -9,6 +9,7 @@ using Compositor.App.Dialogs;
 using Compositor.Editing;
 using Compositor.Filters;
 using Compositor.IO;
+using Compositor.IO.Psd;
 using Compositor.Model;
 using Compositor.Rendering;
 using SkiaSharp;
@@ -307,7 +308,7 @@ public sealed partial class MainWindow
             foreach (var path in settings.RecentFiles.Where(p => File.Exists(p) || Directory.Exists(p)))
             {
                 var item = new MenuItem { Header = path.Replace("_", "__") };
-                item.Click += (_, _) => OpenPaths([path]);
+                item.Click += (_, _) => _ = OpenPaths([path]);
                 recentMenu.Items.Add(item);
             }
             recentMenu.IsEnabled = recentMenu.Items.Count > 0;
@@ -362,6 +363,9 @@ public sealed partial class MainWindow
         if (focused is Control control && control.FindAncestorOfType<MenuItem>() != null) return;
 
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
+        // While text is being typed, letters are text, not tool keys or shortcuts; the key stays unhandled so the
+        // platform still delivers the character.
+        if (session?.IsEditingText == true) return;
         if (canvas.IsDragging) { e.Handled = true; return; }
 
         var gesture = commands.FirstOrDefault(c => c.Matches(e));
@@ -413,18 +417,24 @@ public sealed partial class MainWindow
     private async Task Open()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType] });
-        OpenPaths(files.Select(f => f.TryGetLocalPath()).OfType<string>());
+        await OpenPaths(files.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
     /// <summary>Opens projects in tabs and images as new documents.</summary>
-    public void OpenPaths(IEnumerable<string> paths)
+    public async Task OpenPaths(IEnumerable<string> paths)
     {
         foreach (var path in paths)
         {
             try
             {
                 if (sessions.FirstOrDefault(s => s.FilePath == path) is { } open) { SetSession(open); continue; }
-                if (MacProject.IsProject(path))
+                if (PsdImport.IsPsd(path))
+                {
+                    // Photoshop files open as unsaved documents; what had to be converted is shown before anything is applied.
+                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    AddSession(EditorSession.OpenPhotoshop(import, Path.GetFileNameWithoutExtension(path)));
+                }
+                else if (MacProject.IsProject(path))
                 {
                     // Projects from the macOS app open as unsaved documents; saving writes this app's own format.
                     AddSession(new EditorSession(MacProject.Load(path)) { SuggestedName = Path.GetFileNameWithoutExtension(path.TrimEnd(Path.DirectorySeparatorChar)) });
@@ -453,24 +463,46 @@ public sealed partial class MainWindow
     private async Task OpenMacProject()
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Open macOS Compositor Project (.comp folder)" });
-        OpenPaths(folders.Select(f => f.TryGetLocalPath()).OfType<string>());
+        await OpenPaths(folders.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
     private async Task PlaceImages()
     {
         var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Place Images as Layers", AllowMultiple = true, FileTypeFilter = [ImageType] });
-        PlacePaths(files.Select(f => f.TryGetLocalPath()).OfType<string>(), null);
+        await PlacePaths(files.Select(f => f.TryGetLocalPath()).OfType<string>(), null);
     }
 
-    private void PlacePaths(IEnumerable<string> paths, SKPoint? at)
+    /// <summary>Adds images (and Photoshop files, inside a folder each) to the current document as layers, centered on <paramref name="at"/> when given.</summary>
+    public async Task PlacePaths(IEnumerable<string> paths, SKPoint? at)
     {
         if (session == null) return;
         foreach (var path in paths)
         {
-            try { session.AddImageLayer(Path.GetFileNameWithoutExtension(path), ImageFiles.Load(path), at); }
+            try
+            {
+                var name = Path.GetFileNameWithoutExtension(path);
+                if (PsdImport.IsPsd(path))
+                {
+                    // Into an existing document, a Photoshop file's layers arrive inside a folder named after it.
+                    var target = session;
+                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    if (target != session) { import.Discard(); continue; }
+                    session.PlacePhotoshop(import, name, at);
+                }
+                else session.AddImageLayer(name, ImageFiles.Load(path), at);
+            }
             catch (Exception error) { _ = Prompts.Alert(this, "Import couldn't finish", error.Message); }
         }
         SelectTool(Tool.Move);
+    }
+
+    /// <summary>Reads a Photoshop file and, when anything has to be converted, asks before going on. Null means the user declined.</summary>
+    private async Task<PsdImport?> ImportPhotoshop(string path)
+    {
+        var import = await Task.Run(() => PsdImport.Load(path));
+        if (import.Conversions.Count == 0 || await PsdConversionDialog.Confirm(this, Path.GetFileName(path), import.Conversions)) return import;
+        import.Discard();
+        return null;
     }
 
     private void OnDrop(object? sender, DragEventArgs e)
@@ -479,13 +511,13 @@ public sealed partial class MainWindow
         if (paths.Count == 0) return;
         var projects = paths.Where(p => MacProject.IsProject(p) || Path.GetExtension(p).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)).ToList();
         var images = paths.Except(projects).ToList();
-        OpenPaths(projects);
-        if (session == null || projects.Count > 0) OpenPaths(images);
+        _ = OpenPaths(projects);
+        if (session == null || projects.Count > 0) _ = OpenPaths(images);
         else
         {
             var position = e.GetPosition(canvas);
             var inside = position.X >= 0 && position.Y >= 0 && position.X <= canvas.Bounds.Width && position.Y <= canvas.Bounds.Height;
-            PlacePaths(images, inside ? canvas.ToDocument(position) : null);
+            _ = PlacePaths(images, inside ? canvas.ToDocument(position) : null);
         }
     }
 

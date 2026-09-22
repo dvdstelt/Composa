@@ -65,6 +65,27 @@ public class LayerEffectsTests
     }
 
     [Fact]
+    public void Outer_glow_lights_every_side_and_stays_out_of_the_pixels()
+    {
+        var (session, layer) = RedBoxOnWhite();
+        Assert.True(session.AddEffect(layer, LayerEffectKind.OuterGlow));
+        Assert.Equal(0xFFFFFFFFu, layer.Effects!.OuterGlow!.Color);        // White by default, as Photoshop's is.
+        session.SetEffects(layer, new LayerEffects { OuterGlow = new OuterGlowEffect { Size = 10, Color = 0xFF0000FF, Opacity = 1 } });
+        var flat = session.Composite();
+        AssertColor(SKColors.Red, flat.GetPixel(60, 60));                 // The pixels themselves are untouched.
+        foreach (var (x, y) in new[] { (60, 37), (60, 82), (37, 60), (82, 60) })
+        {
+            var glow = flat.GetPixel(x, y);                                // Just outside each edge: blue over white.
+            Assert.True(glow.Blue > 200 && glow.Red < 200, $"Expected a blue glow at {x},{y} but found {glow}");
+        }
+        AssertColor(SKColors.White, flat.GetPixel(60, 12));               // Well beyond its reach.
+        Assert.True(layer.VisibleBounds.Top < layer.Bounds.Top);
+        Assert.Equal("Add Outer Glow", session.History.UndoName);
+        session.SetEffects(layer, new LayerEffects { OuterGlow = new OuterGlowEffect { Size = 10, Color = 0xFF0000FF, Opacity = 1, Enabled = false } });
+        AssertColor(SKColors.White, session.Composite().GetPixel(60, 37));
+    }
+
+    [Fact]
     public void Effects_follow_the_mask_and_the_transform()
     {
         var (session, layer) = RedBoxOnWhite();
@@ -122,7 +143,8 @@ public class LayerEffectsTests
         {
             Stroke = new StrokeEffect { Size = 5, Color = 0xFF00FF00, Inside = true, Enabled = false },
             Shadow = new ShadowEffect { Angle = 45, Distance = 12, Blur = 6, Opacity = 0.7, Color = 0xFF102030 },
-            ColorOverlay = new ColorOverlayEffect { Color = 0xFFFF00FF, Opacity = 0.4 }
+            ColorOverlay = new ColorOverlayEffect { Color = 0xFFFF00FF, Opacity = 0.4 },
+            OuterGlow = new OuterGlowEffect { Size = 9, Color = 0xFFFFEE00, Opacity = 0.8 }
         });
         using var stream = new MemoryStream();
         ProjectFile.Write(session.Document, stream);
@@ -156,7 +178,8 @@ public class LayerEffectsTests
                         {
                             stroke = new { size = 3.0, red = 0.0, green = 1.0, blue = 0.0, opacity = 1.0, inside = false },
                             shadow = new { enabled = false, angle = 120.0, distance = 8.0, blur = 4.0, red = 0.0, green = 0.0, blue = 0.0, opacity = 0.5 },
-                            innerShadow = new { angle = 90.0, distance = 3.0, blur = 2.0, red = 1.0, green = 0.0, blue = 0.0, opacity = 0.6 }
+                            innerShadow = new { angle = 90.0, distance = 3.0, blur = 2.0, red = 1.0, green = 0.0, blue = 0.0, opacity = 0.6 },
+                            outerGlow = new { size = 14.0, red = 1.0, green = 1.0, blue = 0.0, opacity = 0.9 }
                         }
                     }
                 }
@@ -170,6 +193,7 @@ public class LayerEffectsTests
             Assert.Equal(120, effects.Shadow.Angle);
             Assert.Equal(0.6, effects.InnerShadow!.Opacity, 3);
             Assert.Null(effects.ColorOverlay);
+            Assert.Equal((14d, 0xFFFFFF00u, 0.9), (effects.OuterGlow!.Size, effects.OuterGlow.Color, effects.OuterGlow.Opacity));
         }
         finally { Directory.Delete(folder, recursive: true); }
     }
@@ -183,5 +207,6 @@ public class LayerEffectsTests
         Assert.Equal(0, new LayerEffects { Stroke = new StrokeEffect { Size = 10, Enabled = false } }.Margin());
         Assert.Equal(20 + 30 + 2, new LayerEffects { Shadow = new ShadowEffect { Distance = 20, Blur = 10 } }.Margin());
         Assert.Equal(2, new LayerEffects { ColorOverlay = new ColorOverlayEffect() }.Margin());
+        Assert.Equal(30 + 2, new LayerEffects { OuterGlow = new OuterGlowEffect { Size = 20 } }.Margin());
     }
 }

@@ -147,7 +147,8 @@ public sealed partial class CanvasView
             steps.Add(canvas => DrawCrosshair(canvas, p, hair));
         }
 
-        if (IsBrushTool && cursorInside && !spaceDown && drag is Drag.None or Drag.Stroke)
+        // With Ctrl held the pointer is about to move a layer, so the brush outline gives way to the move cursor.
+        if (IsBrushTool && cursorInside && !spaceDown && !controlHover && !temporaryMove && drag is Drag.None or Drag.Stroke)
         {
             var center = view.MapPoint(currentDocument);
             var radius = (float)(session.Brush.Size / 2 * UnitsPerPixel);

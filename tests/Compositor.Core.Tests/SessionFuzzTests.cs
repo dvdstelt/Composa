@@ -67,7 +67,7 @@ public class SessionFuzzTests
             ("effects", () =>
             {
                 if (Any() is not { Pixels: not null } l) return;
-                var kind = (LayerEffectKind)random.Next(4);
+                var kind = (LayerEffectKind)random.Next(5);
                 switch (random.Next(4))
                 {
                     case 0: session.AddEffect(l, kind); break;

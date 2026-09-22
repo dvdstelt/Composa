@@ -13,7 +13,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 
 ### Layers
 - Layers and folders with 16 blend modes and opacity
-- Layer effects: Stroke (outside or inside), Drop Shadow, Color Overlay and Inner Shadow, each switchable, editable with a live preview and copied between layers by Alt-dragging
+- Layer effects: Stroke (outside or inside), Drop Shadow, Outer Glow, Color Overlay and Inner Shadow, each switchable, editable with a live preview and copied between layers by Alt-dragging
 - Layer masks on layers, folders and adjustment layers: paint, fill, gradient, invert, blur, apply, disable
 - Clipping masks (Alt-click a layer, or Ctrl+Alt+G)
 - Adjustment layers: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Brightness/Contrast, Invert
@@ -24,6 +24,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 ### Transform
 - Non-destructive move, scale, rotate and flip: images keep their full resolution however small you make them
 - Free distort by Ctrl-dragging a corner
+- Ctrl-drag moves the current layer with any tool active, as Photoshop's temporary Move tool does
 - Transform several layers, or a whole folder, together
 - Snapping to canvas and layer edges and centers, with guides
 - Exact values for position, size and angle; arrow keys nudge (Shift for 10 px)
@@ -37,7 +38,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Content-Aware Fill, which can also extend an image past its edges
 
 ### Painting and retouching
-- Brush and Eraser with size, hardness and stroke-level opacity; Shift-click for straight lines
+- Brush and Eraser with size, hardness, stroke-level opacity and Smoothing, which trails the pointer so a shaky hand still draws a smooth line; Shift-click for straight lines
 - Spot Healing Brush (content-aware)
 - Clone Stamp, aligned or not, sampling one layer or all of them
 - Smear tool: Liquify (push), Blur, Smudge, Dodge and Burn
@@ -58,6 +59,7 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Canvas Size, Image Size, and quarter-turn rotation of the canvas or of single layers
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
 - Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
+- Open Photoshop files: layers, folders, masks, clipping, opacity, blend modes, solid fill shapes and adjustments come in editable, and a report lists everything that has to be converted before anything is applied; dropped onto an open document, a Photoshop file arrives inside a folder
 - Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
 - Autosave for crash recovery: unsaved work is copied to `~/.cache/compositor/recovery` every two minutes and offered back after an unclean exit
@@ -72,9 +74,10 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
 - Point text grows from the edge its alignment reads from (right-aligned text grows leftward); the macOS app keeps the top-left corner.
 - Layer effects are drawn on the CPU from a cached image; while a brush stroke is in progress they follow the pixels the stroke started from and catch up when it ends.
+- Photoshop files are opened, never written. Text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` files open (no PSB, CMYK or 16-bit).
 - There is no auto-update.
 
-Beyond the macOS app, this version adds Bold and Italic text, more blend modes (Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery.
+Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool, Bold and Italic text, more blend modes (Hard Light, Exclusion), Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure and Invert adjustments.
 
 ## Requirements
 
@@ -123,6 +126,7 @@ dotnet test
 | B E J S R | Brush, Eraser, Spot Healing, Clone Stamp, Smear |
 | G U T I H Z | Gradient, Shape, Type, Eyedropper, Hand, Zoom |
 | Tab | Switch the current tool's mode (Wand/Object, Paint/Erase, the shape, and so on) |
+| Ctrl+drag | Move the current layer with any tool |
 | Space, Ctrl+wheel | Pan, zoom at the cursor |
 | Ctrl+0, Ctrl+1 | Fit canvas, actual pixels |
 | [ ] and { } | Brush size and hardness |

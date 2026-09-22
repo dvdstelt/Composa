@@ -152,6 +152,74 @@ public class ToolInputTests
     }
 
     [AvaloniaFact]
+    public void Ctrl_drag_moves_the_layer_with_any_tool_and_leaves_the_other_ctrl_drags_alone()
+    {
+        var box = Rendering.Pixels.NewColor(100, 100);
+        box.Erase(SKColors.Red);
+        var layer = session.AddImageLayer("box", box, new SKPoint(300, 200));
+        var blue = Rendering.Pixels.NewColor(40, 40);
+        blue.Erase(SKColors.Blue);
+        var other = session.AddImageLayer("other", blue, new SKPoint(500, 100));
+        session.SelectLayer(layer.Id);
+        window.SelectTool(Tool.Brush);
+        session.Brush = session.Brush with { Size = 10, Hardness = 1 };
+        Dispatcher.UIThread.RunJobs();
+
+        // Pressing Ctrl over the canvas promises a move with the four-way arrow at once, before the pointer moves;
+        // letting go brings the brush cursor back.
+        window.MouseMove(At(300, 200), RawInputModifiers.None);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
+        window.KeyPressQwerty(PhysicalKey.ControlLeft, RawInputModifiers.None);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.KeyReleaseQwerty(PhysicalKey.ControlLeft, RawInputModifiers.Control);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
+        window.MouseMove(At(300, 200), RawInputModifiers.Control);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.MouseMove(At(302, 200), RawInputModifiers.None);
+        Assert.Equal("None", window.Canvas.Cursor?.ToString());
+
+        // With the Brush: the layer moves, nothing is painted, and the tool stays the Brush.
+        Drag(new SKPoint(300, 200), new SKPoint(340, 230), RawInputModifiers.Control);
+        Assert.Equal((290d, 180d), (layer.Transform.X, layer.Transform.Y));
+        Assert.Equal("Move", session.History.UndoName);
+        Assert.Equal(Tool.Brush, session.Tool);
+        Assert.Equal(SKColors.Red, session.Composite().GetPixel(320, 220));
+
+        // A Ctrl-press on another layer's pixels, away from the current frame, moves that layer instead.
+        Drag(new SKPoint(500, 100), new SKPoint(510, 120), RawInputModifiers.Control);
+        Assert.Equal((490d, 100d), (other.Transform.X, other.Transform.Y));
+        Assert.Equal((290d, 180d), (layer.Transform.X, layer.Transform.Y));
+        Assert.Equal(other.Id, session.ActiveLayer!.Id);
+
+        // The Marquee's own Ctrl-drag inside a selection still moves the selected pixels rather than the layer.
+        session.SelectLayer(layer.Id);
+        window.SelectTool(Tool.Marquee);
+        Dispatcher.UIThread.RunJobs();
+        Drag(new SKPoint(300, 190), new SKPoint(340, 230));
+        Drag(new SKPoint(320, 210), new SKPoint(320, 260), RawInputModifiers.Control);
+        Assert.Equal(SKColors.Red, session.Composite().GetPixel(320, 270));  // The pixels moved down...
+        Assert.Equal(SKColors.White, session.Composite().GetPixel(320, 200)); // ...leaving the white background behind.
+        Assert.Equal((490d, 100d), (other.Transform.X, other.Transform.Y)); // No layer was moved.
+
+        // Without a selection, a Ctrl-drag moves the layer again, snapping like an ordinary move does.
+        session.ClearSelection();
+        session.SelectLayer(other.Id);
+        Drag(new SKPoint(510, 120), new SKPoint(23, 120), RawInputModifiers.Control);
+        Assert.Equal(0, other.Transform.X);                                  // 3 px short, snapped onto the canvas edge.
+
+        // The Type tool shows the move cursor too, instead of its I-beam, for as long as Ctrl is down.
+        window.SelectTool(Tool.Text);
+        window.MouseMove(At(200, 300), RawInputModifiers.None);
+        Assert.Equal("Ibeam", window.Canvas.Cursor?.ToString());
+        window.KeyPressQwerty(PhysicalKey.ControlLeft, RawInputModifiers.None);
+        window.MouseMove(At(202, 300), RawInputModifiers.Control);
+        Assert.Equal("SizeAll", window.Canvas.Cursor?.ToString());
+        window.KeyReleaseQwerty(PhysicalKey.ControlLeft, RawInputModifiers.Control);
+        window.MouseMove(At(204, 300), RawInputModifiers.None);
+        Assert.Equal("Ibeam", window.Canvas.Cursor?.ToString());
+    }
+
+    [AvaloniaFact]
     public void Zoom_pan_and_escape()
     {
         window.SelectTool(Tool.Zoom);

@@ -11,5 +11,7 @@
     <PackageReference Include="Avalonia.Skia" Version="$(AvaloniaVersion)" />
     <ProjectReference Include="../../src/Compositor.App/Compositor.App.csproj" />
     <Using Include="Xunit" />
+    <!-- The Photoshop file writer is shared with the core tests, so both suites build the same fixtures. -->
+    <Compile Include="../Compositor.Core.Tests/PsdWriter.cs" Link="PsdWriter.cs" />
   </ItemGroup>
 </Project>
