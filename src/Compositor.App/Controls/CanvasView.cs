@@ -63,6 +63,8 @@ public sealed partial class CanvasView : Control
 
     public bool ShowPixelGrid { get; set; } = true;
     public bool ShowTransformControls { get; set; } = true;
+    /// <summary>A Move-tool press selects the layer under the pointer. Off, it drags the active layer from anywhere and Ctrl-click picks.</summary>
+    public bool AutoSelect { get; set; } = true;
     public double Zoom => zoom;
 
     public EditorSession? Session
@@ -238,7 +240,8 @@ public sealed partial class CanvasView : Control
         var rulers = CaptureRulers((float)Scaling);
         var grid = ShowPixelGrid && zoom >= 8;
         var nearest = zoom >= 1;
-        var outline = selectionOutline;
+        // While the selection is being dragged, the overlay draws it at its new place; the outline it left behind stays hidden.
+        var outline = drag == Drag.MoveSelection ? null : selectionOutline;
         var phase = antsPhase;
         var scaling = (float)Scaling;
 

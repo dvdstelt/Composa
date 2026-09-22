@@ -115,6 +115,8 @@ public sealed partial class MainWindow
             Item("Hue/Saturation…", () => _ = Adjust(AdjustmentKind.HueSaturation), Key.U, ctrl, () => session!.CanEditPixels),
             Item("Brightness/Contrast…", () => _ = Adjust(AdjustmentKind.BrightnessContrast), enabled: () => session!.CanEditPixels),
             Item("Exposure…", () => _ = Adjust(AdjustmentKind.Exposure), enabled: () => session!.CanEditPixels),
+            Item("Black & White…", () => _ = Adjust(AdjustmentKind.BlackAndWhite), enabled: () => session!.CanEditPixels),
+            Item("Color Balance…", () => _ = Adjust(AdjustmentKind.ColorBalance), enabled: () => session!.CanEditPixels),
             Item("Gradient Map…", () => _ = Adjust(AdjustmentKind.GradientMap), enabled: () => session!.CanEditPixels),
             Item("Grain…", () => _ = Adjust(AdjustmentKind.Grain), enabled: () => session!.CanEditPixels),
             Item("Invert", () => session!.Adjust(new InvertAdjustment()), Key.I, ctrl, () => session!.CanEditPixels),
@@ -166,7 +168,7 @@ public sealed partial class MainWindow
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 
         var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
-        grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); };
+        grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); RememberToolSettings(); };
         // View options are flags on the session, so a checkmark follows the current tab.
         MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, string? id = null)
         {
@@ -175,6 +177,7 @@ public sealed partial class MainWindow
                 var rulersShown = session!.View.ShowRulers;
                 session.View = flip(session.View);
                 canvas.ViewOptionsChanged(rulersShown);
+                RememberToolSettings();
             }, key, modifiers, id: id);
             item.ToggleType = MenuItemToggleType.CheckBox;
             viewToggles.Add((item, get));
@@ -186,7 +189,7 @@ public sealed partial class MainWindow
             Item("Zoom In", canvas.ZoomIn, Key.OemPlus, ctrl),
             Item("Zoom Out", canvas.ZoomOut, Key.OemMinus, ctrl),
             Line(), grid,
-            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); }, Key.H, ctrl),
+            Item("Show Transform Controls", () => { canvas.ShowTransformControls = !canvas.ShowTransformControls; canvas.InvalidateVisual(); RebuildOptions(); RememberToolSettings(); }, Key.H, ctrl),
             Line(),
             ViewToggle("Rulers", v => v.ShowRulers, v => v with { ShowRulers = !v.ShowRulers }, Key.R, ctrl),
             Sub("Show",
@@ -340,6 +343,14 @@ public sealed partial class MainWindow
         finally { Cursor = previous; }
     }
 
+    private async Task<T> Busy<T>(Func<Task<T>> action)
+    {
+        var previous = Cursor;
+        Cursor = new Cursor(StandardCursorType.Wait);
+        try { return await action(); }
+        finally { Cursor = previous; }
+    }
+
     private void OnSessionLayersChanged()
     {
         if (session?.Tool != Tool.Move) return;
@@ -405,8 +416,10 @@ public sealed partial class MainWindow
     // ---- Files --------------------------------------------------------------------------------------------------
 
     private static readonly FilePickerFileType ProjectType = new("Compositor project") { Patterns = ["*" + ProjectFile.Extension] };
-    private static readonly FilePickerFileType ImageType = new("Images") { Patterns = ImageFiles.ImportExtensions.Select(e => "*" + e).ToArray() };
-    private static readonly FilePickerFileType AnyOpenable = new("Projects and images") { Patterns = ImageFiles.ImportExtensions.Select(e => "*" + e).Append("*" + ProjectFile.Extension).ToArray() };
+    private static readonly string[] ImageExtensions = [.. ImageFiles.ImportExtensions, .. RawImporter.Extensions];
+    private static readonly FilePickerFileType ImageType = new("Images") { Patterns = ImageExtensions.Select(e => "*" + e).ToArray() };
+    private static readonly FilePickerFileType RawType = new("Camera RAW") { Patterns = RawImporter.Extensions.Select(e => "*" + e).ToArray() };
+    private static readonly FilePickerFileType AnyOpenable = new("Projects and images") { Patterns = ImageExtensions.Select(e => "*" + e).Append("*" + ProjectFile.Extension).ToArray() };
 
     private async Task NewCanvas()
     {
@@ -416,7 +429,7 @@ public sealed partial class MainWindow
 
     private async Task Open()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType, RawType] });
         await OpenPaths(files.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
@@ -447,7 +460,8 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var pixels = ImageFiles.Load(path);
+                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path) : ImageFiles.Load(path);
+                    if (pixels == null) continue;
                     var document = new Document(pixels.Width, pixels.Height);
                     var layer = Layer.Raster(Path.GetFileNameWithoutExtension(path), pixels);
                     document.Layers.Add(layer);
@@ -489,11 +503,29 @@ public sealed partial class MainWindow
                     if (target != session) { import.Discard(); continue; }
                     session.PlacePhotoshop(import, name, at);
                 }
+                else if (RawImporter.IsRaw(path))
+                {
+                    var target = session;
+                    if (await DevelopRaw(path) is not { } developed) continue;
+                    if (target != session) { developed.Dispose(); continue; }
+                    session.AddImageLayer(name, developed, at);
+                }
                 else session.AddImageLayer(name, ImageFiles.Load(path), at);
             }
             catch (Exception error) { _ = Prompts.Alert(this, "Import couldn't finish", error.Message); }
         }
         SelectTool(Tool.Move);
+    }
+
+    /// <summary>
+    /// Decodes a camera RAW file off the UI thread, puts the develop sheet up and develops the full frame with what was
+    /// chosen. Null means the import was cancelled.
+    /// </summary>
+    private async Task<SKBitmap?> DevelopRaw(string path)
+    {
+        var raw = await Busy(() => Task.Run(() => RawImporter.Decode(path)));
+        if (await RawDevelopDialog.Show(this, Path.GetFileName(path), raw) is not { } settings) return null;
+        return await Busy(() => Task.Run(() => raw.Develop(settings)));
     }
 
     /// <summary>Reads a Photoshop file and, when anything has to be converted, asks before going on. Null means the user declined.</summary>

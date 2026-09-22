@@ -47,8 +47,14 @@ public sealed class TransformEdit
     }
 
     /// <summary>The frame's corners in document space: top-left, top-right, bottom-right, bottom-left.</summary>
+    /// <summary>
+    /// The frame's document-space corners, top-left first. A distorted layer's frame is the distorted shape itself, so
+    /// the handles sit where the corners were dragged to rather than on the rectangle they started from.
+    /// </summary>
     public SKPoint[] Corners()
     {
+        if (layers.Count == 1 && layers[0].Layer is { Pixels: { } pixels, Transform.Distort: not null } distorted)
+            return distorted.Transform.Corners(pixels.Width, pixels.Height);
         var rotate = SKMatrix.CreateRotationDegrees((float)Rotation, Frame.MidX, Frame.MidY);
         return [rotate.MapPoint(Frame.Left, Frame.Top), rotate.MapPoint(Frame.Right, Frame.Top), rotate.MapPoint(Frame.Right, Frame.Bottom), rotate.MapPoint(Frame.Left, Frame.Bottom)];
     }

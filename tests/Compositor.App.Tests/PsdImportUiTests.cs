@@ -32,7 +32,7 @@ public class PsdImportUiTests
         var writer = new PsdWriter { Width = 300, Height = 200 };
         writer.Layers.Add(new PsdWriterLayer { Name = "Background", Image = Solid(300, 200, new SKColor(0xF2, 0xE8, 0xD5)) });
         writer.Layers.Add(new PsdWriterLayer { Name = "Headline", Image = Solid(180, 40, new SKColor(0x20, 0x30, 0x50)), Left = 30, Top = 30 }.With("TySh", new byte[16]));
-        writer.Layers.Add(new PsdWriterLayer { Name = "Badge", Image = Solid(60, 60, new SKColor(0xD0, 0x40, 0x30)), Left = 200, Top = 100, Blend = "lbrn" }.With("lfx2", new byte[16]));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Badge", Image = Solid(60, 60, new SKColor(0xD0, 0x40, 0x30)), Left = 200, Top = 100, Blend = "diss" }.With("lfx2", new byte[16]));
         var path = Path.Combine(Path.GetTempPath(), "compositor-psd-" + Guid.NewGuid().ToString("N") + ".psd");
         File.WriteAllBytes(path, writer.Build());
         try
@@ -44,7 +44,7 @@ public class PsdImportUiTests
             var text = string.Join("\n", dialog.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text));
             Assert.Contains("Headline", text);
             Assert.Contains("retyped", text);
-            Assert.Contains("lbrn", text);
+            Assert.Contains("diss", text);
             Assert.Contains("effects", text);
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
             Directory.CreateDirectory(WindowTests.Shots);

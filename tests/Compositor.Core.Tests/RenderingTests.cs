@@ -35,6 +35,67 @@ public class RenderingTests
         AssertColor(new SKColor(100, 50, 25), flat.GetPixel(1, 1));
     }
 
+    [Theory]
+    [InlineData(BlendMode.LinearBurn)]
+    [InlineData(BlendMode.LinearDodge)]
+    [InlineData(BlendMode.VividLight)]
+    [InlineData(BlendMode.LinearLight)]
+    [InlineData(BlendMode.PinLight)]
+    [InlineData(BlendMode.HardMix)]
+    [InlineData(BlendMode.Subtract)]
+    [InlineData(BlendMode.Divide)]
+    public void Photoshop_only_blend_modes_follow_their_formula_and_the_layer_opacity(BlendMode mode)
+    {
+        var backdrop = new SKColor(200, 100, 50);
+        var source = new SKColor(90, 180, 240);
+        var document = TwoLayers(backdrop, source, out var top);
+        top.Blend = mode;
+        top.Opacity = 0.6;
+        var blend = SeparableBlend.FunctionFor(mode);
+        byte Expect(byte cb, byte cs) => (byte)Math.Round((cb / 255f * 0.4f + 0.6f * blend(cb / 255f, cs / 255f)) * 255);
+        using var flat = DocumentRenderer.Flatten(document);
+        AssertColor(new SKColor(Expect(200, 90), Expect(100, 180), Expect(50, 240)), flat.GetPixel(3, 3));
+    }
+
+    [Fact]
+    public void Photoshop_only_blend_modes_give_known_results()
+    {
+        SKColor Blend(BlendMode mode, SKColor bottom, SKColor top)
+        {
+            var document = TwoLayers(bottom, top, out var layer);
+            layer.Blend = mode;
+            using var flat = DocumentRenderer.Flatten(document);
+            return flat.GetPixel(0, 0);
+        }
+        AssertColor(new SKColor(200, 255, 0), Blend(BlendMode.LinearDodge, new SKColor(100, 200, 0), new SKColor(100, 100, 0)));
+        AssertColor(new SKColor(100, 0, 0), Blend(BlendMode.Subtract, new SKColor(200, 100, 0), new SKColor(100, 200, 0)));
+        AssertColor(new SKColor(128, 255, 0), Blend(BlendMode.Divide, new SKColor(100, 200, 0), new SKColor(200, 100, 0)));
+        AssertColor(new SKColor(0, 255, 255), Blend(BlendMode.HardMix, new SKColor(100, 200, 128), new SKColor(100, 100, 128)));
+        AssertColor(new SKColor(45, 0, 0), Blend(BlendMode.LinearBurn, new SKColor(200, 100, 0), new SKColor(100, 100, 255)));
+    }
+
+    [Fact]
+    public void Photoshop_only_blend_modes_over_transparency_show_the_source_and_keep_soft_edges()
+    {
+        // Where nothing lies beneath, the layer shows as it is: Divide over an empty canvas is not white.
+        var document = new Document(8, 8);
+        var top = Layer.Raster("top", Solid(8, 8, new SKColor(90, 180, 240)));
+        top.Blend = BlendMode.Divide;
+        top.Opacity = 0.5;
+        document.Layers.Add(top);
+        using var flat = DocumentRenderer.Flatten(document);
+        var pixel = flat.GetPixel(2, 2);
+        Assert.InRange(pixel.Alpha, 127, 129);
+        AssertColor(new SKColor(90, 180, 240, 128), pixel, 3);
+
+        // A half-covered backdrop: the union of the coverages, with the blend only where both cover.
+        var half = TwoLayers(new SKColor(200, 100, 50, 128), SKColors.White, out var over);
+        over.Blend = BlendMode.LinearBurn;
+        using var mixed = DocumentRenderer.Flatten(half);
+        Assert.Equal(255, mixed.GetPixel(1, 1).Alpha);
+        AssertColor(new SKColor(228, 178, 153), mixed.GetPixel(1, 1), 3); // white where the backdrop is missing, the backdrop's own color where it is
+    }
+
     [Fact]
     public void Hidden_layers_and_hidden_folders_do_not_render()
     {

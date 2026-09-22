@@ -78,7 +78,10 @@ public sealed class PsdImport
         ["norm"] = BlendMode.Normal, ["mul "] = BlendMode.Multiply, ["scrn"] = BlendMode.Screen, ["over"] = BlendMode.Overlay,
         ["dark"] = BlendMode.Darken, ["lite"] = BlendMode.Lighten, ["diff"] = BlendMode.Difference, ["div "] = BlendMode.ColorDodge,
         ["idiv"] = BlendMode.ColorBurn, ["sLit"] = BlendMode.SoftLight, ["hLit"] = BlendMode.HardLight, ["smud"] = BlendMode.Exclusion,
-        ["hue "] = BlendMode.Hue, ["sat "] = BlendMode.Saturation, ["colr"] = BlendMode.Color, ["lum "] = BlendMode.Luminosity
+        ["hue "] = BlendMode.Hue, ["sat "] = BlendMode.Saturation, ["colr"] = BlendMode.Color, ["lum "] = BlendMode.Luminosity,
+        ["lbrn"] = BlendMode.LinearBurn, ["lddg"] = BlendMode.LinearDodge, ["vLit"] = BlendMode.VividLight, ["lLit"] = BlendMode.LinearLight,
+        ["pLit"] = BlendMode.PinLight, ["hMix"] = BlendMode.HardMix, ["fsub"] = BlendMode.Subtract, ["fdiv"] = BlendMode.Divide
+        // Dissolve, Darker Color and Lighter Color have no equivalent here and fall through to Normal with a conversion listed.
     };
 
     private static readonly string[] TextKeys = ["TySh", "tySh", "txt2"];

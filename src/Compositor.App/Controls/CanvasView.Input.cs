@@ -512,7 +512,13 @@ public sealed partial class CanvasView
         if (session.Transform is { } edit) return edit.Corners();
         var targets = session.TransformTargets();
         if (targets.Count == 0) return null;
-        if (targets.Count == 1) return new TransformFrame(targets[0].Transform).Corners();
+        if (targets.Count == 1)
+        {
+            // A distorted layer's handles sit on its corners, wherever they were dragged to.
+            var target = targets[0];
+            if (target.Pixels != null && target.Transform.Distort != null) return target.Transform.Corners(target.Pixels.Width, target.Pixels.Height);
+            return new TransformFrame(target.Transform).Corners();
+        }
         var bounds = SKRect.Empty;
         foreach (var layer in targets) bounds = bounds.IsEmpty ? layer.Bounds : SKRect.Union(bounds, layer.Bounds);
         return Corners(bounds);
@@ -575,6 +581,17 @@ public sealed partial class CanvasView
     }
 
     /// <summary>The topmost visible layer with a non-transparent pixel under a document point.</summary>
+    /// <summary>Whether the one layer being transformed already has a corner pulled out of place.</summary>
+    private bool IsDistorted() => session?.TransformTargets() is [{ Pixels: not null, Transform.Distort: not null }];
+
+    /// <summary>Whether <paramref name="layer"/> is painted above <paramref name="other"/>; layers are stored bottom to top.</summary>
+    private bool IsAbove(Layer layer, Layer? other)
+    {
+        if (session == null || other == null) return true;
+        var order = session.Document.AllLayers().ToList();
+        return order.IndexOf(layer) > order.IndexOf(other);
+    }
+
     private Layer? LayerAt(SKPoint p)
     {
         if (session == null) return null;
@@ -641,15 +658,18 @@ public sealed partial class CanvasView
         var onHandle = handle is not (TransformHandle.None or TransformHandle.Move);
         if (!onHandle)
         {
-            // Clicking pixels of another layer selects it (Ctrl-click or double-click always; otherwise only when the
-            // click misses the current selection's frame entirely).
+            // Clicking pixels of another layer selects it: Ctrl-click or double-click always; with Auto Select, also when
+            // the click misses the current frame or lands on a layer stacked above the active one. A selected background
+            // that covers the canvas contains every press, and keeping it would hide the layer painted on top.
             var hit = LayerAt(pressDocument);
-            if (hit != null && !session.Document.SelectedLayerIds.Contains(hit.Id) && (control || clicks >= 2 || handle == TransformHandle.None))
+            if (hit != null && !session.Document.SelectedLayerIds.Contains(hit.Id)
+                && (control || clicks >= 2 || (AutoSelect && (handle == TransformHandle.None || IsAbove(hit, session.ActiveLayer)))))
                 session.SelectLayer(hit.Id, extend: dragModifiers.HasFlag(KeyModifiers.Shift));
             handle = TransformHandle.Move;
         }
-        else if (control && handle is TransformHandle.TopLeft or TransformHandle.TopRight or TransformHandle.BottomRight or TransformHandle.BottomLeft)
+        else if ((control || IsDistorted()) && handle is TransformHandle.TopLeft or TransformHandle.TopRight or TransformHandle.BottomRight or TransformHandle.BottomLeft)
         {
+            // Ctrl-dragging a corner distorts, as in Photoshop; once a layer is distorted its corners keep distorting.
             distortCorner = handle switch { TransformHandle.TopLeft => 0, TransformHandle.TopRight => 1, TransformHandle.BottomRight => 2, _ => 3 };
         }
         if (session.BeginTransform(handle == TransformHandle.Move ? "Move" : handle == TransformHandle.Rotate ? "Rotate" : distortCorner >= 0 ? "Distort" : "Scale") == null)

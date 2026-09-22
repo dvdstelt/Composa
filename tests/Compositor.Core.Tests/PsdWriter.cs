@@ -281,6 +281,21 @@ internal sealed class PsdWriter
     }
 
     public static byte[] BrightnessContrast(short brightness, short contrast) { var b = new Buffer(); b.I16(brightness); b.I16(contrast); b.I16(0); b.U8(0); b.U8(0); return b.ToArray(); }
+    public static byte[] ColorBalance((short CyanRed, short MagentaGreen, short YellowBlue)[] ranges, bool preserveLuminosity)
+    {
+        var b = new Buffer();
+        foreach (var (cr, mg, yb) in ranges) { b.I16(cr); b.I16(mg); b.I16(yb); }
+        b.U8(preserveLuminosity ? (byte)1 : (byte)0); b.U8(0);
+        return b.ToArray();
+    }
+    public static byte[] BlackWhite(int reds, int yellows, int greens, int cyans, int blues, int magentas, SKColor? tint = null)
+    {
+        var descriptor = new Descriptor().Add("Rd  ", Descriptor.Long(reds)).Add("Yllw", Descriptor.Long(yellows)).Add("Grn ", Descriptor.Long(greens))
+            .Add("Cyn ", Descriptor.Long(cyans)).Add("Bl  ", Descriptor.Long(blues)).Add("Mgnt", Descriptor.Long(magentas))
+            .Add("useTint", Descriptor.Bool(tint != null)).Add("tintColor", Descriptor.Objc(Rgb(tint ?? SKColors.White))).Add("bwPresetKind", Descriptor.Long(1));
+        var b = new Buffer(); b.U32(16); b.Bytes(descriptor.ToArray());
+        return b.ToArray();
+    }
     public static byte[] Exposure(float exposure, float offset, float gamma) { var b = new Buffer(); b.U16(1); b.F32(exposure); b.F32(offset); b.F32(gamma); return b.ToArray(); }
 
     // ---- Descriptor structure ----------------------------------------------------------------------------------------

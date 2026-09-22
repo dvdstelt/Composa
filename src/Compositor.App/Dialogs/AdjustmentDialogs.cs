@@ -40,6 +40,8 @@ public static class AdjustmentDialogs
                 ("Size", grain.Size, 0.5, 20, 0.1, "0.0", v => Update(grain = grain with { Size = v })),
                 ("Roughness", grain.Roughness, 0, 100, 1, "0", v => Update(grain = grain with { Roughness = v }))),
             GradientMapAdjustment map => GradientMapEditor(owner, map, foreground, background, Update),
+            BlackAndWhiteAdjustment bw => BlackAndWhiteEditor(bw, Update),
+            ColorBalanceAdjustment balance => ColorBalanceEditor(balance, Update),
             _ => Ui.Label("This adjustment has no settings.", Palette.Secondary)
         };
         var previewBox = Ui.Check("Preview", true, v => { preview = v; timer.Stop(); timer.Start(); });
@@ -55,6 +57,7 @@ public static class AdjustmentDialogs
         GrainAdjustment grain => grain with { Amount = 0 },
         GradientMapAdjustment => new BrightnessContrastAdjustment(),
         InvertAdjustment => new BrightnessContrastAdjustment(),
+        BlackAndWhiteAdjustment => new BrightnessContrastAdjustment(),
         var other => other
     };
 
@@ -127,6 +130,55 @@ public static class AdjustmentDialogs
         });
         Build();
         return Ui.Column(10, Ui.Row(10, Ui.Label("Range", Palette.Secondary), picker, colorize), rows);
+    }
+
+    private static readonly string[] ColorFamilies = ["Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas"];
+
+    /// <summary>Each slider says how bright that family of colors becomes, as Photoshop's do; the tint colors the gray.</summary>
+    private static Control BlackAndWhiteEditor(BlackAndWhiteAdjustment bw, Action<Adjustment> update)
+    {
+        var weights = new StackPanel { Spacing = 8 };
+        for (var i = 0; i < ColorFamilies.Length; i++)
+        {
+            var index = i;
+            weights.Children.Add(Ui.SliderRow(ColorFamilies[i], bw.Weights[i], BlackAndWhiteAdjustment.MinWeight, BlackAndWhiteAdjustment.MaxWeight,
+                v => update(bw = bw.WithWeight(index, v)), 1, "0", 240, 80).Row);
+        }
+        var tintRows = new StackPanel { Spacing = 8, IsVisible = bw.Tint, Margin = new Thickness(0, 4, 0, 0) };
+        tintRows.Children.Add(Ui.SliderRow("Hue", bw.TintHue, 0, 360, v => update(bw = bw with { TintHue = v }), 1, "0", 240, 80).Row);
+        tintRows.Children.Add(Ui.SliderRow("Saturation", bw.TintSaturation, 0, 100, v => update(bw = bw with { TintSaturation = v }), 1, "0", 240, 80).Row);
+        var tint = Ui.Check("Tint", bw.Tint, v => { tintRows.IsVisible = v; update(bw = bw with { Tint = v }); });
+        ToolTip.SetTip(tint, "Color the result while keeping its tones, for a sepia or a cyanotype");
+        var reset = Ui.TextButton("Reset", () =>
+        {
+            update(bw = new BlackAndWhiteAdjustment { Tint = bw.Tint, TintHue = bw.TintHue, TintSaturation = bw.TintSaturation });
+            for (var i = 0; i < ColorFamilies.Length; i++) ((Slider)((StackPanel)weights.Children[i]).Children[1]).Value = bw.Weights[i];
+        });
+        return Ui.Column(10, weights, Ui.Row(12, tint, reset), tintRows);
+    }
+
+    private static readonly string[] BalanceRanges = ["Shadows", "Midtones", "Highlights"];
+    private static readonly string[] BalancePairs = ["Cyan / Red", "Magenta / Green", "Yellow / Blue"];
+
+    /// <summary>Three shifts each for the shadows, midtones and highlights, with Preserve Luminosity.</summary>
+    private static Control ColorBalanceEditor(ColorBalanceAdjustment balance, Action<Adjustment> update)
+    {
+        var panel = new StackPanel { Spacing = 6 };
+        for (var range = 0; range < 3; range++)
+        {
+            panel.Children.Add(Ui.Label(BalanceRanges[range], Palette.Secondary, weight: FontWeight.SemiBold));
+            for (var channel = 0; channel < 3; channel++)
+            {
+                var (r, c) = (range, channel);
+                panel.Children.Add(Ui.SliderRow(BalancePairs[channel], balance.Shift(range, channel), ColorBalanceAdjustment.MinShift, ColorBalanceAdjustment.MaxShift,
+                    v => update(balance = balance.WithShift(r, c, v)), 1, "0", 220, 110).Row);
+            }
+        }
+        var preserve = Ui.Check("Preserve Luminosity", balance.PreserveLuminosity, v => update(balance = balance with { PreserveLuminosity = v }));
+        ToolTip.SetTip(preserve, "Put each pixel's brightness back afterwards, so only the color moves");
+        preserve.Margin = new Thickness(0, 6, 0, 0);
+        panel.Children.Add(preserve);
+        return panel;
     }
 
     private static Control GradientMapEditor(Window owner, GradientMapAdjustment map, SKColor foreground, SKColor background, Action<Adjustment> update)

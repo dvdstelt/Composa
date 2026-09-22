@@ -3,7 +3,7 @@ using SkiaSharp;
 
 namespace Compositor.Filters;
 
-public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMap, Grain, Invert, BrightnessContrast }
+public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMap, Grain, Invert, BrightnessContrast, BlackAndWhite, ColorBalance }
 
 /// <summary>
 /// A color adjustment. The same settings drive a destructive Image menu command and a live adjustment layer.
@@ -18,6 +18,8 @@ public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMa
 [JsonDerivedType(typeof(GrainAdjustment), "grain")]
 [JsonDerivedType(typeof(InvertAdjustment), "invert")]
 [JsonDerivedType(typeof(BrightnessContrastAdjustment), "brightnessContrast")]
+[JsonDerivedType(typeof(BlackAndWhiteAdjustment), "blackAndWhite")]
+[JsonDerivedType(typeof(ColorBalanceAdjustment), "colorBalance")]
 public abstract record Adjustment
 {
     [JsonIgnore] public abstract AdjustmentKind Kind { get; }
@@ -93,6 +95,8 @@ public abstract record Adjustment
         AdjustmentKind.GradientMap => new GradientMapAdjustment(),
         AdjustmentKind.Grain => new GrainAdjustment { Seed = (uint)Random.Shared.Next() },
         AdjustmentKind.Invert => new InvertAdjustment(),
+        AdjustmentKind.BlackAndWhite => new BlackAndWhiteAdjustment(),
+        AdjustmentKind.ColorBalance => new ColorBalanceAdjustment(),
         _ => new BrightnessContrastAdjustment()
     };
 }
@@ -367,6 +371,136 @@ public sealed record GrainAdjustment : Adjustment
             var weight = 4 * luma * (1 - luma) * 0.75f + 0.25f;
             var delta = (int)MathF.Round(noise * amount * weight);
             r = Math.Clamp(r + delta, 0, 255); g = Math.Clamp(g + delta, 0, 255); b = Math.Clamp(b + delta, 0, 255);
+        };
+    }
+}
+
+/// <summary>
+/// Black &amp; White as Photoshop's is: not a desaturation, but a choice of how bright each family of colors becomes in
+/// gray. Reds at 40% and yellows at 60% is why a default conversion keeps skin and foliage apart where a plain
+/// luminance flattens them. A color is min(r,g,b) of gray, plus the secondary between its two brightest channels,
+/// plus the primary of its brightest, so the six weights apply exactly as Photoshop's do.
+/// </summary>
+public sealed record BlackAndWhiteAdjustment : Adjustment
+{
+    public const double MinWeight = -200, MaxWeight = 300;
+    /// <summary>Photoshop's defaults, in percent.</summary>
+    public double Reds { get; init; } = 40;
+    public double Yellows { get; init; } = 60;
+    public double Greens { get; init; } = 40;
+    public double Cyans { get; init; } = 60;
+    public double Blues { get; init; } = 20;
+    public double Magentas { get; init; } = 80;
+    /// <summary>Colors the result while keeping its tones, for a sepia or a cyanotype.</summary>
+    public bool Tint { get; init; }
+    /// <summary>0…360.</summary>
+    public double TintHue { get; init; } = 40;
+    /// <summary>0…100.</summary>
+    public double TintSaturation { get; init; } = 20;
+    public override AdjustmentKind Kind => AdjustmentKind.BlackAndWhite;
+    public override string DisplayName => "Black & White";
+
+    /// <summary>The weights in the order red, yellow, green, cyan, blue, magenta.</summary>
+    [JsonIgnore] public double[] Weights => [Reds, Yellows, Greens, Cyans, Blues, Magentas];
+
+    public BlackAndWhiteAdjustment WithWeight(int index, double weight) => index switch
+    {
+        0 => this with { Reds = weight }, 1 => this with { Yellows = weight }, 2 => this with { Greens = weight },
+        3 => this with { Cyans = weight }, 4 => this with { Blues = weight }, _ => this with { Magentas = weight }
+    };
+
+    /// <summary>The gray a straight 0…1 color becomes under these weights, before any tint.</summary>
+    public static float Gray(float r, float g, float b, ReadOnlySpan<float> weights)
+    {
+        float max = MathF.Max(r, MathF.Max(g, b)), min = MathF.Min(r, MathF.Min(g, b));
+        var mid = r + g + b - max - min;
+        int primary, secondary;
+        if (max == r) { primary = 0; secondary = g >= b ? 1 : 5; }
+        else if (max == g) { primary = 2; secondary = r >= b ? 1 : 3; }
+        else { primary = 4; secondary = g >= r ? 3 : 5; }
+        return Math.Clamp(min + (mid - min) * weights[secondary] + (max - mid) * weights[primary], 0, 1);
+    }
+
+    internal override PixelOp CreateOp()
+    {
+        var weights = Weights.Select(w => (float)(Math.Clamp(w, MinWeight, MaxWeight) / 100)).ToArray();
+        var tint = Tint && TintSaturation > 0;
+        var hue = ((TintHue % 360) + 360) % 360;
+        var saturation = Math.Clamp(TintSaturation, 0, 100) / 100;
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int _, int _) =>
+        {
+            var gray = Gray(r / 255f, g / 255f, b / 255f, weights);
+            if (!tint) { r = g = b = Lut.ToByte(gray); return; }
+            // The gray becomes the lightness of a color at the chosen hue.
+            ColorMath.HslToRgb(hue, saturation, gray, out var tr, out var tg, out var tb);
+            r = Lut.ToByte(tr); g = Lut.ToByte(tg); b = Lut.ToByte(tb);
+        };
+    }
+}
+
+/// <summary>
+/// Color Balance: shifts color towards one end of each opposing pair, separately for shadows, midtones and
+/// highlights. Preserve Luminosity puts each pixel's brightness back afterwards, so a warm cast doesn't also lighten
+/// the picture.
+/// </summary>
+public sealed record ColorBalanceAdjustment : Adjustment
+{
+    public const double MinShift = -100, MaxShift = 100;
+    /// <summary>Cyan/red, magenta/green and yellow/blue for the shadows, -100…100.</summary>
+    public double[] Shadows { get; init; } = new double[3];
+    public double[] Midtones { get; init; } = new double[3];
+    public double[] Highlights { get; init; } = new double[3];
+    public bool PreserveLuminosity { get; init; } = true;
+    public override AdjustmentKind Kind => AdjustmentKind.ColorBalance;
+    public override string DisplayName => "Color Balance";
+    public override bool IsIdentity => Shadows.All(v => v == 0) && Midtones.All(v => v == 0) && Highlights.All(v => v == 0);
+
+    /// <summary>Range 0 shadows, 1 midtones, 2 highlights; channel 0 cyan/red, 1 magenta/green, 2 yellow/blue.</summary>
+    public ColorBalanceAdjustment WithShift(int range, int channel, double value)
+    {
+        var values = (double[])(range == 0 ? Shadows : range == 1 ? Midtones : Highlights).Clone();
+        values[channel] = value;
+        return range switch { 0 => this with { Shadows = values }, 1 => this with { Midtones = values }, _ => this with { Highlights = values } };
+    }
+
+    public double Shift(int range, int channel) => (range == 0 ? Shadows : range == 1 ? Midtones : Highlights)[channel];
+
+    /// <summary>
+    /// How much a tone belongs to the shadows, midtones and highlights: three overlapping ramps that sum to about one
+    /// across the range, so a shift fades in and out rather than banding at a threshold.
+    /// </summary>
+    internal static void TonalWeights(float v, out float shadow, out float mid, out float highlight)
+    {
+        const float a = 0.25f, b = 0.333f, scale = 0.7f;
+        shadow = Math.Clamp((v - b) / -a + 0.5f, 0, 1) * scale;
+        highlight = Math.Clamp((v + b - 1) / a + 0.5f, 0, 1) * scale;
+        mid = Math.Clamp((v - b) / a + 0.5f, 0, 1) * Math.Clamp((v + b - 1) / -a + 0.5f, 0, 1) * scale;
+    }
+
+    internal override PixelOp CreateOp()
+    {
+        float[] Unit(double[] values) => values.Select(v => (float)(Math.Clamp(v, MinShift, MaxShift) / 100)).ToArray();
+        float[] shadows = Unit(Shadows), midtones = Unit(Midtones), highlights = Unit(Highlights);
+        var preserve = PreserveLuminosity;
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int _, int _) =>
+        {
+            Span<float> c = [r / 255f, g / 255f, b / 255f];
+            var before = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2];
+            for (var i = 0; i < 3; i++)
+            {
+                TonalWeights(c[i], out var s, out var m, out var h);
+                c[i] = Math.Clamp(c[i] + shadows[i] * s + midtones[i] * m + highlights[i] * h, 0, 1);
+            }
+            if (preserve)
+            {
+                var after = 0.299f * c[0] + 0.587f * c[1] + 0.114f * c[2];
+                if (after > 0.0001f)
+                {
+                    var ratio = before / after;
+                    for (var i = 0; i < 3; i++) c[i] = Math.Clamp(c[i] * ratio, 0, 1);
+                }
+            }
+            r = Lut.ToByte(c[0]); g = Lut.ToByte(c[1]); b = Lut.ToByte(c[2]);
         };
     }
 }

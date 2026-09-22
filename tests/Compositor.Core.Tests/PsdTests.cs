@@ -12,6 +12,26 @@ public class PsdTests
 {
     private static PsdImport Load(PsdWriter writer) => PsdImport.Load(writer.Build());
 
+    [Theory]
+    [InlineData("lbrn", BlendMode.LinearBurn)]
+    [InlineData("lddg", BlendMode.LinearDodge)]
+    [InlineData("vLit", BlendMode.VividLight)]
+    [InlineData("lLit", BlendMode.LinearLight)]
+    [InlineData("pLit", BlendMode.PinLight)]
+    [InlineData("hMix", BlendMode.HardMix)]
+    [InlineData("fsub", BlendMode.Subtract)]
+    [InlineData("fdiv", BlendMode.Divide)]
+    [InlineData("hLit", BlendMode.HardLight)]
+    public void Photoshops_remaining_blend_modes_keep_their_mode(string key, BlendMode expected)
+    {
+        var writer = new PsdWriter { Width = 10, Height = 10 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Background", Image = Solid(10, 10, SKColors.Red) });
+        writer.Layers.Add(new PsdWriterLayer { Name = "Blended", Image = Solid(10, 10, SKColors.Blue), Blend = key });
+        var import = Load(writer);
+        Assert.Equal(expected, import.Layers[1].Blend);
+        Assert.Empty(import.Conversions);
+    }
+
     [Fact]
     public void Layers_folders_names_visibility_opacity_and_blend_modes_come_across()
     {
@@ -20,7 +40,7 @@ public class PsdTests
         writer.Layers.Add(new PsdWriterLayer { Name = "</Layer group>", EmptyWidth = 0 }.With("lsct", PsdWriter.Section(3)));
         writer.Layers.Add(new PsdWriterLayer { Name = "Child", Image = Solid(20, 20, SKColors.Blue), Left = 10, Top = 10, Opacity = 128, Blend = "mul " }.With("iOpa", PsdWriter.FillOpacity(128)));
         writer.Layers.Add(new PsdWriterLayer { Name = "Folder", Opacity = 200, Blend = "pass" }.With("lsct", PsdWriter.Section(1)));
-        writer.Layers.Add(new PsdWriterLayer { Name = "Old name", Image = Solid(5, 5, SKColors.Green), Left = 50, Top = 50, Hidden = true, Blend = "lbrn" }.With("luni", PsdWriter.Unicode("Ünïcode ✓")));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Old name", Image = Solid(5, 5, SKColors.Green), Left = 50, Top = 50, Hidden = true, Blend = "diss" }.With("luni", PsdWriter.Unicode("Ünïcode ✓")));
 
         var import = Load(writer);
         Assert.Equal((100, 80, 300d), (import.Width, import.Height, import.Resolution));
@@ -39,7 +59,7 @@ public class PsdTests
         Assert.Equal(BlendMode.Normal, top.Blend);
         var conversion = Assert.Single(import.Conversions);
         Assert.Equal("Ünïcode ✓", conversion.LayerName);
-        Assert.Contains("lbrn", conversion.Message);
+        Assert.Contains("diss", conversion.Message);
 
         var document = import.ToDocument();
         Assert.Equal(top.Id, document.ActiveLayerId);
@@ -207,10 +227,13 @@ public class PsdTests
         writer.Layers.Add(new PsdWriterLayer { Name = "Invert" }.With("nvrt", []));
         writer.Layers.Add(new PsdWriterLayer { Name = "Bright" }.With("brit", PsdWriter.BrightnessContrast(30, -20)));
         writer.Layers.Add(new PsdWriterLayer { Name = "Exposure" }.With("expA", PsdWriter.Exposure(1.5f, 0.1f, 0.8f)));
-        writer.Layers.Add(new PsdWriterLayer { Name = "Balance" }.With("blnc", new byte[8]));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Balance" }.With("blnc", PsdWriter.ColorBalance([(10, 0, -20), (0, 5, 0), (-30, 0, 40)], false)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Mono" }.With("blwh", PsdWriter.BlackWhite(70, 60, 40, 60, 20, 80)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Sepia" }.With("blwh", PsdWriter.BlackWhite(40, 60, 40, 60, 20, 80, new SKColor(255, 128, 0))));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Threshold" }.With("thrs", new byte[2]));
 
         var import = Load(writer);
-        Assert.Equal(["Photo", "Levels", "Curves", "Hue", "Tint", "Invert", "Bright", "Exposure"], import.Layers.Select(l => l.Name));
+        Assert.Equal(["Photo", "Levels", "Curves", "Hue", "Tint", "Invert", "Bright", "Exposure", "Balance", "Mono", "Sepia"], import.Layers.Select(l => l.Name));
         var levels = Assert.IsType<LevelsAdjustment>(import.Layers[1].Adjustment);
         Assert.Equal((10d, 240d, 1.5), (levels.Ranges[0].InputBlack, levels.Ranges[0].InputWhite, levels.Ranges[0].Gamma));
         var curves = Assert.IsType<CurvesAdjustment>(import.Layers[2].Adjustment);
@@ -227,7 +250,20 @@ public class PsdTests
         Assert.Equal((20d, -20d), (bright.Brightness, bright.Contrast));
         var exposure = Assert.IsType<ExposureAdjustment>(import.Layers[7].Adjustment);
         Assert.Equal(1.5, exposure.Exposure, 3);
-        Assert.Contains(import.Conversions, c => c.LayerName == "Balance" && c.Message.Contains("skipped"));
+        var balance = Assert.IsType<ColorBalanceAdjustment>(import.Layers[8].Adjustment);
+        Assert.Equal([10d, 0d, -20d], balance.Shadows);
+        Assert.Equal([0d, 5d, 0d], balance.Midtones);
+        Assert.Equal([-30d, 0d, 40d], balance.Highlights);
+        Assert.False(balance.PreserveLuminosity);
+        var mono = Assert.IsType<BlackAndWhiteAdjustment>(import.Layers[9].Adjustment);
+        Assert.Equal((70d, 80d, false), (mono.Reds, mono.Magentas, mono.Tint));
+        var sepia = Assert.IsType<BlackAndWhiteAdjustment>(import.Layers[10].Adjustment);
+        Assert.True(sepia.Tint);
+        Assert.Equal(30, sepia.TintHue, 0);
+        Assert.Equal(100, sepia.TintSaturation);
+        Assert.DoesNotContain(import.Conversions, c => c.LayerName is "Balance" or "Mono");
+        Assert.Contains(import.Conversions, c => c.LayerName == "Sepia" && c.Message.Contains("may not match"));
+        Assert.Contains(import.Conversions, c => c.LayerName == "Threshold" && c.Message.Contains("skipped"));
         Assert.Contains(import.Conversions, c => c.LayerName == "Levels" && c.Message.Contains("may not match"));
         Assert.DoesNotContain(import.Conversions, c => c.LayerName == "Invert");
     }

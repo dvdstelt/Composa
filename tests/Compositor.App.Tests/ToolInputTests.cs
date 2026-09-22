@@ -152,6 +152,66 @@ public class ToolInputTests
     }
 
     [AvaloniaFact]
+    public void Distorting_a_corner_moves_its_handle_with_it_and_the_corner_keeps_distorting_afterwards()
+    {
+        var box = Rendering.Pixels.NewColor(100, 100);
+        box.Erase(SKColors.Red);
+        var layer = session.AddImageLayer("box", box, new SKPoint(300, 200)); // 250..350 × 150..250
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+
+        // Ctrl-drag the top-left corner straight down past the bottom edge: the shape folds and the handle goes with the corner.
+        Drag(new SKPoint(250, 150), new SKPoint(250, 330), RawInputModifiers.Control);
+        Assert.Equal("Distort", session.History.UndoName);
+        Assert.Equal((250d, 150d, 100d, 100d), (layer.Transform.X, layer.Transform.Y, layer.Transform.Width, layer.Transform.Height));
+        Assert.Equal([0f, 180f, 0f, 0f, 0f, 0f, 0f, 0f], layer.Transform.Distort);
+        var corners = layer.Transform.Corners(100, 100);
+        Assert.Equal(new SKPoint(250, 330), corners[0]);
+
+        // A plain drag on the moved handle goes on distorting rather than scaling the rectangle.
+        Drag(new SKPoint(250, 330), new SKPoint(280, 330));
+        Assert.Equal([30f, 180f, 0f, 0f, 0f, 0f, 0f, 0f], layer.Transform.Distort);
+        Assert.Equal((100d, 100d), (layer.Transform.Width, layer.Transform.Height));
+
+        // Every corner of a distorted layer distorts; the edge handles still scale the whole shape.
+        Drag(new SKPoint(350, 250), new SKPoint(400, 300));
+        Assert.Equal("Distort", session.History.UndoName);
+        Assert.Equal([30f, 180f, 0f, 0f, 50f, 50f, 0f, 0f], layer.Transform.Distort);
+        Drag(new SKPoint(375, 225), new SKPoint(425, 225)); // The right edge's midpoint, between the top-right and the moved bottom-right corner.
+        Assert.Equal("Scale", session.History.UndoName);
+        Assert.True(layer.Transform.Width > 100);
+        Assert.Equal(30 * layer.Transform.Width / 100, layer.Transform.Distort![0], 1); // The distortion scales with the frame.
+    }
+
+    [AvaloniaFact]
+    public void Auto_select_picks_a_layer_stacked_on_a_selected_background_and_can_be_turned_off()
+    {
+        var background = session.ActiveLayer!; // The white canvas covers every press.
+        var box = Rendering.Pixels.NewColor(100, 100);
+        box.Erase(SKColors.Red);
+        var layer = session.AddImageLayer("box", box, new SKPoint(300, 200));
+        session.SelectLayer(background.Id);
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+
+        Click(320, 220);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+        Click(20, 20);
+        Assert.Equal(background.Id, session.ActiveLayer!.Id);
+        Click(320, 220);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+
+        // Off, a press keeps the current layer wherever it lands; Ctrl-click still picks. (Each click lands somewhere
+        // new, because two at one spot make a double-click, which always picks.)
+        window.Canvas.AutoSelect = false;
+        session.SelectLayer(background.Id);
+        Click(360, 260);
+        Assert.Equal(background.Id, session.ActiveLayer!.Id);
+        Click(340, 240, RawInputModifiers.Control);
+        Assert.Equal(layer.Id, session.ActiveLayer!.Id);
+    }
+
+    [AvaloniaFact]
     public void Ctrl_drag_moves_the_layer_with_any_tool_and_leaves_the_other_ctrl_drags_alone()
     {
         var box = Rendering.Pixels.NewColor(100, 100);

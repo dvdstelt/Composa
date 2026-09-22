@@ -163,14 +163,7 @@ public static class MacProject
         return (0, 0);
     }
 
-    private static BlendMode ReadBlend(string? name) => name switch
-    {
-        "Multiply" => BlendMode.Multiply, "Screen" => BlendMode.Screen, "Overlay" => BlendMode.Overlay, "Darken" => BlendMode.Darken,
-        "Lighten" => BlendMode.Lighten, "Difference" => BlendMode.Difference, "Color Dodge" => BlendMode.ColorDodge, "Color Burn" => BlendMode.ColorBurn,
-        "Soft Light" => BlendMode.SoftLight, "Hard Light" => BlendMode.HardLight, "Exclusion" => BlendMode.Exclusion,
-        "Hue" => BlendMode.Hue, "Saturation" => BlendMode.Saturation, "Color" => BlendMode.Color, "Luminosity" => BlendMode.Luminosity,
-        _ => BlendMode.Normal
-    };
+    private static BlendMode ReadBlend(string? name) => BlendModeExtensions.FromDisplayName(name);
 
     private static ShapeStyle ReadShape(JsonElement shape)
     {
@@ -282,6 +275,26 @@ public static class MacProject
             case "Grain":
                 if (!a.TryGetProperty("grainSettings", out var n)) return new GrainAdjustment();
                 return new GrainAdjustment { Amount = Number(n, "amount", 25), Size = Number(n, "size", 1.5), Roughness = Number(n, "roughness", 50), Seed = (uint)Number(n, "seed", 0) };
+            case "Invert":
+                return new InvertAdjustment();
+            case "Black & White":
+                if (!a.TryGetProperty("blackWhiteSettings", out var bw)) return new BlackAndWhiteAdjustment();
+                return new BlackAndWhiteAdjustment
+                {
+                    Reds = Number(bw, "reds", 40), Yellows = Number(bw, "yellows", 60), Greens = Number(bw, "greens", 40),
+                    Cyans = Number(bw, "cyans", 60), Blues = Number(bw, "blues", 20), Magentas = Number(bw, "magentas", 80),
+                    Tint = bw.TryGetProperty("tint", out var tint) && tint.ValueKind == JsonValueKind.True,
+                    TintHue = Number(bw, "tintHue", 40), TintSaturation = Number(bw, "tintSaturation", 20)
+                };
+            case "Color Balance":
+                if (!a.TryGetProperty("colorBalanceSettings", out var cb)) return new ColorBalanceAdjustment();
+                return new ColorBalanceAdjustment
+                {
+                    Shadows = [Number(cb, "shadowCyanRed", 0), Number(cb, "shadowMagentaGreen", 0), Number(cb, "shadowYellowBlue", 0)],
+                    Midtones = [Number(cb, "midCyanRed", 0), Number(cb, "midMagentaGreen", 0), Number(cb, "midYellowBlue", 0)],
+                    Highlights = [Number(cb, "highlightCyanRed", 0), Number(cb, "highlightMagentaGreen", 0), Number(cb, "highlightYellowBlue", 0)],
+                    PreserveLuminosity = !cb.TryGetProperty("preserveLuminosity", out var keep) || keep.ValueKind != JsonValueKind.False
+                };
             case "Hue/Saturation":
                 var hue = new HueSaturationAdjustment { Colorize = a.TryGetProperty("colorize", out var colorize) && colorize.ValueKind == JsonValueKind.True };
                 hue = hue.WithShift(HueRange.Master, new HslShift(Number(a, "hue", 0), Number(a, "saturation", 0), Number(a, "lightness", 0)));

@@ -39,6 +39,8 @@ public sealed partial class MainWindow : Window
         Height = Math.Clamp(settings.WindowHeight, 520, 10000);
         if (settings.Maximized) WindowState = WindowState.Maximized;
         canvas.ShowPixelGrid = settings.ShowPixelGrid;
+        canvas.ShowTransformControls = settings.ShowTransformControls;
+        canvas.AutoSelect = settings.AutoSelect;
         jpegQuality = Math.Clamp(settings.JpegQuality, 1, 100);
         MinWidth = 800;
         MinHeight = 520;
@@ -135,12 +137,16 @@ public sealed partial class MainWindow : Window
     }
 
     public EditorSession? Session => session;
+    /// <summary>The remembered preferences; tests read them back without anything reaching disk.</summary>
+    public Settings Settings => settings;
     public CanvasView Canvas => canvas;
 
     // ---- Sessions and tabs --------------------------------------------------------------------------------------
 
     public void AddSession(EditorSession added)
     {
+        // The first document starts from the remembered view options; later ones inherit them from the current tab.
+        if (lastToolSource == null) added.View = settings.View;
         sessions.Add(added);
         added.HistoryChanged += RebuildTabs;
         added.Problem += message => { if (added == session) ShowProblem(message); };
@@ -240,8 +246,20 @@ public sealed partial class MainWindow : Window
     {
         settings.Maximized = WindowState == WindowState.Maximized;
         if (WindowState == WindowState.Normal) { settings.WindowWidth = Width; settings.WindowHeight = Height; }
-        settings.ShowPixelGrid = canvas.ShowPixelGrid;
         settings.JpegQuality = jpegQuality;
+        RememberToolSettings();
+    }
+
+    /// <summary>
+    /// Auto Select, the transform controls, the pixel grid, rulers, guides, the grid and the snapping switches keep
+    /// whatever they were last set to, across tabs and across launches, the way Photoshop's tool options do.
+    /// </summary>
+    private void RememberToolSettings()
+    {
+        settings.ShowPixelGrid = canvas.ShowPixelGrid;
+        settings.ShowTransformControls = canvas.ShowTransformControls;
+        settings.AutoSelect = canvas.AutoSelect;
+        if (session != null) settings.View = session.View;
         settings.Save();
     }
 
