@@ -30,29 +30,14 @@ public static class ImageFiles
 
     private static byte[]? ConvertWithImageMagick(string path)
     {
-        foreach (var tool in new[] { "magick", "convert" })
-        {
-            try
-            {
-                var start = new System.Diagnostics.ProcessStartInfo(tool) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-                start.ArgumentList.Add(path + "[0]");
-                start.ArgumentList.Add("-auto-orient");
-                start.ArgumentList.Add("png:-");
-                using var process = System.Diagnostics.Process.Start(start);
-                if (process == null) continue;
-                using var output = new MemoryStream();
-                var errors = process.StandardError.ReadToEndAsync();
-                process.StandardOutput.BaseStream.CopyTo(output);
-                process.WaitForExit(60_000);
-                _ = errors.Result;
-                if (process.ExitCode == 0 && output.Length > 0) return output.ToArray();
-            }
-            catch (Exception error) when (error is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
-            {
-                // The tool is not installed or could not run; try the next one, then report the original decode error.
-            }
-        }
-        return null;
+        using var process = ImageMagick.Start(path + "[0]", "-auto-orient", "png:-");
+        if (process == null) return null; // Not installed; the caller reports the original decode error.
+        using var output = new MemoryStream();
+        var errors = process.StandardError.ReadToEndAsync();
+        process.StandardOutput.BaseStream.CopyTo(output);
+        process.WaitForExit(60_000);
+        _ = errors.Result;
+        return process.ExitCode == 0 && output.Length > 0 ? output.ToArray() : null;
     }
 
     public static SKBitmap Load(Stream stream, string name = "image")

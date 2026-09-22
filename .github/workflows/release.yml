@@ -19,32 +19,47 @@ jobs:
   linux:
     # 22.04 rather than latest: a self-contained build links against the build machine's glibc, and
     # 24.04 would produce binaries that refuse to start on Debian 12 or Ubuntu 22.04.
-    runs-on: ubuntu-22.04
+    #
+    # arm64 is built on an arm64 runner rather than cross-compiled, so appimagetool and the glibc
+    # floor behave the same way on both architectures.
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        rid: [linux-x64]
-        # linux-arm64 joins this matrix in Phase 1, built on a ubuntu-22.04-arm runner rather than
-        # cross-compiled, so the packaging tools and the glibc floor behave the same on both.
+        include:
+          - rid: linux-x64
+            runner: ubuntu-22.04
+          - rid: linux-arm64
+            runner: ubuntu-22.04-arm
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
 
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
 
-      - name: Build tarball
-        run: scripts/publish.sh ${{ matrix.rid }}
+      # rpmbuild is not on an Ubuntu runner by default. The .deb is built with ar and tar, which
+      # are, so dpkg is not needed.
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils
 
-      # AppImage, .deb and .rpm are added here in Phase 1, all packed from one staging tree so a
-      # layout bug is fixed once rather than three times.
+      - name: Build every package
+        run: scripts/package/all.sh ${{ matrix.rid }} dist
+
+      - name: Check what was produced
+        run: |
+          ls -lh dist/
+          test -n "$(find dist -name '*.tar.gz')"   || { echo "no tarball";  exit 1; }
+          test -n "$(find dist -name '*.deb')"      || { echo "no deb";      exit 1; }
+          test -n "$(find dist -name '*.rpm')"      || { echo "no rpm";      exit 1; }
+          test -n "$(find dist -name '*.AppImage')" || { echo "no AppImage"; exit 1; }
 
       - uses: actions/upload-artifact@v4
         with:
           name: composa-${{ matrix.rid }}
-          path: dist/*.tar.gz
+          path: dist/*
           if-no-files-found: error
 
   # Windows artifacts arrive in Phase 3 and macOS in Phase 4. They are deliberately absent rather
