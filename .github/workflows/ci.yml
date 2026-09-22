@@ -57,3 +57,36 @@ jobs:
 
       - name: Validate AppStream metainfo
         run: appstreamcli validate packaging/composa.metainfo.xml
+
+      - name: Check every script parses
+        run: for f in scripts/*.sh scripts/package/*.sh; do bash -n "$f"; done
+
+  # The packaging scripts used to be exercised only by a release, which meant a release rehearsal
+  # was the first thing to discover that they did not run on a clean checkout. x86-64 only: arm64
+  # differs in the runner rather than in the scripts, and is covered by the release workflow.
+  packages:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install packaging tools
+        run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils
+
+      # This is deliberately the first dotnet command of the job, exactly as it is in a release, so
+      # that anything the scripts assume a previous build left behind fails here instead.
+      - name: Build every package
+        run: scripts/package/all.sh linux-x64 dist
+
+      - name: Check what was produced
+        run: |
+          ls -lh dist/
+          test -n "$(find dist -name '*.tar.gz')"   || { echo "no tarball";  exit 1; }
+          test -n "$(find dist -name '*.deb')"      || { echo "no deb";      exit 1; }
+          test -n "$(find dist -name '*.rpm')"      || { echo "no rpm";      exit 1; }
+          test -n "$(find dist -name '*.AppImage')" || { echo "no AppImage"; exit 1; }

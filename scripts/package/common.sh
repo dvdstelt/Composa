@@ -20,8 +20,30 @@ rpm_arch() { case "$1" in linux-x64) echo x86_64 ;; linux-arm64) echo aarch64 ;;
 
 # MinVer derives this from the nearest git tag, so it matches what the application reports about
 # itself. The MinVer target answers in under a second, unlike a full build.
+#
+# That target ships inside MinVer's NuGet package, so it does not exist until the project has been
+# restored. A developer's checkout is always restored already; a CI checkout never is, which is
+# exactly the difference that has to be handled here rather than assumed away.
+#
+# COMPOSA_VERSION lets all.sh resolve the version once and pass it to every format, instead of each
+# script paying for its own restore.
 app_version() {
-  dotnet msbuild "$ROOT/src/Composa.App/Composa.App.csproj" -t:MinVer -getProperty:MinVerVersion -v:q -nologo 2>/dev/null | tr -d '[:space:]'
+  if [ -n "${COMPOSA_VERSION:-}" ]; then echo "$COMPOSA_VERSION"; return 0; fi
+
+  dotnet restore "$ROOT/src/Composa.App/Composa.App.csproj" >/dev/null || {
+    echo "common.sh: dotnet restore failed, so the version cannot be determined." >&2
+    return 1
+  }
+
+  local version
+  # No 2>/dev/null here. Hiding MSBuild's stderr once turned a one-line error into a build that
+  # failed with no output at all.
+  version="$(dotnet msbuild "$ROOT/src/Composa.App/Composa.App.csproj" -t:MinVer -getProperty:MinVerVersion -v:q -nologo | tr -d '[:space:]')" || {
+    echo "common.sh: MinVer could not be asked for the version." >&2
+    return 1
+  }
+  [ -n "$version" ] || { echo "common.sh: MinVer returned an empty version." >&2; return 1; }
+  echo "$version"
 }
 
 # Debian and RPM both reject a '-' in a version, which every pre-release from MinVer contains.
