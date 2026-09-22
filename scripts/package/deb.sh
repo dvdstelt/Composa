@@ -10,15 +10,15 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 RID="${1:?usage: deb.sh <rid> <staging-dir> <output-dir>}"
-STAGE="${2:?}"
-OUT="${3:?}"
+STAGE="$(abspath "${2:?}")"
+OUT="$(ensure_dir "${3:?}")"
 VERSION="$(app_version)"
 DEB_VERSION="$(deb_version "$VERSION")"
 ARCH="$(deb_arch "$RID")"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-mkdir -p "$WORK/control" "$OUT"
+mkdir -p "$WORK/control"
 
 INSTALLED_KB=$(du -sk "$STAGE" | cut -f1)
 

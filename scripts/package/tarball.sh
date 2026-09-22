@@ -6,13 +6,13 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 RID="${1:?usage: tarball.sh <rid> <output-dir>}"
-OUT="${2:?}"
+OUT="$(ensure_dir "${2:?}")"
 VERSION="$(app_version)"
 NAME="$APP-$VERSION-$RID"
 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
-mkdir -p "$WORK/$NAME" "$OUT"
+mkdir -p "$WORK/$NAME"
 
 # One executable is the whole point of this format, so this is the one build that is single-file.
 dotnet publish "$ROOT/src/Composa.App" -c Release -r "$RID" --self-contained true \
