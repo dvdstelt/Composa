@@ -158,33 +158,15 @@ public static class RawImporter
     /// <summary>Decodes the frame at the camera's own white balance and exposure. Seconds of work: call it off the UI thread.</summary>
     public static RawImage Decode(string path)
     {
-        Exception? last = null;
-        foreach (var tool in new[] { "magick", "convert" })
-        {
-            try
-            {
-                var start = new ProcessStartInfo(tool) { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
-                start.ArgumentList.Add(path + "[0]");
-                start.ArgumentList.Add("-auto-orient");
-                start.ArgumentList.Add("-depth");
-                start.ArgumentList.Add("16");
-                start.ArgumentList.Add("pam:-");
-                using var process = Process.Start(start);
-                if (process == null) continue;
-                using var output = new MemoryStream();
-                var errors = process.StandardError.ReadToEndAsync();
-                process.StandardOutput.BaseStream.CopyTo(output);
-                if (!process.WaitForExit(180_000)) { process.Kill(); throw new InvalidDataException($"{Path.GetFileName(path)} took too long to decode."); }
-                if (process.ExitCode != 0 || output.Length == 0)
-                    throw new InvalidDataException($"{Path.GetFileName(path)} could not be decoded. {FirstLine(errors.Result)}".Trim());
-                return RawImage.ParsePam(output.ToArray());
-            }
-            catch (Exception error) when (error is System.ComponentModel.Win32Exception or IOException or InvalidOperationException)
-            {
-                last = error; // The tool is not installed or could not run; try the next name.
-            }
-        }
-        throw new InvalidDataException($"{Path.GetFileName(path)} is a camera RAW file. Opening one needs ImageMagick (with its LibRaw delegate), which is not installed.", last);
+        using var process = ImageMagick.Start(path + "[0]", "-auto-orient", "-depth", "16", "pam:-")
+            ?? throw new InvalidDataException($"{Path.GetFileName(path)} is a camera RAW file. Opening one needs ImageMagick (with its LibRaw delegate), which is not installed.");
+        using var output = new MemoryStream();
+        var errors = process.StandardError.ReadToEndAsync();
+        process.StandardOutput.BaseStream.CopyTo(output);
+        if (!process.WaitForExit(180_000)) { process.Kill(); throw new InvalidDataException($"{Path.GetFileName(path)} took too long to decode."); }
+        if (process.ExitCode != 0 || output.Length == 0)
+            throw new InvalidDataException($"{Path.GetFileName(path)} could not be decoded. {FirstLine(errors.Result)}".Trim());
+        return RawImage.ParsePam(output.ToArray());
     }
 
     private static string FirstLine(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
