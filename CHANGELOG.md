@@ -2,7 +2,7 @@
 
 All notable changes to Composa are recorded here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.30] - 2026-09-23
+## [0.3.0] - 2026-09-23
 
 Catches up with Compositor 1.2.3 to 1.2.6.
 
