@@ -1,0 +1,14 @@
+Third-party software in this build of Composa
+
+Composa itself is MIT licensed; see LICENSE.
+
+The Windows and macOS builds of Composa include Magick.NET, which is how they open HEIC, AVIF, TIFF and camera RAW files without ImageMagick being installed separately. Linux builds do not include it and use the ImageMagick that the distribution provides instead.
+
+Magick.NET is licensed under the Apache License 2.0. It carries ImageMagick (ImageMagick License) and the libraries ImageMagick uses to read and write image formats, all compiled into the single native library Magick.Native-Q16-<architecture>.dll (or .dylib on macOS) that sits next to the Composa executable. Every component, its version and its full licence text is listed in ImageMagick-NOTICE.txt, which is Magick.NET's own notice file, shipped unchanged.
+
+Several of those components are licensed under the GNU Lesser General Public License, among them libraw (camera RAW), libheif and libde265 (HEIC). Composa does not modify them. The native library is loaded at runtime as a separate file, so it can be replaced with one built from source. The sources and the build scripts that produce it are published at:
+
+  https://github.com/dlemstra/Magick.Native
+  https://github.com/dlemstra/Magick.NET
+
+and each component's own upstream source is linked from ImageMagick-NOTICE.txt.

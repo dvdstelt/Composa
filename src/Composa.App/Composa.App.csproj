@@ -18,7 +18,14 @@
     <DefineConstants Condition="'$(BundleImageMagick)' == 'true'">$(DefineConstants);BUNDLED_IMAGEMAGICK</DefineConstants>
   </PropertyGroup>
   <ItemGroup Condition="'$(BundleImageMagick)' == 'true'">
-    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.17.1" />
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.17.1" GeneratePathProperty="true" />
+    <!--
+      Bundling redistributes ImageMagick and the LGPL libraries compiled into it, so the notices go
+      wherever the library goes. They are tied to the reference here rather than to a packaging
+      script, so no build can carry the library without them.
+    -->
+    <None Include="../../packaging/THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(PkgMagick_NET-Q16-AnyCPU)/Notice.txt" Link="ImageMagick-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup Condition="'$(BundleImageMagick)' != 'true'">
     <Compile Remove="BundledImageMagick.cs" />
@@ -38,4 +45,13 @@
     -->
     <AssemblyMetadata Include="UpdateChannel" Value="$(UpdateChannel)" Condition="'$(UpdateChannel)' != ''" />
   </ItemGroup>
+  <!--
+    SkiaSharp and HarfBuzzSharp ship debug symbols for their native Windows libraries, 105 MB of them,
+    and DebugType=none only governs Composa's own. Nobody debugs a native library from a download.
+  -->
+  <Target Name="LeaveOutDebugSymbols" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
 </Project>
