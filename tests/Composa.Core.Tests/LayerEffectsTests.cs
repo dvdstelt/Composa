@@ -86,6 +86,27 @@ public class LayerEffectsTests
     }
 
     [Fact]
+    public void Inner_glow_lights_the_inside_of_the_edges_and_stays_within_the_shape()
+    {
+        var (session, layer) = RedBoxOnWhite();
+        Assert.True(session.AddEffect(layer, LayerEffectKind.InnerGlow));
+        Assert.Equal((10d, 0xFFFFFFFFu, 0.75), (layer.Effects!.InnerGlow!.Size, layer.Effects.InnerGlow.Color, layer.Effects.InnerGlow.Opacity));
+        session.SetEffects(layer, new LayerEffects { InnerGlow = new InnerGlowEffect { Size = 12, Color = 0xFF0000FF, Opacity = 1 } });
+        var flat = session.Composite();
+        foreach (var (x, y) in new[] { (60, 41), (60, 78), (41, 60), (78, 60) })
+        {
+            var glow = flat.GetPixel(x, y);                                // Just inside each edge: blue over red.
+            Assert.True(glow.Blue > 80 && glow.Red < 200, $"Expected a blue glow at {x},{y} but found {glow}"); // Half strength at the edge itself, as a Gaussian of the shape is.
+        }
+        AssertColor(SKColors.Red, flat.GetPixel(60, 60), 8);              // The middle is barely touched.
+        AssertColor(SKColors.White, flat.GetPixel(60, 37));               // Nothing spills outside.
+        Assert.Equal(2, layer.Effects!.Margin());                          // An inside effect needs no room around the layer.
+        Assert.Equal("Add Inner Glow", session.History.UndoName);
+        session.SetEffects(layer, new LayerEffects { InnerGlow = new InnerGlowEffect { Size = 12, Color = 0xFF0000FF, Opacity = 1, Enabled = false } });
+        AssertColor(SKColors.Red, session.Composite().GetPixel(60, 41));
+    }
+
+    [Fact]
     public void Effects_follow_the_mask_and_the_transform()
     {
         var (session, layer) = RedBoxOnWhite();
@@ -144,7 +165,8 @@ public class LayerEffectsTests
             Stroke = new StrokeEffect { Size = 5, Color = 0xFF00FF00, Inside = true, Enabled = false },
             Shadow = new ShadowEffect { Angle = 45, Distance = 12, Blur = 6, Opacity = 0.7, Color = 0xFF102030 },
             ColorOverlay = new ColorOverlayEffect { Color = 0xFFFF00FF, Opacity = 0.4 },
-            OuterGlow = new OuterGlowEffect { Size = 9, Color = 0xFFFFEE00, Opacity = 0.8 }
+            OuterGlow = new OuterGlowEffect { Size = 9, Color = 0xFFFFEE00, Opacity = 0.8 },
+            InnerGlow = new InnerGlowEffect { Size = 7, Color = 0xFF00FFEE, Opacity = 0.6 }
         });
         using var stream = new MemoryStream();
         ProjectFile.Write(session.Document, stream);
@@ -179,7 +201,8 @@ public class LayerEffectsTests
                             stroke = new { size = 3.0, red = 0.0, green = 1.0, blue = 0.0, opacity = 1.0, inside = false },
                             shadow = new { enabled = false, angle = 120.0, distance = 8.0, blur = 4.0, red = 0.0, green = 0.0, blue = 0.0, opacity = 0.5 },
                             innerShadow = new { angle = 90.0, distance = 3.0, blur = 2.0, red = 1.0, green = 0.0, blue = 0.0, opacity = 0.6 },
-                            outerGlow = new { size = 14.0, red = 1.0, green = 1.0, blue = 0.0, opacity = 0.9 }
+                            outerGlow = new { size = 14.0, red = 1.0, green = 1.0, blue = 0.0, opacity = 0.9 },
+                            innerGlow = new { size = 6.0, red = 0.0, green = 1.0, blue = 1.0, opacity = 0.4 }
                         }
                     }
                 }
@@ -194,6 +217,7 @@ public class LayerEffectsTests
             Assert.Equal(0.6, effects.InnerShadow!.Opacity, 3);
             Assert.Null(effects.ColorOverlay);
             Assert.Equal((14d, 0xFFFFFF00u, 0.9), (effects.OuterGlow!.Size, effects.OuterGlow.Color, effects.OuterGlow.Opacity));
+            Assert.Equal((6d, 0xFF00FFFFu, 0.4), (effects.InnerGlow!.Size, effects.InnerGlow.Color, effects.InnerGlow.Opacity));
         }
         finally { Directory.Delete(folder, recursive: true); }
     }
@@ -208,5 +232,6 @@ public class LayerEffectsTests
         Assert.Equal(20 + 30 + 2, new LayerEffects { Shadow = new ShadowEffect { Distance = 20, Blur = 10 } }.Margin());
         Assert.Equal(2, new LayerEffects { ColorOverlay = new ColorOverlayEffect() }.Margin());
         Assert.Equal(30 + 2, new LayerEffects { OuterGlow = new OuterGlowEffect { Size = 20 } }.Margin());
+        Assert.Equal(2, new LayerEffects { InnerGlow = new InnerGlowEffect { Size = 40 } }.Margin());
     }
 }

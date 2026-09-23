@@ -204,7 +204,7 @@ public static class MacProject
         }.Clamped();
     }
 
-    /// <summary>Stroke, drop shadow, color overlay, inner shadow and outer glow, each optional; a missing <c>enabled</c> means shown.</summary>
+    /// <summary>Stroke, drop shadow, color overlay, inner shadow, outer glow and inner glow, each optional; a missing <c>enabled</c> means shown.</summary>
     private static LayerEffects? ReadEffects(JsonElement effects)
     {
         bool Enabled(JsonElement e) => !e.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False;
@@ -225,7 +225,9 @@ public static class MacProject
                 : null,
             InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null,
             OuterGlow = effects.TryGetProperty("outerGlow", out var glow) && glow.ValueKind == JsonValueKind.Object
-                ? new OuterGlowEffect { Enabled = Enabled(glow), Size = Number(glow, "size", 20), Color = (uint)UnitColor(glow), Opacity = Opacity(glow, 0.75) } : null
+                ? new OuterGlowEffect { Enabled = Enabled(glow), Size = Number(glow, "size", 20), Color = (uint)UnitColor(glow), Opacity = Opacity(glow, 0.75) } : null,
+            InnerGlow = effects.TryGetProperty("innerGlow", out var innerGlow) && innerGlow.ValueKind == JsonValueKind.Object
+                ? new InnerGlowEffect { Enabled = Enabled(innerGlow), Size = Number(innerGlow, "size", 10), Color = (uint)UnitColor(innerGlow), Opacity = Opacity(innerGlow, 0.75) } : null
         };
         return result.IsEmpty ? null : result.Clamped();
     }

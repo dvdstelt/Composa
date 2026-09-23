@@ -122,7 +122,7 @@ public sealed class LayersPanel : UserControl
             item.Click += (_, _) => NewEffectRequested?.Invoke(kind);
             effectsMenu.Items.Add(item);
         }
-        var effectsButton = Ui.IconButton(Icons.Effects, "Layer effects: stroke, drop shadow, color overlay, inner shadow, outer glow", () => { });
+        var effectsButton = Ui.IconButton(Icons.Effects, "Layer effects: stroke, drop shadow, color overlay, inner shadow, outer glow, inner glow", () => { });
         effectsButton.Click += (_, _) => { if (session?.ActiveLayer is { Pixels: not null }) effectsMenu.Open(effectsButton); };
 
         var footer = Ui.Row(2,
