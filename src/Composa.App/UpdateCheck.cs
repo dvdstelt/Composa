@@ -56,9 +56,16 @@ public sealed record UpdateResult(UpdateOutcome Outcome, ReleaseVersion Version 
 /// Reports that a newer version exists. It never downloads or installs anything: it reads one
 /// release from the GitHub API and, at most, offers to open the release page in a browser.
 /// </summary>
-public sealed class UpdateCheck(IReleaseSource source, Settings settings, Func<DateTime>? now = null)
+/// <param name="runningVersion">
+/// What to compare against, defaulting to this build's own version. Tests pass it explicitly:
+/// otherwise every comparison would depend on whether the current commit happens to be tagged, and
+/// the same test would exercise a stable version the day of a release and a pre-release the day
+/// after.
+/// </param>
+public sealed class UpdateCheck(IReleaseSource source, Settings settings, Func<DateTime>? now = null, string? runningVersion = null)
 {
     private readonly Func<DateTime> now = now ?? (() => DateTime.UtcNow);
+    private readonly string runningVersion = runningVersion ?? AppInfo.Version;
 
     /// <summary>How long an automatic check waits before asking again. A manual check ignores it.</summary>
     public static readonly TimeSpan Interval = TimeSpan.FromHours(24);
@@ -91,6 +98,12 @@ public sealed class UpdateCheck(IReleaseSource source, Settings settings, Func<D
                 return new UpdateResult(UpdateOutcome.TooSoon);
         }
 
+        // The attempt is recorded before anything can go wrong with it, so that a failure waits its
+        // turn like a success does. Otherwise someone offline, or rate limited by GitHub, would
+        // send another request on every single launch.
+        settings.LastUpdateCheck = now();
+        settings.Save();
+
         ReleaseInfo? latest;
         try { latest = await source.Latest(cancel); }
         catch (Exception error) when (error is HttpRequestException or TaskCanceledException or NotSupportedException or System.Text.Json.JsonException)
@@ -99,12 +112,9 @@ public sealed class UpdateCheck(IReleaseSource source, Settings settings, Func<D
             return new UpdateResult(UpdateOutcome.Failed);
         }
 
-        settings.LastUpdateCheck = now();
-        settings.Save();
-
         if (latest is null || !ReleaseVersion.TryParse(latest.Tag, out var available))
             return new UpdateResult(UpdateOutcome.Failed);
-        if (!ReleaseVersion.TryParse(AppInfo.Version, out var running))
+        if (!ReleaseVersion.TryParse(this.runningVersion, out var running))
             return new UpdateResult(UpdateOutcome.Failed);
 
         // Someone on a stable build is not offered a pre-release: running 0.3.0 should never be

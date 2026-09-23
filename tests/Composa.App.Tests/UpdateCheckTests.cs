@@ -65,56 +65,50 @@ public class UpdateCheckTests
     private static Settings Fresh() => new() { CheckForUpdates = true };
 
     /// <summary>
-    /// What this build believes it is. Derived, never hardcoded: MinVer takes it from the nearest
-    /// tag, so it changes with every release and a literal here would rot on the next one.
+    /// The version under test is stated, never taken from the assembly. MinVer derives that from
+    /// the nearest tag, so it is stable on the day of a release and a pre-release the day after,
+    /// and a test built on it would pass or fail depending on the tag rather than the logic.
     /// </summary>
-    private static ReleaseVersion Running
-    {
-        get
-        {
-            Assert.True(ReleaseVersion.TryParse(AppInfo.Version, out var running), $"AppInfo.Version is not a version: {AppInfo.Version}");
-            return running;
-        }
-    }
-
-    /// <summary>A version comfortably ahead of whatever this build is, whatever it is.</summary>
-    private static string Newer(string? pre = null)
-        => $"v{Running.Major + 1}.0.0" + (pre is null ? "" : "-" + pre);
+    private static UpdateCheck Check(Source source, Settings? settings = null, string running = "1.0.0", Func<DateTime>? now = null)
+        => new(source, settings ?? Fresh(), now, running);
 
     [Fact]
     public async Task A_newer_release_is_offered()
     {
-        var result = await new UpdateCheck(new Source(Release(Newer())), Fresh()).Run(manual: false);
+        var result = await Check(new Source(Release("v1.1.0")), running: "1.0.0").Run(manual: false);
         Assert.Equal(UpdateOutcome.Available, result.Outcome);
         Assert.True(result.ShouldNotify);
-        Assert.Equal($"{Running.Major + 1}.0.0", result.Version.ToString());
+        Assert.Equal("1.1.0", result.Version.ToString());
     }
 
     [Fact]
     public async Task The_same_or_an_older_release_is_not()
     {
-        var same = await new UpdateCheck(new Source(Release("v" + Running)), Fresh()).Run(manual: false);
+        var same = await Check(new Source(Release("v1.0.0")), running: "1.0.0").Run(manual: false);
         Assert.Equal(UpdateOutcome.UpToDate, same.Outcome);
 
-        var older = await new UpdateCheck(new Source(Release($"v{Running.Major}.0.0-alpha.1")), Fresh()).Run(manual: false);
+        var older = await Check(new Source(Release("v0.9.0")), running: "1.0.0").Run(manual: false);
         Assert.Equal(UpdateOutcome.UpToDate, older.Outcome);
     }
 
     [Fact]
     public async Task A_stable_build_is_never_offered_a_prerelease()
     {
-        Assert.False(Running.IsPreRelease, "this test needs a stable running version");
-        var result = await new UpdateCheck(new Source(Release(Newer("beta.1"), pre: true)), Fresh()).Run(manual: false);
+        var result = await Check(new Source(Release("v1.1.0-beta.1", pre: true)), running: "1.0.0").Run(manual: false);
         Assert.Equal(UpdateOutcome.UpToDate, result.Outcome);
+
+        // Someone already running a pre-release does want to hear about the next one.
+        var onPre = await Check(new Source(Release("v1.1.0-beta.2", pre: true)), running: "1.1.0-beta.1").Run(manual: false);
+        Assert.Equal(UpdateOutcome.Available, onPre.Outcome);
     }
 
     [Fact]
     public async Task An_automatic_check_asks_at_most_once_a_day()
     {
         var settings = Fresh();
-        var source = new Source(Release(Newer()));
+        var source = new Source(Release("v1.1.0"));
         var clock = DateTime.UtcNow;
-        var check = new UpdateCheck(source, settings, () => clock);
+        var check = Check(source, settings, now: () => clock);
 
         Assert.Equal(UpdateOutcome.Available, (await check.Run(manual: false)).Outcome);
         Assert.Equal(1, source.Calls);
@@ -141,19 +135,19 @@ public class UpdateCheckTests
     public async Task A_skipped_version_stays_quiet_but_a_later_one_does_not()
     {
         var settings = Fresh();
-        settings.SkippedVersion = $"{Running.Major + 1}.0.0";
+        settings.SkippedVersion = "1.1.0";
 
-        var skipped = await new UpdateCheck(new Source(Release(Newer())), settings).Run(manual: false);
+        var skipped = await Check(new Source(Release("v1.1.0")), settings).Run(manual: false);
         Assert.Equal(UpdateOutcome.Skipped, skipped.Outcome);
         Assert.False(skipped.ShouldNotify);
 
         settings.LastUpdateCheck = null;
-        var later = await new UpdateCheck(new Source(Release($"v{Running.Major + 2}.0.0")), settings).Run(manual: false);
+        var later = await Check(new Source(Release("v1.2.0")), settings).Run(manual: false);
         Assert.Equal(UpdateOutcome.Available, later.Outcome);
 
         // Asking explicitly reports it even if that version was skipped.
         settings.LastUpdateCheck = null;
-        var asked = await new UpdateCheck(new Source(Release(Newer())), settings).Run(manual: true);
+        var asked = await Check(new Source(Release("v1.1.0")), settings).Run(manual: true);
         Assert.Equal(UpdateOutcome.Available, asked.Outcome);
     }
 
@@ -162,8 +156,8 @@ public class UpdateCheckTests
     {
         var settings = Fresh();
         settings.CheckForUpdates = false;
-        var source = new Source(Release(Newer()));
-        var check = new UpdateCheck(source, settings);
+        var source = new Source(Release("v1.1.0"));
+        var check = Check(source, settings);
 
         Assert.Equal(UpdateOutcome.Disabled, (await check.Run(manual: false)).Outcome);
         Assert.Equal(0, source.Calls); // Nothing reaches the network.
@@ -175,15 +169,40 @@ public class UpdateCheckTests
     public async Task A_network_failure_is_reported_rather_than_thrown()
     {
         var source = new Source(throws: new HttpRequestException("no route to host"));
-        var result = await new UpdateCheck(source, Fresh()).Run(manual: false);
+        var result = await Check(source).Run(manual: false);
         Assert.Equal(UpdateOutcome.Failed, result.Outcome);
         Assert.False(result.ShouldNotify);
+    }
+
+    /// <summary>
+    /// Being offline, or rate limited by GitHub, must not turn every launch into another request.
+    /// A failed check waits its turn exactly like a successful one.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_check_still_counts_as_having_checked()
+    {
+        var settings = Fresh();
+        var source = new Source(throws: new HttpRequestException("no route to host"));
+        var clock = DateTime.UtcNow;
+        var check = Check(source, settings, now: () => clock);
+
+        Assert.Equal(UpdateOutcome.Failed, (await check.Run(manual: false)).Outcome);
+        Assert.Equal(1, source.Calls);
+        Assert.NotNull(settings.LastUpdateCheck);
+
+        clock += TimeSpan.FromMinutes(5); // As if the application were relaunched.
+        Assert.Equal(UpdateOutcome.TooSoon, (await check.Run(manual: false)).Outcome);
+        Assert.Equal(1, source.Calls); // Not a second request.
+
+        clock += TimeSpan.FromHours(25);
+        Assert.Equal(UpdateOutcome.Failed, (await check.Run(manual: false)).Outcome);
+        Assert.Equal(2, source.Calls);
     }
 
     [Fact]
     public async Task A_tag_that_makes_no_sense_is_a_failure_not_a_crash()
     {
-        var result = await new UpdateCheck(new Source(Release("nightly")), Fresh()).Run(manual: false);
+        var result = await Check(new Source(Release("nightly"))).Run(manual: false);
         Assert.Equal(UpdateOutcome.Failed, result.Outcome);
     }
 
@@ -192,6 +211,6 @@ public class UpdateCheckTests
     public void A_build_with_no_channel_set_checks_by_itself()
     {
         Assert.Equal(UpdateChannel.GitHub, UpdateCheck.Channel);
-        Assert.True(new UpdateCheck(new Source(), Fresh()).RunsAutomatically);
+        Assert.True(Check(new Source()).RunsAutomatically);
     }
 }

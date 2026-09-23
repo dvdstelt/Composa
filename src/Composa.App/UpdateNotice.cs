@@ -25,7 +25,12 @@ public sealed class UpdateNotice : Border
         Add(row, message, 0);
         Add(row, Ui.TextButton("Release notes", () => OpenReleasePage?.Invoke()), 1);
         Add(row, Ui.TextButton("Skip this version", () => { Skip?.Invoke(); Hide(); }), 2);
-        Add(row, Ui.IconButton(Icons.Close, "Dismiss", Hide, 11), 3);
+        // Built here rather than through Ui.IconButton, which leaves the icon its default muted
+        // foreground: readable on a dark panel, nearly invisible on this one.
+        var dismiss = new Button { Content = Icons.Create(Icons.Close, 11, Brushes.White), Classes = { "flat" } };
+        ToolTip.SetTip(dismiss, "Dismiss");
+        dismiss.Click += (_, _) => Hide();
+        Add(row, dismiss, 3);
         Child = row;
     }
 
