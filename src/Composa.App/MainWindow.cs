@@ -27,6 +27,7 @@ public sealed partial class MainWindow : Window
     private readonly Border foregroundSwatch = new() { Width = 26, Height = 26, BorderBrush = Brushes.White, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(3) };
     private readonly Border backgroundSwatch = new() { Width = 26, Height = 26, BorderBrush = Brushes.White, BorderThickness = new Thickness(1.5), CornerRadius = new CornerRadius(3) };
     private readonly Panel welcome;
+    private readonly UpdateNotice updateNotice = new();
     private Action? refreshOptions;
     private readonly Settings settings = Settings.Load();
     private readonly Recovery? recovery = Settings.Persist ? new Recovery() : null;
@@ -56,15 +57,19 @@ public sealed partial class MainWindow : Window
         AddAt(center, Ui.Separator(), 3).Margin = new Thickness(0);
         AddAt(center, layers, 4);
 
-        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,*,Auto,Auto") };
+        // The update notice sits under the menu, where it is visible without covering anything.
+        var root = new Grid { RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto,*,Auto,Auto") };
         root.Children.Add(BuildMenu());
-        AddRow(root, BuildTabBar(), 1);
-        AddRow(root, optionsHost, 2);
-        AddRow(root, Ui.Separator(false), 3);
-        AddRow(root, center, 4);
-        AddRow(root, Ui.Separator(false), 5);
-        AddRow(root, BuildStatusBar(), 6);
+        AddRow(root, updateNotice, 1);
+        AddRow(root, BuildTabBar(), 2);
+        AddRow(root, optionsHost, 3);
+        AddRow(root, Ui.Separator(false), 4);
+        AddRow(root, center, 5);
+        AddRow(root, Ui.Separator(false), 6);
+        AddRow(root, BuildStatusBar(), 7);
         Content = root;
+
+        StartUpdateCheck();
 
         canvas.ViewChanged += UpdateStatus;
         canvas.PointerAt += point => positionText.Text = point is { } p ? $"{p.X}, {p.Y}" : "";

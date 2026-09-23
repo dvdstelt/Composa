@@ -16,6 +16,7 @@ Catches up with Compositor 1.2.3 to 1.2.6.
 - Copy and paste whole layers with nothing selected, folders and adjustments included, within a project or into another tab.
 - A right-click menu on every layer row for the layer, its folder and its mask.
 - Crop ratios 3:4 and 9:16, and a crop box that starts at the selection.
+- Composa reports when a newer version is available, as a dismissable strip rather than a dialog. It never downloads or installs anything; the notice links to the release page. The check is one anonymous request a day, it can be turned off under Help, and builds installed from the `.deb` or `.rpm` never check at all because apt and dnf own updates for them.
 
 ### Changed
 

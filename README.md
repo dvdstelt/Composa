@@ -89,7 +89,7 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 - Camera RAW files open only through ImageMagick's LibRaw delegate. The develop step applies exposure and white balance to the 16-bit decoded frame rather than to the sensor data, as Apple's RAW pipeline does on macOS, so its temperature and tint are relative to the camera's reading and there is no tone Boost control.
 - The Camera Raw Filter has no Geometry group (Upright and guided lines), no vectorscope, no Option-drag clipping views, no point colors and no sharpening-mask overlay; its white-balance eyedropper works on the thumbnail in the panel rather than on the canvas, because the panel is a dialog. The filter renders on the full layer while you drag, so a very large layer answers more slowly than the macOS preview does.
 - Layer masks always move with their layer, so the layer menu has no Link Mask item.
-- There is no auto-update.
+- Composa tells you when a newer version is available, but never installs it: the notice links to the release page and nothing is downloaded or replaced behind your back. See [Update checks](#update-checks).
 
 Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool, Bold and Italic text, Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure, Invert, Black & White and Color Balance adjustments.
 
@@ -135,6 +135,16 @@ tar xzf composa-*-linux-x64.tar.gz && cd composa-*-linux-x64 && ./install.sh
 ```
 
 That installs under `~/.local`, so it needs no root. Set `PREFIX` to install elsewhere.
+
+### Update checks
+
+Composa checks once a day whether a newer version has been released, and shows a dismissable strip when there is one. It never downloads or installs anything: the only action it offers is opening the release page in your browser.
+
+The check is a single anonymous `GET` to `https://api.github.com/repos/dvdstelt/Composa/releases/latest`. It sends no version number, no identifier, no machine details and no telemetry of any kind, and GitHub sees only what any visitor to that URL would show. If the request fails, nothing is reported and nothing is retried until the next day.
+
+Turn it off under **Help > Check for Updates Automatically**, or set `COMPOSA_DISABLE_UPDATE_CHECK=1`, which is there so a distribution packager can switch it off without patching code. **Help > Check for Updates** still works when the automatic check is off.
+
+Builds installed from the `.deb` or `.rpm` never check on their own, because apt and dnf own updates for them; there, the menu item says so rather than pointing you around your package manager.
 
 ### ImageMagick
 
