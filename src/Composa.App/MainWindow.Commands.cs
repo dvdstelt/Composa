@@ -210,7 +210,26 @@ public sealed partial class MainWindow
         commands.Add(new Shortcut("Zoom In (keypad)", "Zoom In", "Menus", new KeyGesture(Key.Add, ctrl), canvas.ZoomIn, () => HasDocument, hidden: true));
         commands.Add(new Shortcut("Zoom Out (keypad)", "Zoom Out", "Menus", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument, hidden: true));
 
-        Top("_Help", Item("Keyboard Shortcuts…", () => _ = ShowShortcuts(), Key.F1, needsDocument: false), Item("About Composa", () => _ = Prompts.Alert(this, "About Composa",
+        // A package manager owns updates for a .deb or .rpm, so there is nothing to switch on there.
+        var autoUpdates = new MenuItem
+        {
+            Header = "Check for Updates Automatically",
+            ToggleType = MenuItemToggleType.CheckBox,
+            IsChecked = settings.CheckForUpdates,
+            IsEnabled = UpdateCheck.Channel == UpdateChannel.GitHub
+        };
+        autoUpdates.Click += (_, _) =>
+        {
+            settings.CheckForUpdates = !settings.CheckForUpdates;
+            autoUpdates.IsChecked = settings.CheckForUpdates;
+            settings.Save();
+        };
+
+        Top("_Help", Item("Keyboard Shortcuts…", () => _ = ShowShortcuts(), Key.F1, needsDocument: false),
+            Item("Check for Updates…", () => _ = CheckForUpdatesNow(), needsDocument: false),
+            autoUpdates,
+            Line(),
+            Item("About Composa", () => _ = Prompts.Alert(this, "About Composa",
             $"Composa {AppInfo.Version}\n\nA layer-based image editor for compositing and retouching, built with .NET, Avalonia and Skia. " +
             "It is a from-scratch implementation of the open-source macOS app Compositor by Robbie Tilton (MIT license)."), needsDocument: false));
         BuildToolKeys();

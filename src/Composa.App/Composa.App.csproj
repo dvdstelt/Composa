@@ -14,5 +14,11 @@
     <PackageReference Include="Avalonia.Fonts.Inter" Version="$(AvaloniaVersion)" />
     <ProjectReference Include="../Composa.Core/Composa.Core.csproj" />
     <AvaloniaResource Include="Assets/**" />
+    <!--
+      How this build was distributed, read back at runtime by UpdateCheck. The packaging scripts
+      pass "managed" for the .deb and .rpm, where apt or dnf owns updates and the application must
+      not nag about them. Anything else, including a developer build, is "github".
+    -->
+    <AssemblyMetadata Include="UpdateChannel" Value="$(UpdateChannel)" Condition="'$(UpdateChannel)' != ''" />
   </ItemGroup>
 </Project>

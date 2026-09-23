@@ -18,6 +18,13 @@ public sealed class Settings
     /// <summary>Rebound shortcuts by command id: a gesture string, or empty for none. Missing entries keep the default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
+    /// <summary>Whether to look for a newer version at launch. The manual check in the Help menu ignores this.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+    /// <summary>When the last automatic check ran, so it happens at most once a day.</summary>
+    public DateTime? LastUpdateCheck { get; set; }
+    /// <summary>A version the user dismissed. Only that one stays quiet; the next is announced.</summary>
+    public string? SkippedVersion { get; set; }
+
     private static string FilePath
     {
         get
