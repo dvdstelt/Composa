@@ -263,7 +263,7 @@ public sealed partial class EditorSession
             var matrix = TargetMatrix(target);
             var scale = Math.Sqrt(Math.Abs(matrix.ScaleX * matrix.ScaleY - matrix.SkewX * matrix.SkewY));
             if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3)
-                settings = settings with { Radius = settings.Radius / scale, BloomRadius = settings.BloomRadius / scale, TonalRadius = settings.TonalRadius / scale };
+                settings = settings with { Radius = settings.Radius / scale, BloomRadius = settings.BloomRadius / scale, TonalRadius = settings.TonalRadius / scale, CameraRawScale = 1 / scale };
             // A floating layer's blur spreads past its edges; one that fills the canvas has nothing to spread into.
             var bounds = target.Pixels != null ? target.Bounds : new SKRect(0, 0, document.Width, document.Height);
             settings = settings with { ClampEdges = bounds.Left <= 0.5f && bounds.Top <= 0.5f && bounds.Right >= document.Width - 0.5f && bounds.Bottom >= document.Height - 0.5f };

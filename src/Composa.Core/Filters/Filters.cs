@@ -4,7 +4,7 @@ using SkiaSharp;
 
 namespace Composa.Filters;
 
-public enum FilterKind { GaussianBlur, MotionBlur, AddNoise, Sharpen, Vignette, BloomGlow, TonalContrast, LensCorrection, RemoveBackground }
+public enum FilterKind { GaussianBlur, MotionBlur, AddNoise, Sharpen, Vignette, BloomGlow, TonalContrast, LensCorrection, CameraRaw, RemoveBackground }
 
 /// <summary>Settings for the destructive Filter menu commands. Unused values are ignored by each kind.</summary>
 public sealed record FilterSettings
@@ -48,6 +48,9 @@ public sealed record FilterSettings
     public double TonalShadows { get; init; } = 40;
     public double TonalMidtones { get; init; } = 60;
     public double TonalHighlights { get; init; } = 30;
+    /// <summary>The Camera Raw Filter's whole grade, and the layer's pixels per document pixel so its radii match the picture.</summary>
+    public CameraRawSettings CameraRaw { get; init; } = new();
+    public double CameraRawScale { get; init; } = 1;
     public uint Seed { get; init; } = 1;
     /// <summary>Set for layers that fill the canvas: a blur then continues their edge colors instead of fading into transparency.</summary>
     public bool ClampEdges { get; init; }
@@ -59,6 +62,7 @@ public sealed record FilterSettings
         FilterKind.BloomGlow => BloomAmount <= 0,
         FilterKind.TonalContrast => TonalAmount <= 0 || (TonalShadows == 0 && TonalMidtones == 0 && TonalHighlights == 0),
         FilterKind.LensCorrection => Distortion == 0,
+        FilterKind.CameraRaw => CameraRaw.IsIdentity,
         FilterKind.Sharpen or FilterKind.AddNoise => Amount <= 0,
         _ => false
     };
@@ -74,6 +78,7 @@ public sealed record FilterSettings
         FilterKind.BloomGlow => "Bloom / Glow",
         FilterKind.TonalContrast => "Tonal Contrast",
         FilterKind.LensCorrection => "Lens Correction",
+        FilterKind.CameraRaw => "Camera Raw Filter",
         FilterKind.RemoveBackground => "Remove Background",
         _ => kind.ToString()
     };
@@ -122,6 +127,8 @@ public static unsafe class ImageFilters
                 return Bloom(source, settings.BloomAmount / 50, settings.BloomRadius, settings.ClampEdges && HasOpaqueBorder(source));
             case FilterKind.TonalContrast:
                 return (TonalContrast(source, settings), 0, 0);
+            case FilterKind.CameraRaw:
+                return (CameraRawPixels.Apply(source, settings.CameraRaw, settings.CameraRawScale, settings.Seed), 0, 0);
             case FilterKind.RemoveBackground:
                 return (RemoveBackground(source, settings.Amount), 0, 0);
             default:
@@ -256,6 +263,9 @@ public static unsafe class ImageFilters
         });
         return result;
     }
+
+    /// <summary>The Lens Correction warp on its own, for the Camera Raw Filter's Optics: <paramref name="distortion"/> is -1…1 as the filter's slider gives it.</summary>
+    internal static SKBitmap Distort(SKBitmap source, double distortion) => LensCorrection(source, distortion);
 
     private static SKBitmap LensCorrection(SKBitmap source, double distortion)
     {

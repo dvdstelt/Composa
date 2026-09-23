@@ -706,11 +706,28 @@ public sealed partial class MainWindow
         else { target.PreviewAdjustment(result); target.CommitPreview(); }
     }
 
+    /// <summary>The last Camera Raw grade, so the panel opens where it was left; a hidden group is absent from it.</summary>
+    private CameraRawSettings lastCameraRaw = new();
+
     private async Task Filter(FilterKind kind)
     {
         if (session == null) return;
         var target = session;
         if (!target.BeginFilter(kind)) { ShowProblem("Select a pixel layer or a mask first."); return; }
+        if (kind == FilterKind.CameraRaw)
+        {
+            var original = target.PreviewOriginal!;
+            var seed = (uint)Random.Shared.Next();
+            var grade = await CameraRawDialog.Show(this, lastCameraRaw, original,
+                settings => Busy(() => target.PreviewFilter(new FilterSettings { Kind = kind, CameraRaw = settings, Seed = seed })),
+                () => target.ActiveLayer is { } layer ? (target.IsEditingMask ? layer.Mask : layer.Pixels) : null);
+            if (grade == null) { target.CancelPreview(); return; }
+            lastCameraRaw = grade;
+            if (grade.IsIdentity) { target.CancelPreview(); return; }
+            target.PreviewFilter(new FilterSettings { Kind = kind, CameraRaw = grade, Seed = seed });
+            target.CommitPreview();
+            return;
+        }
         var initial = new FilterSettings { Kind = kind, Radius = kind == FilterKind.Sharpen ? 2 : kind == FilterKind.MotionBlur ? 30 : 8, Amount = kind == FilterKind.Sharpen ? 60 : 20, Seed = (uint)Random.Shared.Next() };
         var result = await AdjustmentDialogs.EditFilter(this, initial, settings => Busy(() => target.PreviewFilter(settings)));
         // A filter left at nothing (a vignette of zero) closes as Cancel does, without an undo step.
