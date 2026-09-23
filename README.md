@@ -7,9 +7,9 @@ The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal an
 Today Composa is built and tested on Linux only, on X11 and Wayland (through XWayland). Windows and macOS builds are planned; nothing in the code is Linux-specific by design, but neither has been run yet.
 
 > [!IMPORTANT]
-> This entire codebase was created by Claude Code Fable 5.1 in a single prompt. I ran it once and played around with it, but haven't looked at the code at all.
+> This entire codebase was initially created by Claude Code Fable 5.1 in a single prompt.
 > The prompt was `Create a version based on the code of Compositor. I'm going to bed. Don't ask questions and don't finish until you're done.`
-> There's still a lot of work to make this work on Linux, Windows and Mac. But I always really liked Photoshop and hopefully this can become my new tool in the future.
+> There's still a lot of work to be done imo. But I always really liked Photoshop and hopefully this can become my new tool in the future.
 
 ## Features
 
