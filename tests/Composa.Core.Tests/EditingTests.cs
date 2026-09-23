@@ -10,6 +10,7 @@ using static Composa.Core.Tests.TestImages;
 
 namespace Composa.Core.Tests;
 
+[Collection(ClipboardCollection.Name)]
 public class EditingTests
 {
     [Fact]
