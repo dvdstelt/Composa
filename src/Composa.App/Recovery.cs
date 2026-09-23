@@ -21,16 +21,7 @@ public sealed class Recovery
     private readonly Dictionary<EditorSession, (Guid Id, int Revision)> saved = [];
     private Task running = Task.CompletedTask;
 
-    public Recovery(string? directory = null)
-    {
-        if (directory == null)
-        {
-            var cache = Environment.GetEnvironmentVariable("XDG_CACHE_HOME");
-            if (string.IsNullOrEmpty(cache)) cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".cache");
-            directory = Path.Combine(cache, "composa", "recovery");
-        }
-        this.directory = directory;
-    }
+    public Recovery(string? directory = null) => this.directory = directory ?? Path.Combine(AppPaths.Cache, "recovery");
 
     /// <summary>Writes every modified session that changed since its last autosave. Returns the task doing the writing.</summary>
     public Task Save(IEnumerable<EditorSession> sessions)
