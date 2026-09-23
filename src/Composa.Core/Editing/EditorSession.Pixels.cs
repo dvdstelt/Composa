@@ -13,10 +13,26 @@ public sealed class ClipboardImage(SKBitmap pixels, SKPointI origin)
     public SKPointI Origin { get; } = origin;
 }
 
+/// <summary>
+/// Whole layers copied with nothing selected. Paste brings them back complete (folder contents, masks, effects,
+/// editable text and shapes, adjustments): in the project they came from as copies above the active layer, in
+/// another project centered on its canvas. The layers are clones sharing the source's immutable bitmaps.
+/// </summary>
+public sealed class ClipboardLayers(IReadOnlyList<Layer> layers, EditorSession source, int canvasWidth, int canvasHeight)
+{
+    /// <summary>Bottom to top, roots only: a layer inside a copied folder comes with the folder.</summary>
+    public IReadOnlyList<Layer> Layers { get; } = layers;
+    public EditorSession Source { get; } = source;
+    public int CanvasWidth { get; } = canvasWidth;
+    public int CanvasHeight { get; } = canvasHeight;
+}
+
 public sealed partial class EditorSession
 {
     /// <summary>Pixels copied inside the app, shared by every open project.</summary>
     public static ClipboardImage? Clipboard { get; set; }
+    /// <summary>Layers copied whole (Copy with nothing selected), shared by every open project. Set alongside <see cref="Clipboard"/> and cleared by a pixel copy.</summary>
+    public static ClipboardLayers? CopiedLayers { get; set; }
 
     /// <summary>The active layer when it (or its mask) can take pixel edits.</summary>
     public Layer? EditableLayer => ActiveLayer is { } layer && (IsEditingMask || (layer.Pixels != null && !layer.IsLive)) ? layer : null;
@@ -214,6 +230,31 @@ public sealed partial class EditorSession
         return (ColorToMask(color), 0, 0);
     });
 
+    /// <summary>
+    /// Starts a filter's live preview. Vignette also paints an empty layer, which has no pixels of its own yet: the
+    /// layer is grown to the canvas first, and the vignette then frames and fills the whole canvas.
+    /// </summary>
+    public bool BeginFilter(FilterKind kind)
+    {
+        var fillsCanvas = kind == FilterKind.Vignette && !IsEditingMask && EditableLayer is { Pixels: { } pixels } && IsClear(pixels);
+        if (!BeginPreview(FilterSettings.DisplayName(kind), coverCanvas: fillsCanvas)) return false;
+        previewFillsClear = fillsCanvas;
+        return true;
+    }
+
+    private bool previewFillsClear;
+
+    private static unsafe bool IsClear(SKBitmap pixels)
+    {
+        var data = (byte*)pixels.GetPixels();
+        for (var y = 0; y < pixels.Height; y++)
+        {
+            var row = data + (long)y * pixels.RowBytes;
+            for (var x = 3; x < pixels.Width * 4; x += 4) if (row[x] != 0) return false;
+        }
+        return true;
+    }
+
     public void PreviewFilter(FilterSettings settings)
     {
         // Radii and distances are given in document pixels; a scaled-down photo has several source pixels to each.
@@ -221,10 +262,18 @@ public sealed partial class EditorSession
         {
             var matrix = TargetMatrix(target);
             var scale = Math.Sqrt(Math.Abs(matrix.ScaleX * matrix.ScaleY - matrix.SkewX * matrix.SkewY));
-            if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3) settings = settings with { Radius = settings.Radius / scale };
+            if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3)
+                settings = settings with { Radius = settings.Radius / scale, BloomRadius = settings.BloomRadius / scale, TonalRadius = settings.TonalRadius / scale, CameraRawScale = 1 / scale };
             // A floating layer's blur spreads past its edges; one that fills the canvas has nothing to spread into.
             var bounds = target.Pixels != null ? target.Bounds : new SKRect(0, 0, document.Width, document.Height);
             settings = settings with { ClampEdges = bounds.Left <= 0.5f && bounds.Top <= 0.5f && bounds.Right >= document.Width - 0.5f && bounds.Bottom >= document.Height - 0.5f };
+            if (settings.Kind == FilterKind.Vignette)
+            {
+                // An empty layer takes the vignette across the canvas; a layer with pixels is framed and recolored as it is.
+                SKRect? frame = null;
+                if (previewFillsClear && matrix.TryInvert(out var inverse)) frame = inverse.MapRect(new SKRect(0, 0, document.Width, document.Height));
+                settings = settings with { VignetteFillsClear = previewFillsClear, VignetteFrame = frame };
+            }
         }
         PreviewFilterCore(settings);
     }
@@ -303,7 +352,7 @@ public sealed partial class EditorSession
 
     public void ApplyFilter(FilterSettings settings)
     {
-        if (!BeginPreview(FilterSettings.DisplayName(settings.Kind))) return;
+        if (!BeginFilter(settings.Kind)) return;
         PreviewFilter(settings);
         CommitPreview();
     }
@@ -490,11 +539,24 @@ public sealed partial class EditorSession
         return Grab(rendered, area);
     }
 
-    public bool CanCopy => ActiveLayer is { Pixels: not null };
+    /// <summary>Copy takes pixels from a pixel layer (or a mask); with nothing selected it also takes the layers themselves, folders and adjustments included.</summary>
+    public bool CanCopy => ActiveLayer is { } layer && (layer.Pixels != null || CanCopyLayers);
+
+    /// <summary>Copy with no selection copies the selected layers whole, for Paste here or in another project.</summary>
+    public bool CanCopyLayers => ActiveLayer != null && document.Selection == null && !IsEditingMask;
 
     public bool Copy()
     {
-        if (ActiveLayer is not { Pixels: not null } layer || GrabLayer(layer) is not { } image) return false;
+        CopiedLayers = CanCopyLayers
+            ? new ClipboardLayers(SelectedRoots().Select(l => l.Clone()).ToList(), this, document.Width, document.Height)
+            : null;
+        if (ActiveLayer is not { Pixels: not null } layer || GrabLayer(layer) is not { } image)
+        {
+            // A folder or an adjustment layer has no pixels of its own; other apps get its rendering when it has one.
+            if (CopiedLayers == null) return false;
+            Clipboard = ActiveLayer is { IsGroup: true } group && GrabLayer(group) is { } rendered ? rendered : null;
+            return true;
+        }
         Clipboard = image;
         return true;
     }
@@ -503,6 +565,7 @@ public sealed partial class EditorSession
     {
         if (Grab(Composite(), document.Bounds) is not { } image) return false;
         Clipboard = image;
+        CopiedLayers = null;
         return true;
     }
 
@@ -512,9 +575,13 @@ public sealed partial class EditorSession
         if (document.Selection != null) ClearSelection(); else DeleteSelectedLayers();
     }
 
-    /// <summary>Pastes as a new layer: where it was copied from when that still fits the canvas, otherwise centered.</summary>
+    /// <summary>
+    /// Pastes as a new layer: where it was copied from when that still fits the canvas, otherwise centered. Layers
+    /// copied whole come back complete instead; an image handed in from another app always pastes as pixels.
+    /// </summary>
     public Layer? Paste(ClipboardImage? image = null, string name = "Pasted Layer")
     {
+        if (image == null && CopiedLayers is { } layers) return PasteLayers(layers);
         image ??= Clipboard;
         if (image == null) return null;
         var pixels = Pixels.Clone(image.Pixels);
@@ -528,6 +595,47 @@ public sealed partial class EditorSession
         Invalidate(AffectedArea(layer));
         LayersChanged?.Invoke();
         return layer;
+    }
+
+    /// <summary>
+    /// Layers copied whole, pasted above the active layer as one undo step. In their own project they keep their
+    /// place, like Duplicate Layer; in another they are centered on the canvas together, keeping their positions
+    /// relative to each other. Returns the topmost pasted layer, which becomes active with every copy selected.
+    /// </summary>
+    private Layer? PasteLayers(ClipboardLayers copied)
+    {
+        if (copied.Layers.Count == 0) return null;
+        var pasted = copied.Layers.Select(l => l.Clone(newIds: true)).ToList();
+        if (copied.Source != this)
+        {
+            // Centered on this canvas: a single layer by its own center, several by the center of what they cover.
+            var pictured = pasted.SelectMany(l => Document.Flatten([l])).Where(l => l.Pixels != null).Select(l => l.Bounds).ToList();
+            var covered = pictured.Count > 0 ? pictured.Aggregate(SKRect.Union) : new SKRect(0, 0, copied.CanvasWidth, copied.CanvasHeight);
+            var dx = Math.Round(document.Width / 2.0 - covered.MidX);
+            var dy = Math.Round(document.Height / 2.0 - covered.MidY);
+            foreach (var layer in pasted.SelectMany(l => Document.Flatten([l])))
+            {
+                if (layer.Pixels != null) layer.Transform = layer.Transform.Translated(dx, dy);
+                else if (layer.Mask is { } mask && (dx != 0 || dy != 0 || mask.Width != document.Width || mask.Height != document.Height))
+                    layer.Mask = RemapDocumentMask(mask, document.Width, document.Height, SKMatrix.CreateTranslation((float)dx, (float)dy), 255);
+            }
+        }
+        Apply(pasted.Count > 1 ? "Paste Layers" : "Paste Layer", () =>
+        {
+            if (ActiveLayer is { } active)
+            {
+                var siblings = active.IsGroup && !active.Collapsed ? active.Children : document.SiblingsOf(active.Id)!;
+                var index = active.IsGroup && !active.Collapsed ? siblings.Count : siblings.IndexOf(active) + 1;
+                siblings.InsertRange(index, pasted);
+            }
+            else document.Layers.AddRange(pasted);
+            document.SetActive(pasted[^1].Id);
+            foreach (var layer in pasted) document.SelectedLayerIds.Add(layer.Id);
+        });
+        EditingMask = false;
+        InvalidateAll();
+        LayersChanged?.Invoke();
+        return pasted[^1];
     }
 
     /// <summary>Ctrl+J: the selected pixels on a new layer, or a duplicate of the layer when nothing is selected.</summary>

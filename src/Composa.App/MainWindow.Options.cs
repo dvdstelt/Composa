@@ -116,10 +116,13 @@ public sealed partial class MainWindow
                 break;
             case Tool.Crop:
                 Add(Title("Crop"));
+                var ratio = Ui.Combo(EditorSession.CropRatios, s.CropRatio, r => r, r => { s.CropRatio = r; canvas.ChangeCropRatio(); }, 100);
+                ToolTip.SetTip(ratio, "The shape the crop box keeps while you drag it");
+                Add(Ui.Row(6, Ui.Label("Ratio", Palette.Secondary), ratio));
                 var readout = Ui.Label("Drag on the canvas to choose the area to keep", Palette.Secondary);
                 var apply = Ui.TextButton("Apply", canvas.ApplyCrop, accent: true);
                 var cancel = Ui.TextButton("Cancel", canvas.CancelCrop);
-                Add(readout, apply, cancel, Ui.Separator(), Flat("Trim transparent edges", s.TrimCanvas));
+                Add(readout, apply, cancel, Ui.Separator(), Flat("Trim transparent edges", () => { if (!s.Trim()) ShowProblem("Nothing to trim: no edge is transparent."); else canvas.Fit(); }));
                 refreshOptions = () =>
                 {
                     apply.IsEnabled = cancel.IsEnabled = canvas.HasCrop;

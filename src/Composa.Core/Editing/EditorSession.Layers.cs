@@ -116,22 +116,40 @@ public sealed partial class EditorSession
         LayersChanged?.Invoke();
     }
 
-    public void DuplicateSelectedLayers()
+    /// <summary>
+    /// Duplicate Layer, Ctrl+J without a selection and Paste of layers copied whole: a copy of every selected layer
+    /// (a folder with all it holds), as one undo step. One copy sits just above its original; several stack together,
+    /// in their order, above the topmost original, as Photoshop's do. The copies end up selected, the copy of the
+    /// active layer active.
+    /// </summary>
+    public void DuplicateSelectedLayers(string name = "Duplicate Layer") => DuplicateLayers(SelectedRoots(), name);
+
+    private void DuplicateLayers(List<Layer> roots, string name)
     {
-        var roots = SelectedRoots();
         if (roots.Count == 0) return;
-        Apply("Duplicate Layer", () =>
+        Apply(roots.Count > 1 && name == "Duplicate Layer" ? "Duplicate Layers" : name, () =>
         {
-            Layer? last = null;
-            foreach (var layer in roots)
+            var copies = roots.Select(layer =>
             {
                 var copy = layer.Clone(newIds: true);
                 copy.Name = layer.Name + " copy";
-                var siblings = document.SiblingsOf(layer.Id)!;
-                siblings.Insert(siblings.IndexOf(layer) + 1, copy);
-                last = copy;
+                return (Original: layer, Copy: copy);
+            }).ToList();
+            if (copies.Count == 1)
+            {
+                var siblings = document.SiblingsOf(roots[0].Id)!;
+                siblings.Insert(siblings.IndexOf(roots[0]) + 1, copies[0].Copy);
             }
-            document.SetActive(last!.Id);
+            else
+            {
+                // Above the topmost original, keeping the copies in the originals' order.
+                var top = roots[^1];
+                var siblings = document.SiblingsOf(top.Id)!;
+                siblings.InsertRange(siblings.IndexOf(top) + 1, copies.Select(c => c.Copy));
+            }
+            var active = copies.FirstOrDefault(c => c.Original.Id == document.ActiveLayerId).Copy ?? copies[^1].Copy;
+            document.SetActive(active.Id);
+            foreach (var (_, copy) in copies) document.SelectedLayerIds.Add(copy.Id);
         });
         InvalidateAll();
         LayersChanged?.Invoke();
@@ -226,6 +244,13 @@ public sealed partial class EditorSession
         LayersChanged?.Invoke();
     }
 
+    /// <summary>Takes a layer out of its folder and puts it just above that folder.</summary>
+    public void MoveOutOfFolder(Layer layer)
+    {
+        if (document.ParentOf(layer.Id) is not { } parent) return;
+        MoveLayers([layer], parent, LayerDrop.Above);
+    }
+
     /// <summary>Moves layers next to <paramref name="target"/>: above it, below it, or into it when it is a folder.</summary>
     public void MoveLayers(IReadOnlyList<Layer> layers, Layer? target, LayerDrop drop)
     {
@@ -311,6 +336,9 @@ public sealed partial class EditorSession
             foreach (var layer in roots.SelectMany(r => Document.Flatten([r])).Where(l => l.Pixels != null))
                 area = Geometry.Union(area, Geometry.RoundOut(layer.VisibleBounds));
             area = Geometry.Intersect(area, new SKRectI(-Document.MaxSide, -Document.MaxSide, 2 * Document.MaxSide, 2 * Document.MaxSide));
+            // Layers that sprawl far beyond the canvas would need a bitmap the size of a wall; the merge then keeps
+            // only what lies within the canvas.
+            if ((long)area.Width * area.Height > IO.ImageFiles.MaxPixels) area = document.Bounds;
 
             // The merged layer keeps the bottom layer's blend mode and opacity, so those are left out of the render.
             var single = roots.Count == 1;

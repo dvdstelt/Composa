@@ -5,6 +5,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Composa.App.Dialogs;
+using Composa.Editing;
 using Composa.Filters;
 using SkiaSharp;
 
@@ -105,5 +106,52 @@ public class JpegDialogTests
         dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "21-jpeg-export.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
         dialog.Close(true);
         Assert.Equal(60, await task);
+    }
+}
+
+public class CameraRawDialogTests
+{
+    [AvaloniaFact]
+    public void The_panel_lists_every_group_and_ok_commits_the_grade_as_one_step()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(200, 120, SKColors.White);
+        window.AddSession(session);
+        var photo = Rendering.Pixels.NewColor(160, 100);
+        photo.Erase(new SKColor(128, 110, 100));
+        session.AddImageLayer("Photo", photo);
+        Dispatcher.UIThread.RunJobs();
+        var original = session.ActiveLayer!.Pixels!;
+        CameraRawSettings? result = null;
+        var task = CameraRawDialog.Show(window, new CameraRawSettings { Exposure = 0.5 }, original, s => result = s, () => session.ActiveLayer?.Pixels);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = Assert.Single(window.OwnedWindows);
+        Assert.Equal("Camera Raw Filter", dialog.Title);
+        var groups = dialog.GetVisualDescendants().OfType<Expander>().ToList();
+        Assert.Equal(9, groups.Count);
+        var headers = groups.Select(g => ((Grid)g.Header!).Children.OfType<TextBlock>().Single().Text).ToList();
+        Assert.Equal(["Light", "Color", "Effects", "Curve", "Color Mixer", "Color Grading", "Detail", "Optics", "Calibration"], headers);
+        Assert.True(groups[0].IsExpanded && groups[1].IsExpanded && !groups[2].IsExpanded);
+        // The Light group's eye is shown because Exposure is set; clicking it renders without the group.
+        var eye = ((Grid)groups[0].Header!).Children.OfType<Button>().Single();
+        Assert.True(eye.IsVisible);
+        Assert.False(((Grid)groups[2].Header!).Children.OfType<Button>().Single().IsVisible);
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Directory.CreateDirectory(WindowTests.Shots);
+        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "30-camera-raw.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        eye.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        dialog.Close(true);
+        Dispatcher.UIThread.RunJobs();
+        var grade = task.Result;
+        Assert.NotNull(grade);
+        Assert.Equal(0, grade!.Exposure);                                   // Hidden on OK, the group is absent from the grade.
+        Assert.True(grade.IsIdentity);
+
+        // Through the menu, the grade previews live and commits as one undo step named after the filter.
+        session.ApplyFilter(new FilterSettings { Kind = FilterKind.CameraRaw, CameraRaw = new CameraRawSettings { Exposure = 1 } });
+        Assert.Equal("Camera Raw Filter", session.History.UndoName);
+        Assert.True(session.ActiveLayer!.Pixels!.GetPixel(10, 10).Red > 160);
+        _ = result;
     }
 }

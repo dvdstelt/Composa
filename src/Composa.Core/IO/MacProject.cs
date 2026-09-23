@@ -204,7 +204,7 @@ public static class MacProject
         }.Clamped();
     }
 
-    /// <summary>Stroke, drop shadow, color overlay, inner shadow and outer glow, each optional; a missing <c>enabled</c> means shown.</summary>
+    /// <summary>Stroke, drop shadow, color overlay, inner shadow, outer glow and inner glow, each optional; a missing <c>enabled</c> means shown.</summary>
     private static LayerEffects? ReadEffects(JsonElement effects)
     {
         bool Enabled(JsonElement e) => !e.TryGetProperty("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.False;
@@ -225,7 +225,9 @@ public static class MacProject
                 : null,
             InnerShadow = effects.TryGetProperty("innerShadow", out var inner) && inner.ValueKind == JsonValueKind.Object ? Shadow(inner, 10, 10) : null,
             OuterGlow = effects.TryGetProperty("outerGlow", out var glow) && glow.ValueKind == JsonValueKind.Object
-                ? new OuterGlowEffect { Enabled = Enabled(glow), Size = Number(glow, "size", 20), Color = (uint)UnitColor(glow), Opacity = Opacity(glow, 0.75) } : null
+                ? new OuterGlowEffect { Enabled = Enabled(glow), Size = Number(glow, "size", 20), Color = (uint)UnitColor(glow), Opacity = Opacity(glow, 0.75) } : null,
+            InnerGlow = effects.TryGetProperty("innerGlow", out var innerGlow) && innerGlow.ValueKind == JsonValueKind.Object
+                ? new InnerGlowEffect { Enabled = Enabled(innerGlow), Size = Number(innerGlow, "size", 10), Color = (uint)UnitColor(innerGlow), Opacity = Opacity(innerGlow, 0.75) } : null
         };
         return result.IsEmpty ? null : result.Clamped();
     }
@@ -277,6 +279,17 @@ public static class MacProject
                 return new GrainAdjustment { Amount = Number(n, "amount", 25), Size = Number(n, "size", 1.5), Roughness = Number(n, "roughness", 50), Seed = (uint)Number(n, "seed", 0) };
             case "Invert":
                 return new InvertAdjustment();
+            case "Gaussian Blur":
+                return new GaussianBlurAdjustment { Radius = Number(a, "blurRadius", 10) };
+            case "Motion Blur":
+                return new MotionBlurAdjustment { Angle = Number(a, "motionAngle", 0), Distance = Number(a, "motionDistance", 10) };
+            case "Add Noise":
+                return new AddNoiseAdjustment
+                {
+                    Amount = Number(a, "noiseAmount", 10), Seed = (uint)Number(a, "noiseSeed", 0),
+                    Gaussian = a.TryGetProperty("noiseGaussian", out var gaussian) && gaussian.ValueKind == JsonValueKind.True,
+                    Monochromatic = a.TryGetProperty("noiseMonochromatic", out var mono) && mono.ValueKind == JsonValueKind.True
+                };
             case "Black & White":
                 if (!a.TryGetProperty("blackWhiteSettings", out var bw)) return new BlackAndWhiteAdjustment();
                 return new BlackAndWhiteAdjustment

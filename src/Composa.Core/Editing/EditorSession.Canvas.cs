@@ -256,14 +256,4 @@ public sealed partial class EditorSession
             ? t with { X = extent - t.X - t.Width, FlipHorizontal = !t.FlipHorizontal, Rotation = -t.Rotation, Distort = distort }
             : t with { Y = extent - t.Y - t.Height, FlipVertical = !t.FlipVertical, Rotation = -t.Rotation, Distort = distort };
     }
-
-    /// <summary>Shrinks the canvas to the union of every visible layer's pixels.</summary>
-    public void TrimCanvas()
-    {
-        using var flat = Flatten();
-        using var alpha = Pixels.NewMask(flat.Width, flat.Height);
-        using (var canvas = new SKCanvas(alpha)) canvas.DrawBitmap(flat, 0, 0);
-        var bounds = SelectionMask.Bounds(alpha);
-        if (!bounds.IsEmpty) Crop(bounds, "Trim");
-    }
 }

@@ -124,7 +124,7 @@ public sealed partial class MainWindow
             Line(),
             Item("Canvas Size…", () => _ = CanvasSize(), Key.C, ctrl | alt),
             Item("Image Size…", () => _ = ImageSize(), Key.I, ctrl | alt),
-            Item("Trim Transparent Edges", () => { session!.TrimCanvas(); canvas.Fit(); }),
+            Item("Trim…", () => _ = Trim()),
             Line(),
             Item("Rotate Canvas 90° Clockwise", () => { session!.RotateCanvas(true); canvas.Fit(); }),
             Item("Rotate Canvas 90° Counterclockwise", () => { session!.RotateCanvas(false); canvas.Fit(); }),
@@ -141,7 +141,7 @@ public sealed partial class MainWindow
             Item("Edit Adjustment…", () => _ = EditAdjustmentLayer(session!.ActiveLayer!, false), enabled: () => session!.ActiveLayer?.IsAdjustment == true),
             Line(),
             Item("Transform Layer", () => { canvas.ShowTransformControls = true; SelectTool(Tool.Move); }, Key.T, ctrl),
-            Item("Duplicate Layer / Layer via Copy", () => session!.LayerViaCopy(), Key.J, ctrl),
+            Item("Duplicate Layer / Layer via Copy", () => session!.LayerViaCopy(), Key.J, ctrl, () => session!.ActiveLayer != null),
             Item("Rename Layer…", layers.BeginRename, Key.F2, enabled: () => session!.ActiveLayer != null),
             Item("Delete Layer", layers.DeleteLayerOrMask, enabled: () => session!.ActiveLayer != null),
             Line(),
@@ -205,6 +205,8 @@ public sealed partial class MainWindow
             Line(),
             ViewToggle("Lock Guides", v => v.LockGuides, v => v with { LockGuides = !v.LockGuides }, Key.OemSemicolon, ctrl | alt),
             Item("Clear Guides", () => session!.ClearGuides(), enabled: () => session!.CanClearGuides));
+        // '+' is Shift and '=' on most keyboards, so Zoom In answers with Shift held too.
+        commands.Add(new Shortcut("Zoom In (with Shift)", "Zoom In", "Menus", new KeyGesture(Key.OemPlus, ctrl | shift), canvas.ZoomIn, () => HasDocument, hidden: true));
         commands.Add(new Shortcut("Zoom In (keypad)", "Zoom In", "Menus", new KeyGesture(Key.Add, ctrl), canvas.ZoomIn, () => HasDocument, hidden: true));
         commands.Add(new Shortcut("Zoom Out (keypad)", "Zoom Out", "Menus", new KeyGesture(Key.Subtract, ctrl), canvas.ZoomOut, () => HasDocument, hidden: true));
 
@@ -613,6 +615,7 @@ public sealed partial class MainWindow
     private async Task Copy(bool merged)
     {
         if (session == null || !(merged ? session.CopyMerged() : session.Copy())) { ShowProblem("There is nothing to copy here."); return; }
+        if (EditorSession.Clipboard == null) { await ClearExternalClipboard(); return; }
         await PublishClipboard();
     }
 
@@ -635,6 +638,14 @@ public sealed partial class MainWindow
             await Clipboard.SetBitmapAsync(bitmap);
         }
         catch { /* The in-app clipboard still works when the desktop's clipboard refuses the image. */ }
+    }
+
+    /// <summary>Layers with nothing to show other apps (an adjustment) leave the desktop's clipboard empty, so Paste here is not mistaken for an outside image.</summary>
+    private async Task ClearExternalClipboard()
+    {
+        if (Clipboard == null) return;
+        try { await Clipboard.ClearAsync(); }
+        catch { /* Nothing to share; the in-app clipboard still has the layers. */ }
     }
 
     private async Task Paste()
@@ -695,14 +706,32 @@ public sealed partial class MainWindow
         else { target.PreviewAdjustment(result); target.CommitPreview(); }
     }
 
+    /// <summary>The last Camera Raw grade, so the panel opens where it was left; a hidden group is absent from it.</summary>
+    private CameraRawSettings lastCameraRaw = new();
+
     private async Task Filter(FilterKind kind)
     {
         if (session == null) return;
         var target = session;
-        if (!target.BeginPreview(FilterSettings.DisplayName(kind))) { ShowProblem("Select a pixel layer or a mask first."); return; }
+        if (!target.BeginFilter(kind)) { ShowProblem("Select a pixel layer or a mask first."); return; }
+        if (kind == FilterKind.CameraRaw)
+        {
+            var original = target.PreviewOriginal!;
+            var seed = (uint)Random.Shared.Next();
+            var grade = await CameraRawDialog.Show(this, lastCameraRaw, original,
+                settings => Busy(() => target.PreviewFilter(new FilterSettings { Kind = kind, CameraRaw = settings, Seed = seed })),
+                () => target.ActiveLayer is { } layer ? (target.IsEditingMask ? layer.Mask : layer.Pixels) : null);
+            if (grade == null) { target.CancelPreview(); return; }
+            lastCameraRaw = grade;
+            if (grade.IsIdentity) { target.CancelPreview(); return; }
+            target.PreviewFilter(new FilterSettings { Kind = kind, CameraRaw = grade, Seed = seed });
+            target.CommitPreview();
+            return;
+        }
         var initial = new FilterSettings { Kind = kind, Radius = kind == FilterKind.Sharpen ? 2 : kind == FilterKind.MotionBlur ? 30 : 8, Amount = kind == FilterKind.Sharpen ? 60 : 20, Seed = (uint)Random.Shared.Next() };
         var result = await AdjustmentDialogs.EditFilter(this, initial, settings => Busy(() => target.PreviewFilter(settings)));
-        if (result == null) target.CancelPreview();
+        // A filter left at nothing (a vignette of zero) closes as Cancel does, without an undo step.
+        if (result == null || result.IsIdentity) target.CancelPreview();
         else { target.PreviewFilter(result); target.CommitPreview(); }
     }
 
@@ -772,6 +801,19 @@ public sealed partial class MainWindow
         if (session == null) return;
         if (await CanvasDialogs.CanvasSize(this, session.Document.Width, session.Document.Height) is not { } result) return;
         session.ResizeCanvas(result.Width, result.Height, result.Anchor);
+        canvas.Fit();
+    }
+
+    private TrimOptions trimOptions = new();
+
+    /// <summary>Image &gt; Trim: the dialog remembers its last choices for the session.</summary>
+    private async Task Trim()
+    {
+        if (session == null) return;
+        var target = session;
+        if (await TrimDialog.Show(this, trimOptions) is not { } options) return;
+        trimOptions = options;
+        if (!target.Trim(options)) { ShowProblem("Nothing to trim: no edge is empty in that sense."); return; }
         canvas.Fit();
     }
 

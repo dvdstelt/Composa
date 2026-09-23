@@ -62,8 +62,35 @@ public sealed partial class CanvasView
     {
         CancelInteraction();
         if (session?.Tool != Tool.Crop) cropRect = null;
+        // With a selection, the crop starts at its bounds, as Photoshop's does: C, then Enter, crops to it.
+        else if (cropRect == null && session.Selection is { } selection && SelectionMask.Bounds(selection) is { IsEmpty: false } bounds)
+            cropRect = ConstrainCrop(new SKRect(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom));
         UpdateCursor();
         InvalidateVisual();
+    }
+
+    /// <summary>The crop bar's ratio changed: the box, when there is one, is reshaped around its center to match.</summary>
+    public void ChangeCropRatio()
+    {
+        if (cropRect is { } crop) cropRect = ConstrainCrop(crop);
+        InvalidateVisual();
+        ToolStateChanged?.Invoke();
+    }
+
+    /// <summary>Reshapes a box to the chosen ratio about its center, kept to the width or height that still fits the canvas.</summary>
+    private SKRect ConstrainCrop(SKRect box)
+    {
+        if (session?.CropAspect is not { } aspect || box.Width < 1 || box.Height < 1) return box;
+        var width = box.Width;
+        var height = (float)(width / aspect);
+        if (height > session.Document.Height) { height = session.Document.Height; width = (float)(height * aspect); }
+        if (width > session.Document.Width) { width = session.Document.Width; height = (float)(width / aspect); }
+        var shaped = SKRect.Create(box.MidX - width / 2, box.MidY - height / 2, width, height);
+        // Slid back inside the canvas when the reshaping pushed it out.
+        var dx = Math.Max(0, -shaped.Left) - Math.Max(0, shaped.Right - session.Document.Width);
+        var dy = Math.Max(0, -shaped.Top) - Math.Max(0, shaped.Bottom - session.Document.Height);
+        shaped.Offset(dx, dy);
+        return shaped;
     }
 
     public void CancelInteraction()
@@ -453,19 +480,36 @@ public sealed partial class CanvasView
         if (handle is TransformHandle.TopRight or TransformHandle.Right or TransformHandle.BottomRight) right = px;
         if (handle is TransformHandle.TopLeft or TransformHandle.Top or TransformHandle.TopRight) top = py;
         if (handle is TransformHandle.BottomLeft or TransformHandle.Bottom or TransformHandle.BottomRight) bottom = py;
-        if (shift && start.Width > 0 && start.Height > 0)
+        // The bar's ratio always holds; without one, Shift keeps the box's proportions (a fresh box becomes square).
+        var ratio = session.CropAspect ?? (shift ? start.Width > 0 && start.Height > 0 ? start.Width / (double)start.Height : 1 : null);
+        if (ratio is { } aspect)
         {
-            // Keep the proportions by adjusting an edge that is not under the pointer's control, anchored opposite the handle.
-            var aspect = start.Width / start.Height;
-            if (handle is TransformHandle.Left or TransformHandle.Right) bottom = top + Math.Abs(right - left) / aspect;
-            else if (handle is TransformHandle.TopLeft or TransformHandle.BottomLeft) left = right - Math.Abs(bottom - top) * aspect;
-            else right = left + Math.Abs(bottom - top) * aspect * (right < left ? -1 : 1);
-        }
-        else if (shift)
-        {
-            var side = Math.Max(Math.Abs(right - left), Math.Abs(bottom - top));
-            right = left + side * (right < left ? -1 : 1);
-            bottom = top + side * (bottom < top ? -1 : 1);
+            var movesLeft = handle is TransformHandle.TopLeft or TransformHandle.Left or TransformHandle.BottomLeft;
+            var movesRight = handle is TransformHandle.TopRight or TransformHandle.Right or TransformHandle.BottomRight;
+            var movesTop = handle is TransformHandle.TopLeft or TransformHandle.Top or TransformHandle.TopRight;
+            var movesBottom = handle is TransformHandle.BottomLeft or TransformHandle.Bottom or TransformHandle.BottomRight;
+            // The edge opposite the handle stays put; the pointer's edge sets the size along its own axis.
+            float anchorX = movesLeft ? start.Right : start.Left, anchorY = movesTop ? start.Bottom : start.Top;
+            float draggedX = movesLeft ? left : right, draggedY = movesTop ? top : bottom;
+            float w = Math.Abs(draggedX - anchorX), h = Math.Abs(draggedY - anchorY);
+            if ((movesLeft || movesRight) && !movesTop && !movesBottom)
+            {
+                h = (float)(w / aspect);
+                left = draggedX >= anchorX ? anchorX : anchorX - w; right = left + w;
+                top = start.MidY - h / 2; bottom = top + h;
+            }
+            else if ((movesTop || movesBottom) && !movesLeft && !movesRight)
+            {
+                w = (float)(h * aspect);
+                top = draggedY >= anchorY ? anchorY : anchorY - h; bottom = top + h;
+                left = start.MidX - w / 2; right = left + w;
+            }
+            else
+            {
+                if (w / aspect > h) h = (float)(w / aspect); else w = (float)(h * aspect);
+                left = draggedX >= anchorX ? anchorX : anchorX - w; right = left + w;
+                top = draggedY >= anchorY ? anchorY : anchorY - h; bottom = top + h;
+            }
         }
         if (alt)
         {

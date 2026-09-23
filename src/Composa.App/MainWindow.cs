@@ -191,6 +191,7 @@ public sealed partial class MainWindow : Window
             target.ShapeCornerRadius = from.ShapeCornerRadius; target.GradientRadial = from.GradientRadial; target.GradientToTransparent = from.GradientToTransparent; target.TextDefaults = from.TextDefaults;
             target.ShapeLineWidth = from.ShapeLineWidth; target.WandMode = from.WandMode; target.ObjectEdgeOffset = from.ObjectEdgeOffset; target.View = from.View;
             target.SelectionExpandAmount = from.SelectionExpandAmount; target.SelectionContractAmount = from.SelectionContractAmount; target.SelectionFeatherAmount = from.SelectionFeatherAmount;
+            target.CropRatio = from.CropRatio;
             target.Tool = tool;
         }
         lastToolSource = target;

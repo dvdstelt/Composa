@@ -82,30 +82,54 @@ public static class DocumentRenderer
         area = Geometry.Intersect(area, new SKRectI(0, 0, target.Width, target.Height));
         if (area.IsEmpty) return;
         // Skia's raster backend draws on one thread, so large areas are split into bands rendered side by side.
-        // Every layer operation is per-pixel, which makes the bands independent of each other.
+        // Every layer operation is per-pixel, which makes the bands independent of each other, except the blur
+        // adjustments: their bands are rendered with a halo of the picture around them that is then left out.
         var bands = (long)area.Width * area.Height < 300_000 ? 1 : Math.Clamp(area.Height / 48, 1, Environment.ProcessorCount);
         if (bands > 1) Pixels.PrepareLevels(document, view.Scale);
         var bandHeight = (area.Height + bands - 1) / bands;
+        var margin = (int)Math.Ceiling(SamplingMargin(document, options) * view.Scale);
+        var canvas = Geometry.RoundOut(new SKRect(-view.Origin.X * view.Scale, -view.Origin.Y * view.Scale,
+            (document.Width - view.Origin.X) * view.Scale, (document.Height - view.Origin.Y) * view.Scale));
         Parallel.For(0, bands, band =>
         {
             var top = area.Top + band * bandHeight;
             var part = new SKRectI(area.Left, top, area.Right, Math.Min(area.Bottom, top + bandHeight));
             if (part.Height <= 0) return;
-            using var tile = new Tile(part, view);
+            var padded = part;
+            if (margin > 0)
+            {
+                // The halo stops at the canvas: beyond it there is nothing to sample, and the blurs continue the edge instead.
+                padded.Inflate(margin, margin);
+                padded = Geometry.Union(part, Geometry.Intersect(padded, canvas));
+            }
+            using var tile = new Tile(padded, view);
             RenderNodes(document.Layers, tile, options);
             tile.Canvas.Flush();
-            CopyRows(tile.Bitmap, target, part);
+            CopyRows(tile.Bitmap, new SKPointI(part.Left - padded.Left, part.Top - padded.Top), target, part);
         });
         Pixels.Invalidate(target);
     }
 
-    private static unsafe void CopyRows(SKBitmap from, SKBitmap to, SKRectI area)
+    /// <summary>The widest halo any visible adjustment layer needs around an area rendered on its own, in document pixels.</summary>
+    public static double SamplingMargin(Document document, RenderOptions? options = null)
+    {
+        double margin = 0;
+        foreach (var layer in document.AllLayers())
+        {
+            var shown = Resolve(layer, options);
+            if (shown.Adjustment is { SamplingMargin: > 0 } adjustment && shown.Visible && shown.Opacity > 0 && document.IsEffectivelyVisible(shown))
+                margin = Math.Max(margin, adjustment.SamplingMargin);
+        }
+        return margin;
+    }
+
+    private static unsafe void CopyRows(SKBitmap from, SKPointI fromOrigin, SKBitmap to, SKRectI area)
     {
         var source = (byte*)from.GetPixels();
         var destination = (byte*)to.GetPixels();
         long bytes = (long)area.Width * 4;
         for (var y = 0; y < area.Height; y++)
-            Buffer.MemoryCopy(source + (long)y * from.RowBytes, destination + (long)(y + area.Top) * to.RowBytes + (long)area.Left * 4, bytes, bytes);
+            Buffer.MemoryCopy(source + (long)(y + fromOrigin.Y) * from.RowBytes + (long)fromOrigin.X * 4, destination + (long)(y + area.Top) * to.RowBytes + (long)area.Left * 4, bytes, bytes);
     }
 
     /// <summary>Renders only the given layers (and their clipped followers) over a document-space area, for merges and copies.</summary>

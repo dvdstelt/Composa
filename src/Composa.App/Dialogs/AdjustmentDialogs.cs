@@ -39,6 +39,12 @@ public static class AdjustmentDialogs
                 ("Amount", grain.Amount, 0, 100, 1, "0", v => Update(grain = grain with { Amount = v })),
                 ("Size", grain.Size, 0.5, 20, 0.1, "0.0", v => Update(grain = grain with { Size = v })),
                 ("Roughness", grain.Roughness, 0, 100, 1, "0", v => Update(grain = grain with { Roughness = v }))),
+            GaussianBlurAdjustment blur => Sliders(
+                ("Radius", blur.Radius, GaussianBlurAdjustment.MinRadius, GaussianBlurAdjustment.MaxRadius, 0.1, "0.0", v => Update(blur = blur with { Radius = v }))),
+            MotionBlurAdjustment motion => Sliders(
+                ("Angle", motion.Angle, -90, 90, 1, "0", v => Update(motion = motion with { Angle = v })),
+                ("Distance", motion.Distance, MotionBlurAdjustment.MinDistance, 500, 1, "0", v => Update(motion = motion with { Distance = v }))),
+            AddNoiseAdjustment noise => NoiseEditor(noise, Update),
             GradientMapAdjustment map => GradientMapEditor(owner, map, foreground, background, Update),
             BlackAndWhiteAdjustment bw => BlackAndWhiteEditor(bw, Update),
             ColorBalanceAdjustment balance => ColorBalanceEditor(balance, Update),
@@ -55,6 +61,9 @@ public static class AdjustmentDialogs
     private static Adjustment Identity(Adjustment like) => Adjustment.Create(like.Kind) switch
     {
         GrainAdjustment grain => grain with { Amount = 0 },
+        GaussianBlurAdjustment blur => blur with { Radius = 0 },
+        MotionBlurAdjustment motion => motion with { Distance = 0 },
+        AddNoiseAdjustment noise => noise with { Amount = 0 },
         GradientMapAdjustment => new BrightnessContrastAdjustment(),
         InvertAdjustment => new BrightnessContrastAdjustment(),
         BlackAndWhiteAdjustment => new BrightnessContrastAdjustment(),
@@ -66,6 +75,16 @@ public static class AdjustmentDialogs
         var panel = new StackPanel { Spacing = 8 };
         foreach (var r in rows) panel.Children.Add(Ui.SliderRow(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, 240, 80).Row);
         return panel;
+    }
+
+    private static readonly string[] NoiseDistributions = ["Uniform", "Gaussian"];
+
+    private static Control NoiseEditor(AddNoiseAdjustment noise, Action<Adjustment> update)
+    {
+        var amount = Ui.SliderRow("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", 240, 80).Row;
+        var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => d, d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
+        var mono = Ui.Check("Monochromatic", noise.Monochromatic, v => update(noise = noise with { Monochromatic = v }));
+        return Ui.Column(10, amount, Ui.Row(10, Ui.Label("Distribution", Palette.Secondary), distribution), mono);
     }
 
     private static Control LevelsEditor(LevelsAdjustment levels, Histogram? histogram, Action<Adjustment> update)
@@ -244,11 +263,53 @@ public static class AdjustmentDialogs
                 break;
             case FilterKind.AddNoise:
                 Slider("Amount", initial.Amount, 0, 100, v => current with { Amount = v });
+                panel.Children.Add(Ui.Row(10, Ui.Label("Distribution", Palette.Secondary),
+                    Ui.Combo(NoiseDistributions, initial.Gaussian ? "Gaussian" : "Uniform", d => d, d => Update(current with { Gaussian = d == "Gaussian" }), 120)));
                 panel.Children.Add(Ui.Check("Monochromatic", initial.Monochrome, v => Update(current with { Monochrome = v })));
                 break;
+            case FilterKind.Vignette:
+                var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
+                void PaintSwatch() => swatch.Background = new SolidColorBrush(new SKColor(current.VignetteColor).ToAvalonia());
+                PaintSwatch();
+                ToolTip.SetTip(swatch, "Choose the vignette color");
+                swatch.PointerPressed += async (_, _) =>
+                {
+                    if (await Prompts.Color(owner, "Vignette Color", new SKColor(current.VignetteColor)) is not { } picked) return;
+                    Update(current with { VignetteColor = (uint)picked | 0xFF000000 });
+                    PaintSwatch();
+                };
+                var colorLabel = Ui.Label("Color", Palette.Secondary);
+                colorLabel.Width = 90;
+                panel.Children.Add(Ui.Row(8, colorLabel, swatch));
+                Slider("Amount", initial.VignetteAmount, 0, 100, v => current with { VignetteAmount = v });
+                Slider("Midpoint", initial.VignetteMidpoint, 0, 100, v => current with { VignetteMidpoint = v });
+                Slider("Roundness", initial.VignetteRoundness, -100, 100, v => current with { VignetteRoundness = v });
+                Slider("Feather", initial.VignetteFeather, 0, 100, v => current with { VignetteFeather = v });
+                Slider("Highlights", initial.VignetteHighlights, 0, 100, v => current with { VignetteHighlights = v });
+                panel.Children.Add(new TextBlock
+                {
+                    Text = "Blends the color into the edges while keeping the center. On an empty layer it paints across the whole canvas.",
+                    Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
+                });
+                break;
+            case FilterKind.BloomGlow:
+                Slider("Amount", initial.BloomAmount, 0, 100, v => current with { BloomAmount = v });
+                Slider("Radius", initial.BloomRadius, 1, 150, v => current with { BloomRadius = v });
+                break;
+            case FilterKind.TonalContrast:
+                Slider("Amount", initial.TonalAmount, 0, 100, v => current with { TonalAmount = v });
+                Slider("Shadows", initial.TonalShadows, -100, 100, v => current with { TonalShadows = v });
+                Slider("Midtones", initial.TonalMidtones, -100, 100, v => current with { TonalMidtones = v });
+                Slider("Highlights", initial.TonalHighlights, -100, 100, v => current with { TonalHighlights = v });
+                Slider("Radius", initial.TonalRadius, 1, 100, v => current with { TonalRadius = v });
+                break;
             case FilterKind.LensCorrection:
-                Slider("Distortion", initial.Distortion, -100, 100, v => current with { Distortion = v });
-                Slider("Vignette", initial.Vignette, -100, 100, v => current with { Vignette = v });
+                Slider("Remove Distortion", initial.Distortion, -100, 100, v => current with { Distortion = v });
+                panel.Children.Add(new TextBlock
+                {
+                    Text = "Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion).",
+                    Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
+                });
                 break;
             case FilterKind.RemoveBackground:
                 Slider("Tolerance", initial.Amount, 1, 100, v => current with { Amount = v });
