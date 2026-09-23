@@ -16,7 +16,11 @@ public static class ProjectFile
 {
     public const string Extension = ".cmps";
     public const string Format = "org.composa.project";
-    public const int Version = 2;
+    /// <summary>
+    /// The format version new saves write, and the highest one <see cref="Read"/> accepts. 1 was the first release,
+    /// 2 added guides, 3 added the Gaussian Blur, Motion Blur and Add Noise adjustment layers and the Inner Glow effect.
+    /// </summary>
+    public const int Version = 3;
 
     private static readonly JsonSerializerOptions Json = new()
     {
