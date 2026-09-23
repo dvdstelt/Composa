@@ -124,7 +124,7 @@ public sealed partial class MainWindow
             Line(),
             Item("Canvas Size…", () => _ = CanvasSize(), Key.C, ctrl | alt),
             Item("Image Size…", () => _ = ImageSize(), Key.I, ctrl | alt),
-            Item("Trim Transparent Edges", () => { session!.TrimCanvas(); canvas.Fit(); }),
+            Item("Trim…", () => _ = Trim()),
             Line(),
             Item("Rotate Canvas 90° Clockwise", () => { session!.RotateCanvas(true); canvas.Fit(); }),
             Item("Rotate Canvas 90° Counterclockwise", () => { session!.RotateCanvas(false); canvas.Fit(); }),
@@ -783,6 +783,19 @@ public sealed partial class MainWindow
         if (session == null) return;
         if (await CanvasDialogs.CanvasSize(this, session.Document.Width, session.Document.Height) is not { } result) return;
         session.ResizeCanvas(result.Width, result.Height, result.Anchor);
+        canvas.Fit();
+    }
+
+    private TrimOptions trimOptions = new();
+
+    /// <summary>Image &gt; Trim: the dialog remembers its last choices for the session.</summary>
+    private async Task Trim()
+    {
+        if (session == null) return;
+        var target = session;
+        if (await TrimDialog.Show(this, trimOptions) is not { } options) return;
+        trimOptions = options;
+        if (!target.Trim(options)) { ShowProblem("Nothing to trim: no edge is empty in that sense."); return; }
         canvas.Fit();
     }
 
