@@ -15,12 +15,13 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 
 ### Layers
 - Layers and folders with 24 blend modes, grouped in the menu as Photoshop groups them, and opacity
-- Layer effects: Stroke (outside or inside), Drop Shadow, Outer Glow, Color Overlay and Inner Shadow, each switchable, editable with a live preview and copied between layers by Alt-dragging
+- Layer effects: Stroke (outside or inside), Drop Shadow, Outer Glow, Inner Glow, Color Overlay and Inner Shadow, each switchable, editable with a live preview and copied between layers by Alt-dragging
 - Layer masks on layers, folders and adjustment layers: paint, fill, gradient, invert, blur, apply, disable
 - Clipping masks (Alt-click a layer, or Ctrl+Alt+G)
-- Adjustment layers: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Brightness/Contrast, Black & White, Color Balance, Invert
+- Adjustment layers: Hue/Saturation, Levels, Curves, Exposure, Gradient Map, Grain, Brightness/Contrast, Black & White, Color Balance, Invert, and the live Gaussian Blur, Motion Blur and Add Noise, which work on everything beneath them
 - Merge Down, Merge Layers, Merge Group (Ctrl+E) and Flatten Image
-- Duplicate, rename inline, reorder and nest by drag and drop; Alt-drag to duplicate
+- Duplicate (several at once, stacked together above the topmost), rename inline, reorder and nest by drag and drop; Alt-drag to duplicate
+- Copy and paste whole layers, folders and adjustments included, within a project or into another tab, where they arrive centered; a right-click menu on every row for the layer, its folder and its mask
 - Swipe down the eye column to show or hide many layers; Alt-click an eye to solo a layer
 
 ### Transform
@@ -54,12 +55,16 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 ### Adjustments and filters
 - Levels (with Auto and a histogram), Curves, Hue/Saturation (master and six color ranges, Colorize), Exposure, Gradient Map, Grain, Brightness/Contrast, Invert
 - Black & White with Photoshop's six color weights, so reds and greens stay apart instead of flattening into one gray, and an optional tint for sepia or cyanotype; Color Balance for shadows, midtones and highlights separately, with Preserve Luminosity
-- Gaussian Blur and Motion Blur that spread past a layer's edges, Sharpen, Add Noise, Lens Correction, Remove Background
+- Gaussian Blur and Motion Blur that spread past a layer's edges, Sharpen, Add Noise (uniform or Gaussian), Lens Correction, Remove Background
+- Finishing filters: Vignette in any color (on an empty layer it paints across the whole canvas), Bloom / Glow and Tonal Contrast
+- Camera Raw Filter: a grade panel with Light, Color (Auto white balance and an eyedropper), Effects (texture, clarity, dehaze, glow, vignette, grain), Curve, Color Mixer, Color Grading, Detail, Optics and Calibration, each group switchable off without losing its sliders, with a histogram of the result
 - Live previews, limited to the selection when there is one
 
 ### Canvas and files
 - Multiple projects in tabs
-- Crop with snapping, Shift to keep proportions, Alt for symmetric cropping; Trim
+- Crop with a ratio picker (Original, 1:1, 4:3, 3:4, 16:9, 9:16), snapping, Shift to keep proportions, Alt for symmetric cropping; with a selection the crop box starts at its bounds
+- Trim to transparent pixels or to a corner's color, on the edges you choose
+- Zoom In and Zoom Out step through fixed stops, so ten steps in and ten out land back where they started
 - Canvas Size, Image Size, and quarter-turn rotation of the canvas or of single layers
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
 - Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
@@ -76,12 +81,14 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 - Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent, so busy backgrounds defeat these here.
 - HEIC, AVIF and TIFF open only when ImageMagick (`magick` or `convert`) is installed, because Skia does not decode them itself.
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
-- Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries pixels across, keeping their position.
+- Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries whole layers across when nothing is selected, and pixels when something is; layers pasted into another project arrive centered on its canvas.
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
 - Point text grows from the edge its alignment reads from (right-aligned text grows leftward); the macOS app keeps the top-left corner.
 - Layer effects are drawn on the CPU from a cached image; while a brush stroke is in progress they follow the pixels the stroke started from and catch up when it ends.
 - Photoshop files are opened, never written. Text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure, Black & White, Color Balance and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` files open (no PSB, CMYK or 16-bit).
 - Camera RAW files open only through ImageMagick's LibRaw delegate. The develop step applies exposure and white balance to the 16-bit decoded frame rather than to the sensor data, as Apple's RAW pipeline does on macOS, so its temperature and tint are relative to the camera's reading and there is no tone Boost control.
+- The Camera Raw Filter has no Geometry group (Upright and guided lines), no vectorscope, no Option-drag clipping views, no point colors and no sharpening-mask overlay; its white-balance eyedropper works on the thumbnail in the panel rather than on the canvas, because the panel is a dialog. The filter renders on the full layer while you drag, so a very large layer answers more slowly than the macOS preview does.
+- Layer masks always move with their layer, so the layer menu has no Link Mask item.
 - There is no auto-update.
 
 Beyond the macOS app, this version adds Ctrl-drag to move a layer with any tool, Bold and Italic text, Brightness/Contrast, Sharpen, Dodge and Burn, WebP export, canvas and layer rotation, pen pressure, and autosave with crash recovery. Its Photoshop import also opens flattened files and zip-compressed layers, keeps solid color fill layers live, and maps Brightness/Contrast, Exposure, Invert, Black & White and Color Balance adjustments.

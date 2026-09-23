@@ -4,6 +4,27 @@ All notable changes to Composa are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+Catches up with Compositor 1.2.3 to 1.2.6.
+
+### Added
+
+- Camera Raw Filter: Light, Color (with Auto white balance and an eyedropper on the panel's thumbnail), Effects (texture, clarity, dehaze, glow, vignette, grain), Curve, Color Mixer, Color Grading, Detail, Optics and Calibration, each group switchable off without clearing it, and a histogram of the graded layer.
+- Finishing filters: Vignette in any color, which on an empty layer paints across the whole canvas; Bloom / Glow; Tonal Contrast.
+- Gaussian Blur, Motion Blur and Add Noise as adjustment layers. Add Noise, as a layer and as a filter, offers a Gaussian distribution.
+- The Inner Glow layer effect.
+- Image > Trim… with a choice of transparent pixels or a corner's color, and which edges to trim.
+- Copy and paste whole layers with nothing selected, folders and adjustments included, within a project or into another tab.
+- A right-click menu on every layer row for the layer, its folder and its mask.
+- Crop ratios 3:4 and 9:16, and a crop box that starts at the selection.
+
+### Changed
+
+- Zoom In and Zoom Out step through fixed stops (12.5% to 1600%), anchored on the view's center.
+- Duplicate Layer and Ctrl+J duplicate every selected layer as one step; several copies stack together above the topmost original and end up selected.
+- Lens Correction keeps only Remove Distortion; the vignette has a filter of its own.
+- Grain's Roughness adds smaller particles whose size follows Size instead of one-pixel noise.
+- Project files are written as format version 3, which older builds cannot open when they hold the new adjustment layers or effect.
+
 ## [0.2.0] - 2026-09-23
 
 The first release with downloadable packages. Composa has been buildable from source for a while; this is the first version you can simply install.
