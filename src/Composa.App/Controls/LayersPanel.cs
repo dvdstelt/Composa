@@ -464,52 +464,53 @@ public sealed class LayersPanel : UserControl
         return bitmap;
     }
 
+    /// <summary>
+    /// The row's menu, as the macOS app orders it: the layer itself, then clipping and folders, then its mask, then
+    /// visibility. Layer effects have their own rows and footer button, so they are not repeated here. A right-click
+    /// on a layer outside the selection selects it first (see <see cref="RowPressed"/>); inside a selection of several,
+    /// the whole selection is what Duplicate, Delete, Group and Merge act on.
+    /// </summary>
     private ContextMenu BuildMenu(Layer layer)
     {
         var current = session!;
         var menu = new ContextMenu();
-        void Add(string header, Action action, bool enabled = true)
+        MenuItem Add(string header, Action action, bool enabled = true, MenuItem? parent = null)
         {
             var item = new MenuItem { Header = header, IsEnabled = enabled };
             item.Click += (_, _) => { if (!current.Document.SelectedLayerIds.Contains(layer.Id)) current.SelectLayer(layer.Id); action(); };
-            menu.Items.Add(item);
+            (parent?.Items ?? menu.Items).Add(item);
+            return item;
         }
+        var several = current.Document.SelectedLayerIds.Count > 1 && current.Document.SelectedLayerIds.Contains(layer.Id);
+        var targetsMask = current.IsEditingMask && layer.Id == current.ActiveLayer?.Id && layer.Mask != null;
+
+        Add(several ? "Duplicate Layers" : "Duplicate Layer", () => current.DuplicateSelectedLayers());
+        Add("Rename…", () => { renaming = layer.Id; Rebuild(); }, !several);
+        Add(targetsMask ? "Delete Mask" : several ? "Delete Selected Layers" : "Delete Layer", () => { if (targetsMask) current.DeleteMask(layer); else current.DeleteSelectedLayers(); });
         if (layer.IsAdjustment) Add("Edit Adjustment…", () => EditAdjustmentRequested?.Invoke(layer));
-        Add("Rename", () => { renaming = layer.Id; Rebuild(); });
-        Add("Duplicate", current.DuplicateSelectedLayers);
-        Add("Delete", current.DeleteSelectedLayers);
-        menu.Items.Add(new Separator());
-        Add(layer.Clipped ? "Release Clipping Mask" : "Create Clipping Mask", () => current.ToggleClippingMask(layer), current.CanClip(layer));
-        if (layer.Mask == null)
-        {
-            Add("Add Layer Mask", () => current.AddMask(layer));
-            Add("Add Layer Mask (Hide All)", () => current.AddMask(layer, hideAll: true));
-        }
-        else
-        {
-            Add(layer.MaskEnabled ? "Disable Layer Mask" : "Enable Layer Mask", () => current.SetMaskEnabled(layer, !layer.MaskEnabled));
-            Add("Apply Layer Mask", () => current.ApplyMask(layer), layer.Pixels != null);
-            Add("Delete Layer Mask", () => current.DeleteMask(layer));
-            Add("Select Mask", () => current.SelectLayerMask(layer));
-        }
-        if (layer.Pixels != null) Add("Select Pixels", () => current.SelectLayerPixels(layer));
-        if (layer.Pixels != null)
-        {
-            var effects = new MenuItem { Header = "Layer Effects" };
-            foreach (var kind in Enum.GetValues<LayerEffectKind>())
-            {
-                var item = new MenuItem { Header = LayerEffects.DisplayName(kind) + "…" };
-                item.Click += (_, _) => { if (!current.Document.SelectedLayerIds.Contains(layer.Id)) current.SelectLayer(layer.Id); if (layer.Effects?.Contains(kind) == true) EditEffectRequested?.Invoke(layer, kind); else NewEffectRequested?.Invoke(kind); };
-                effects.Items.Add(item);
-            }
-            menu.Items.Add(effects);
-        }
         if (layer.Text != null) Add("Edit Text…", () => EditTextRequested?.Invoke(layer));
         if (layer.IsLive) Add("Rasterize Layer", () => current.RasterizeShape(layer));
         menu.Items.Add(new Separator());
+
+        Add(layer.Clipped ? "Release Clipping Mask" : "Create Clipping Mask", () => current.ToggleClippingMask(layer), current.CanClip(layer));
         Add("Group Selected Layers", current.GroupSelectedLayers);
         if (layer.IsGroup) Add("Ungroup", () => current.Ungroup(layer));
+        Add("Move Out of Folder", () => current.MoveOutOfFolder(layer), current.Document.ParentOf(layer.Id) != null);
         Add(current.MergeTitle, current.MergeLayers, current.CanMerge);
+        menu.Items.Add(new Separator());
+
+        var addMask = new MenuItem { Header = "Add Mask", IsEnabled = layer.Mask == null };
+        Add("Reveal All (White)", () => current.AddMask(layer), parent: addMask);
+        Add("Hide All (Black)", () => current.AddMask(layer, hideAll: true), parent: addMask);
+        menu.Items.Add(addMask);
+        Add(layer.Mask is { } && !layer.MaskEnabled ? "Enable Mask" : "Disable Mask", () => current.SetMaskEnabled(layer, !layer.MaskEnabled), layer.Mask != null);
+        Add("Delete Mask", () => current.DeleteMask(layer), layer.Mask != null);
+        Add("Apply Mask", () => current.ApplyMask(layer), layer.Mask != null && layer.Pixels != null);
+        Add("Select Mask", () => current.SelectLayerMask(layer), layer.Mask != null);
+        if (layer.Pixels != null) Add("Select Pixels", () => current.SelectLayerPixels(layer));
+        menu.Items.Add(new Separator());
+
+        Add(layer.Visible ? "Hide Layer" : "Show Layer", () => current.SetVisible(layer, !layer.Visible));
         return menu;
     }
 

@@ -105,3 +105,58 @@ public class LayersPanelInputTests
         Assert.Equal("Sky", session.Document.Find(layer.Id)!.Name);
     }
 }
+
+public class LayerContextMenuTests
+{
+    [AvaloniaFact]
+    public void The_row_menu_lists_the_layer_mask_and_visibility_actions_and_follows_the_layer()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(300, 200, SKColors.White);
+        window.AddSession(session);
+        var layer = session.AddBlankLayer();
+        Dispatcher.UIThread.RunJobs();
+        var panel = window.GetVisualDescendants().OfType<LayersPanel>().Single();
+        List<string> Headers() => panel.GetVisualDescendants().OfType<Border>().Single(b => b.Tag == layer).ContextMenu!.Items.OfType<MenuItem>().Select(i => (string)i.Header!).ToList();
+        MenuItem Item(string header) => panel.GetVisualDescendants().OfType<Border>().Single(b => b.Tag == layer).ContextMenu!.Items.OfType<MenuItem>().Single(i => (string)i.Header! == header);
+
+        var headers = Headers();
+        Assert.Equal(["Duplicate Layer", "Rename…", "Delete Layer"], headers.Take(3));
+        Assert.Contains("Create Clipping Mask", headers);
+        Assert.Contains("Group Selected Layers", headers);
+        Assert.Contains("Move Out of Folder", headers);
+        Assert.Contains("Merge Down", headers);
+        Assert.Contains("Add Mask", headers);
+        Assert.Contains("Disable Mask", headers);
+        Assert.Contains("Delete Mask", headers);
+        Assert.Equal("Hide Layer", headers[^1]);
+        Assert.DoesNotContain("Layer Effects", headers);
+        Assert.False(Item("Move Out of Folder").IsEnabled);
+        Assert.False(Item("Delete Mask").IsEnabled);
+        Assert.Equal(["Reveal All (White)", "Hide All (Black)"], Item("Add Mask").Items.OfType<MenuItem>().Select(i => (string)i.Header!));
+
+        session.AddMask(layer);
+        session.SetVisible(layer, false);
+        Dispatcher.UIThread.RunJobs();
+        headers = Headers();
+        // Adding a mask targets it, so Delete at the top now deletes the mask, as the mask section's own item does.
+        Assert.Equal("Delete Mask", headers[2]);
+        session.EditingMask = false;
+        session.NotifyLayersChanged();
+        Dispatcher.UIThread.RunJobs();
+        headers = Headers();
+        Assert.Equal("Delete Layer", headers[2]);
+        Assert.False(Item("Add Mask").IsEnabled);
+        Assert.True(Item("Delete Mask").IsEnabled);
+        Assert.Equal("Show Layer", headers[^1]);
+
+        // Several selected: the menu says so, and Rename needs one layer.
+        session.SelectLayer(session.Document.Layers[0].Id, extend: true);
+        Dispatcher.UIThread.RunJobs();
+        headers = Headers();
+        Assert.Equal("Duplicate Layers", headers[0]);
+        Assert.Equal("Delete Selected Layers", headers[2]);
+        Assert.False(Item("Rename…").IsEnabled);
+    }
+}
