@@ -3,10 +3,19 @@ name: Release
 # Publishing a release on GitHub is the trigger, and GitHub creates the tag itself, so a release
 # never depends on a tag being pushed from a terminal. MinVer then derives the version from that
 # tag, which is why every checkout below needs the full history.
+#
+# A draft can be filled first instead, with a dispatch naming its tag. That avoids the window where
+# a published release is live with no downloads attached to it, which is worse than no release,
+# because the update check will eventually point people at whatever the latest release is.
 on:
   release:
     types: [published]
-  workflow_dispatch: # For rehearsing the build without publishing anything.
+  workflow_dispatch:
+    inputs:
+      draft_tag:
+        description: "Attach the artifacts to this draft release, e.g. v0.2.0. Leave empty to rehearse the build without uploading anything."
+        required: false
+        default: ""
 
 permissions:
   contents: write # Needed to attach artifacts to the release.
@@ -45,6 +54,16 @@ jobs:
       - name: Install packaging tools
         run: sudo apt-get update && sudo apt-get install -y rpm desktop-file-utils
 
+      # A draft release has no git tag yet, because GitHub only creates one when a release is
+      # published. MinVer therefore has nothing to read and would version the artifacts
+      # 0.0.0-alpha.0.N. The tag the draft is going to get is the version, so it is supplied
+      # through MinVer's own override. Every dotnet invocation below inherits it.
+      - name: Take the version from the draft tag
+        if: inputs.draft_tag != ''
+        env:
+          DRAFT_TAG: ${{ inputs.draft_tag }}
+        run: echo "MinVerVersionOverride=${DRAFT_TAG#v}" >> "$GITHUB_ENV"
+
       - name: Build every package
         run: scripts/package/all.sh ${{ matrix.rid }} dist
 
@@ -68,7 +87,8 @@ jobs:
   publish:
     needs: [linux]
     runs-on: ubuntu-22.04
-    if: github.event_name == 'release'
+    # Either a real release, or a dispatch that named a draft to fill.
+    if: github.event_name == 'release' || inputs.draft_tag != ''
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -82,7 +102,10 @@ jobs:
           sha256sum * > sha256sums.txt
           cat sha256sums.txt
 
+      # A draft is addressable by the tag name it will eventually get, so the same command serves
+      # both paths.
       - name: Attach to the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" upload/* --clobber --repo "${{ github.repository }}"
+          TAG: ${{ github.event.release.tag_name || inputs.draft_tag }}
+        run: gh release upload "$TAG" upload/* --clobber --repo "${{ github.repository }}"
