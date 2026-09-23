@@ -83,6 +83,20 @@ public sealed partial class EditorSession
     public int SelectionExpandAmount { get; set; } = 1;
     public int SelectionContractAmount { get; set; } = 1;
     public int SelectionFeatherAmount { get; set; } = 2;
+    /// <summary>The crop bar's ratio: one of <see cref="CropRatios"/>. Free lets the box take any shape.</summary>
+    public string CropRatio { get; set; } = "Free";
+    public static readonly string[] CropRatios = ["Free", "Original", "1:1", "4:3", "3:4", "16:9", "9:16"];
+    /// <summary>Width over height for the chosen crop ratio, or null for Free.</summary>
+    public double? CropAspect => CropRatio switch
+    {
+        "Original" => (double)document.Width / document.Height,
+        "1:1" => 1,
+        "4:3" => 4 / 3.0,
+        "3:4" => 3 / 4.0,
+        "16:9" => 16 / 9.0,
+        "9:16" => 9 / 16.0,
+        _ => null
+    };
     public ShapeKind ShapeKind { get; set; } = ShapeKind.Rectangle;
     public double ShapeCornerRadius { get; set; } = 24;
     /// <summary>A Line shape's thickness in document pixels.</summary>

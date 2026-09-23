@@ -1,4 +1,5 @@
 using Avalonia;
+using Composa.App.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -305,4 +306,59 @@ public class ToolInputTests
 
     private static void TestColor(SKColor expected, SKColor actual) =>
         Assert.True(Math.Abs(expected.Red - actual.Red) < 3 && Math.Abs(expected.Green - actual.Green) < 3 && Math.Abs(expected.Blue - actual.Blue) < 3, $"expected {expected}, found {actual}");
+}
+
+public class ZoomAndCropTests
+{
+    [AvaloniaFact]
+    public void Zoom_in_and_out_step_through_fixed_stops_and_come_back_without_drift()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        window.AddSession(EditorSession.NewCanvas(3000, 2000, SKColors.White));
+        Dispatcher.UIThread.RunJobs();
+        var canvas = window.Canvas;
+        canvas.ZoomTo(1);
+        window.KeyPressQwerty(PhysicalKey.Equal, RawInputModifiers.Control);
+        Assert.Equal(1.25, canvas.Zoom);
+        window.KeyPressQwerty(PhysicalKey.Equal, RawInputModifiers.Control | RawInputModifiers.Shift); // '+' is Shift and '='.
+        Assert.Equal(1.5, canvas.Zoom);
+        window.KeyPressQwerty(PhysicalKey.Minus, RawInputModifiers.Control);
+        Assert.Equal(1.25, canvas.Zoom);
+        canvas.ZoomTo(0.5);
+        for (var i = 0; i < 10; i++) canvas.ZoomIn();
+        for (var i = 0; i < 10; i++) canvas.ZoomOut();
+        Assert.Equal(0.5, canvas.Zoom);
+        canvas.ZoomTo(0.55);                                              // Off a stop: the next stop, not a multiple.
+        canvas.ZoomIn();
+        Assert.Equal(2 / 3.0, canvas.Zoom, 9);
+        canvas.ZoomTo(CanvasView.ZoomStops[^1]);
+        canvas.ZoomIn();
+        Assert.Equal(CanvasView.ZoomStops[^1], canvas.Zoom);              // Clamped at the last stop.
+    }
+
+    [AvaloniaFact]
+    public void The_crop_box_starts_at_the_selection_and_follows_the_ratio()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(400, 300, SKColors.White);
+        window.AddSession(session);
+        session.SelectRect(new SKRect(40, 50, 140, 130));
+        window.SelectTool(Tool.Crop);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(new SKRect(40, 50, 140, 130), window.Canvas.CropRect);
+        session.CropRatio = "1:1";
+        window.Canvas.ChangeCropRatio();
+        var square = window.Canvas.CropRect!.Value;
+        Assert.Equal(square.Width, square.Height, 3);
+        Assert.Equal(90, square.MidX, 0.5);                                // Reshaped about its center.
+        Assert.Equal(90, square.MidY, 0.5);
+        Assert.Contains("3:4", EditorSession.CropRatios);
+        Assert.Contains("9:16", EditorSession.CropRatios);
+        session.CropRatio = "9:16";
+        Assert.Equal(9 / 16.0, session.CropAspect);
+        window.SelectTool(Tool.Move);
+        Assert.Null(window.Canvas.CropRect);
+    }
 }

@@ -165,8 +165,26 @@ public sealed partial class CanvasView : Control
         ViewChanged?.Invoke();
     }
 
-    public void ZoomIn() => ZoomTo(zoom * 1.25);
-    public void ZoomOut() => ZoomTo(zoom / 1.25);
+    /// <summary>The stops Zoom In and Zoom Out step through, so ten steps in and ten out land back where they started.</summary>
+    public static readonly double[] ZoomStops = [1 / 8.0, 1 / 6.0, 1 / 4.0, 1 / 3.0, 1 / 2.0, 2 / 3.0, 1, 1.25, 1.5, 2, 3, 4, 5, 6, 8, 12, 16];
+
+    /// <summary>The next stop above (or below) a zoom; the zoom itself when there is none.</summary>
+    public static double NextZoomStop(double current, bool up)
+    {
+        var tolerance = Math.Max(1e-9, Math.Abs(current) * 1e-9);
+        if (up) return ZoomStops.FirstOrDefault(stop => stop > current + tolerance, current);
+        return ZoomStops.LastOrDefault(stop => stop < current - tolerance, current);
+    }
+
+    /// <summary>Steps to the next zoom stop, keeping the point at the middle of the view where it is.</summary>
+    public void ZoomIn() => ZoomStep(up: true);
+    public void ZoomOut() => ZoomStep(up: false);
+
+    private void ZoomStep(bool up)
+    {
+        var target = NextZoomStop(zoom, up);
+        if (target != zoom) ZoomTo(target);
+    }
 
     private void PanBy(Vector delta)
     {
