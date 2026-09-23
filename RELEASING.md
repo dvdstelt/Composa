@@ -7,7 +7,7 @@ Cutting a release is drafting it on GitHub. The version is derived from the tag 
 1. Move the `## [Unreleased]` entries in `CHANGELOG.md` under a new `## [x.y.z]` heading with today's date, and leave a fresh empty `## [Unreleased]` above it. Commit that on a branch and merge it.
 2. On GitHub, go to Releases and draft a new release. Create a new tag in the form `vX.Y.Z` (for example `v0.2.0`) targeting `main`, and paste in the changelog section for this version. **Save it as a draft; do not publish yet.**
 3. Run the **Release** workflow manually, giving it that tag as `draft_tag`. It builds every artifact and attaches them to the draft.
-4. Check the draft: every expected artifact is present, and `sha256sums.txt` lists them all. Download one and run it.
+4. Check the draft: every expected artifact is present, and `sha256sums.txt` lists them all. That is, for each of x86-64 and arm64, an AppImage, a `.deb`, an `.rpm` and a tarball for Linux, and a `-setup.exe` and a zip for Windows: twelve files plus the checksums. Download one and run it.
 5. Publish the draft. GitHub creates the tag at that moment, so nothing is ever pushed from a terminal. A tag containing `-` (for example `v0.3.0-beta.1`) is marked as a pre-release.
 
 Publishing first and letting the workflow fill the release in afterwards also works, and is one step shorter. The reason the draft comes first is the few minutes in between: a published release with no downloads on it is worse than no release, because the update check points people at whatever the latest release is.

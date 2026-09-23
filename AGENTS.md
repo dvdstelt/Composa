@@ -2,7 +2,7 @@
 
 ## What this is
 
-Composa is a from-scratch implementation of the macOS image editor [Compositor](https://github.com/robbietilton/Compositor). The upstream app is Swift on AppKit, SwiftUI, CoreImage, Metal and Vision, none of which are portable, so nothing is shared at the source level: this repository reimplements the same feature set in C# on .NET 10, Avalonia 12 and SkiaSharp 3. It is built and tested on Linux today; Windows and macOS are planned, so keep new code free of platform assumptions.
+Composa is a from-scratch implementation of the macOS image editor [Compositor](https://github.com/robbietilton/Compositor). The upstream app is Swift on AppKit, SwiftUI, CoreImage, Metal and Vision, none of which are portable, so nothing is shared at the source level: this repository reimplements the same feature set in C# on .NET 10, Avalonia 12 and SkiaSharp 3. It is developed on Linux and released for Linux and Windows; macOS is planned, so keep new code free of platform assumptions. CI runs the whole suite on Windows as well.
 
 ## Layout
 
@@ -43,12 +43,19 @@ Composa is a from-scratch implementation of the macOS image editor [Compositor](
 - CI builds all four package formats on x86-64 for every push and pull request. That job exists because these scripts were once exercised only by a release, which meant a release rehearsal was the first thing to discover they could not run from a clean checkout.
 - `RELEASING.md` is the procedure: fill a **draft** release through a workflow dispatch, check it, then publish. A published release with no artifacts attached is worse than no release, because the update check points people at whatever is latest. GitHub creates the tag when the release is published, so no tag is ever pushed from a terminal.
 
+- **Magick.NET is bundled for every RID except Linux ones**, through the `BundleImageMagick` property in `Composa.App.csproj`. Linux packages leave out its 36 MB native library because the distributions ship ImageMagick; a developer build has no RID and bundles it, which is why the bundled path is tested on Linux too (`BundledImageMagickTests`). Code that uses it sits behind `#if BUNDLED_IMAGEMAGICK` or in `BundledImageMagick.cs`, which is left out of compilation otherwise.
+- **The licence notices travel with the library, never separately.** Bundling redistributes LGPL libraries (libraw, libheif, libde265 among them), so `THIRD-PARTY-NOTICES.txt` and Magick.NET's own notice (`ImageMagick-NOTICE.txt`) are items in the same conditional block as the package reference, and `windows.sh` refuses to package a build without them.
+- A publish drops every `.pdb`: SkiaSharp and HarfBuzzSharp ship 105 MB of native symbols for Windows that `DebugType=none` does not cover.
+- Composa's own folders come from `AppPaths` (XDG on Linux, `%APPDATA%` and `%LOCALAPPDATA%` on Windows, Application Support and Caches on macOS). Nothing else builds a config or cache path.
+- `scripts/package/windows.sh [rid] [out] [--no-installer]` publishes one tree and packs the zip and the Inno Setup installer (`packaging/windows/composa.iss`) from it. It runs in Git Bash on Windows and, without the installer, on Linux. Neither Windows build is single-file: that would unpack 40 MB of native libraries into `%TEMP%` on first launch. **The installer's `AppId` must never change**, or a new version installs beside the old one instead of upgrading it.
+- `.gitattributes` forces LF on `*.sh`, because the Windows runners run them in Git Bash and bash rejects CRLF scripts.
+
 ## Rules for what the application tells the user about itself
 
 - `UpdateCheck` reports that a newer release exists and never downloads or installs anything. A stable build is never offered a pre-release; a pre-release sorts before the version it leads to; skipping applies to one version only.
 - **A build installed by a package manager must never mention updates.** The `UpdateChannel` build property is set to `managed` by the packaging scripts for the `.deb` and `.rpm`, read back from assembly metadata, and the Help menu then explains that apt or dnf owns updates instead of pointing people around them.
 - An automatic check that fails says nothing, but still records the attempt: otherwise someone offline or rate limited by GitHub sends another request on every launch.
-- `ImageMagick` (in `Composa.Core/IO`) resolves the tool once and asks each candidate to identify itself rather than trusting its name. **Never probe for `convert` on Windows**: `C:\Windows\System32\convert.exe` is the FAT-to-NTFS volume converter and is on the PATH of every Windows machine.
+- `ImageMagick` (in `Composa.Core/IO`) resolves once which `IImageMagick` to use: `ImageMagickTool`, the installed command line, or `ImageMagick.Bundled`, the Magick.NET library that `Program.Main` registers in builds that carry it. Linux prefers the tool, everything else the bundled library. The tool asks each candidate to identify itself rather than trusting its name. **Never probe for `convert` on Windows**: `C:\Windows\System32\convert.exe` is the FAT-to-NTFS volume converter and is on the PATH of every Windows machine.
 
 ## Commands
 
@@ -58,5 +65,6 @@ dotnet test
 dotnet run --project src/Composa.App
 scripts/package/all.sh          # every Linux package into dist/
 scripts/publish.sh              # just the portable tarball
+scripts/package/windows.sh      # Windows zip and installer (--no-installer on Linux)
 scripts/make-icons.sh           # only when packaging/composa.svg changes
 ```
