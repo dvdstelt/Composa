@@ -362,11 +362,18 @@ public sealed record GrainAdjustment : Adjustment
     {
         var amount = (float)(Math.Clamp(Amount, 0, 100) / 100 * 96);
         var size = (float)Math.Clamp(Size, 0.5, 20);
+        // Roughness adds smaller, less regular particles, as Photoshop does, but their size follows the Size control
+        // instead of collapsing to one-pixel noise, so Size still shows at any Roughness.
+        var detail = Math.Max(0.5f, size * 0.35f);
         var rough = (float)(Math.Clamp(Roughness, 0, 100) / 100);
         var seed = Seed;
+        var fineSeed = seed ^ 0x9E3779B9u;
         return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int x, int y) =>
         {
-            var noise = Smooth(x / size, y / size, seed) * (1 - rough) * 1.6f + Hash(x, y, seed ^ 0x9E3779B9u) * rough;
+            // Blending lattice values narrows the spread; 1.6 restores about the lattice's own.
+            var smooth = Smooth(x / size, y / size, seed) * 1.6f;
+            var fine = Smooth(x / detail, y / detail, fineSeed) * 1.6f;
+            var noise = smooth + (fine - smooth) * rough;
             var luma = (r * 54 + g * 183 + b * 19) / 65280f;
             var weight = 4 * luma * (1 - luma) * 0.75f + 0.25f;
             var delta = (int)MathF.Round(noise * amount * weight);

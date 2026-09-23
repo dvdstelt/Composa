@@ -88,4 +88,22 @@ public class AdjustmentTests
         using var flat = Composa.Rendering.DocumentRenderer.Flatten(session.Document);
         AssertColor(new SKColor(55, 155, 205), flat.GetPixel(1, 1));
     }
+
+    [Fact]
+    public void Grain_size_makes_larger_particles_even_when_rough()
+    {
+        static double NeighbourDifference(SKBitmap bitmap)
+        {
+            double total = 0;
+            var count = 0;
+            for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 1; x < bitmap.Width; x++) { total += Math.Abs(bitmap.GetPixel(x, y).Red - bitmap.GetPixel(x - 1, y).Red); count++; }
+            return total / count;
+        }
+        using var small = Solid(64, 64, new SKColor(128, 128, 128));
+        new GrainAdjustment { Amount = 70, Size = 1, Roughness = 70, Seed = 17 }.Apply(small);
+        using var large = Solid(64, 64, new SKColor(128, 128, 128));
+        new GrainAdjustment { Amount = 70, Size = 12, Roughness = 70, Seed = 17 }.Apply(large);
+        Assert.True(NeighbourDifference(large) < NeighbourDifference(small) * 0.7, "larger grain should form visibly larger, more coherent particles");
+    }
 }
