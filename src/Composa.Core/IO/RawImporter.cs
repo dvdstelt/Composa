@@ -140,9 +140,9 @@ public sealed class RawImage
 }
 
 /// <summary>
-/// Camera RAW files, decoded by ImageMagick's LibRaw delegate when ImageMagick is installed. The decode keeps 16 bits
+/// Camera RAW files, decoded by ImageMagick's LibRaw delegate when ImageMagick is available. The decode keeps 16 bits
 /// per channel so that the develop step has range to work with; the macOS app uses Apple's RAW pipeline, which has no
-/// Linux equivalent, so exposure and white balance are applied here to the decoded frame rather than to the sensor data.
+/// equivalent on other platforms, so exposure and white balance are applied here to the decoded frame rather than to the sensor data.
 /// </summary>
 public static class RawImporter
 {
@@ -158,16 +158,8 @@ public static class RawImporter
     /// <summary>Decodes the frame at the camera's own white balance and exposure. Seconds of work: call it off the UI thread.</summary>
     public static RawImage Decode(string path)
     {
-        using var process = ImageMagick.Start(path + "[0]", "-auto-orient", "-depth", "16", "pam:-")
+        var decoded = ImageMagick.Convert(path, ImageMagickOutput.Pam16)
             ?? throw new InvalidDataException($"{Path.GetFileName(path)} is a camera RAW file. Opening one needs ImageMagick (with its LibRaw delegate), which is not installed.");
-        using var output = new MemoryStream();
-        var errors = process.StandardError.ReadToEndAsync();
-        process.StandardOutput.BaseStream.CopyTo(output);
-        if (!process.WaitForExit(180_000)) { process.Kill(); throw new InvalidDataException($"{Path.GetFileName(path)} took too long to decode."); }
-        if (process.ExitCode != 0 || output.Length == 0)
-            throw new InvalidDataException($"{Path.GetFileName(path)} could not be decoded. {FirstLine(errors.Result)}".Trim());
-        return RawImage.ParsePam(output.ToArray());
+        return RawImage.ParsePam(decoded);
     }
-
-    private static string FirstLine(string text) => text.Split('\n', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault()?.Trim() ?? "";
 }

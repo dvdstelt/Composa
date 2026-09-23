@@ -4,7 +4,7 @@ A layer-based image editor for compositing and retouching, with Photoshop-style 
 
 The macOS app is written in Swift on top of AppKit, SwiftUI, CoreImage, Metal and Vision, so it cannot be compiled for anything else. Composa rebuilds the same editor from scratch in C# with .NET 10, [Avalonia](https://avaloniaui.net/) and [SkiaSharp](https://github.com/mono/SkiaSharp), which run on Linux, Windows and macOS alike.
 
-Today Composa is built and tested on Linux only, on X11 and Wayland (through XWayland). Windows and macOS builds are planned; nothing in the code is Linux-specific by design, but neither has been run yet.
+Composa is developed on Linux, on X11 and Wayland (through XWayland), and that is where it gets the most use. Windows builds are published too and the full test suite runs on Windows for every change, but the Windows version is newer and has seen far less real use. A macOS build is planned.
 
 > [!IMPORTANT]
 > This entire codebase was initially created by Claude Code Fable 5.1 in a single prompt.
@@ -78,8 +78,8 @@ Today Composa is built and tested on Linux only, on X11 and Wayland (through XWa
 ## Differences from the macOS app
 
 - Projects are saved as `.cmps` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
-- Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which has no Linux equivalent, so busy backgrounds defeat these here.
-- HEIC, AVIF and TIFF open only when ImageMagick (`magick` or `convert`) is installed, because Skia does not decode them itself.
+- Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which exists only on Apple's platforms, so busy backgrounds defeat these here.
+- HEIC, AVIF, TIFF and camera RAW open through ImageMagick, because Skia does not decode them itself. The Windows build includes it; on Linux they open when ImageMagick (`magick` or `convert`) is installed.
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
 - Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries whole layers across when nothing is selected, and pixels when something is; layers pasted into another project arrive centered on its canvas.
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
@@ -99,7 +99,9 @@ Every release publishes these on the [releases page](https://github.com/dvdstelt
 
 | Format | For | Notes |
 | --- | --- | --- |
-| `.AppImage` | Any distribution | One file, no installation. Mark it executable and run it. |
+| `-setup.exe` | Windows 10 and 11 | Installs for your account without administrator rights, adds a Start menu entry and the `.cmps` file type. |
+| `-win-x64.zip` | Windows, no installation | Extract anywhere and run `composa.exe`. |
+| `.AppImage` | Any Linux distribution | One file, no installation. Mark it executable and run it. |
 | `.deb` | Debian, Ubuntu, Mint, Pop!_OS | Installs the launcher, icons and the `.cmps` file type. |
 | `.rpm` | Fedora, RHEL, openSUSE | As above. |
 | `.tar.gz` | Anything else, or no root | Extract and run `install.sh` for a per-user install. |
@@ -109,6 +111,18 @@ Check a download against the `sha256sums.txt` published with it:
 ```bash
 sha256sum -c sha256sums.txt --ignore-missing
 ```
+
+On Windows, compare the output of this with the line for that file:
+
+```powershell
+Get-FileHash .\composa-*-setup.exe
+```
+
+### Windows
+
+Run `composa-<version>-win-x64-setup.exe`, or `win-arm64` on a Windows on Arm machine. It installs for your account only; if you have administrator rights it also offers to install for every user. The file type registration makes Composa the program for `.cmps` projects and adds it to **Open with** for images, without taking any image type away from the program that opens it today. Uninstall it from **Settings > Apps** like anything else. Your preferences stay behind in `%APPDATA%\Composa`.
+
+Composa's Windows builds are not code signed yet, so the first time you run the installer or `composa.exe`, Microsoft Defender SmartScreen stops it with "Windows protected your PC". Click **More info**, check that the publisher reads "Unknown publisher" and the file name is the one you downloaded, then click **Run anyway**. SmartScreen shows this for any program that is unsigned or has not yet been downloaded often enough to build a reputation; it is not a detection of anything in the file. Checking the download against `sha256sums.txt` is the way to know it is the file that was published.
 
 ### AppImage
 
@@ -148,14 +162,18 @@ Builds installed from the `.deb` or `.rpm` never check on their own, because apt
 
 ### ImageMagick
 
-The packages recommend rather than require ImageMagick, because it is needed only to open HEIC, AVIF, TIFF and camera RAW files. Install it if you want those; everything else works without it.
+HEIC, AVIF, TIFF and camera RAW files open through ImageMagick.
+
+On Windows it is included: the download carries [Magick.NET](https://github.com/dlemstra/Magick.NET), so nothing has to be installed separately. Its licences, including those of the LGPL libraries it contains for RAW and HEIC, are in `THIRD-PARTY-NOTICES.txt` and `ImageMagick-NOTICE.txt` next to `composa.exe`.
+
+On Linux the packages recommend rather than require it, because every distribution ships ImageMagick and it is needed only for those formats. Install it if you want them; everything else works without it.
 
 ## Requirements
 
-- Linux, x86-64 or arm64. Windows and macOS are not built yet.
-- Fontconfig and the usual X11 libraries, present on any desktop distribution. A downloaded build needs nothing else: .NET is bundled.
-- ImageMagick, optionally, to open HEIC, AVIF, TIFF and camera RAW.
-- To build from source: the .NET 10 SDK, plus `rpmbuild` if you want the `.rpm`.
+- Windows 10 or 11, x64 or arm64. Nothing else: .NET and ImageMagick are bundled.
+- Linux, x86-64 or arm64, with Fontconfig and the usual X11 libraries, present on any desktop distribution. .NET is bundled; ImageMagick is optional, to open HEIC, AVIF, TIFF and camera RAW.
+- macOS is not built yet.
+- To build from source: the .NET 10 SDK, plus `rpmbuild` if you want the `.rpm` and [Inno Setup 6](https://jrsoftware.org/isinfo.php) if you want the Windows installer.
 
 ## Build from source
 
@@ -166,6 +184,10 @@ scripts/package/all.sh
 Or just the portable tarball:
 ```bash
 scripts/publish.sh
+```
+The Windows zip and installer, from Git Bash on Windows. On Linux, add `--no-installer` to build the zip alone, since Inno Setup runs only on Windows:
+```bash
+scripts/package/windows.sh win-x64
 ```
 
 Run it straight from the checkout while developing:

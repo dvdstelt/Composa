@@ -81,11 +81,58 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-  # Windows artifacts arrive in Phase 3 and macOS in Phase 4. They are deliberately absent rather
-  # than stubbed, so a green run means every artifact this workflow claims to build was built.
+  # Both architectures build on an x64 runner: .NET cross-publishes arm64 and every native library
+  # arrives prebuilt, so nothing here depends on the runner's own architecture the way the Linux
+  # glibc floor does.
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [win-x64, win-arm64]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --yes --no-progress }
+
+      # See the Linux job: a draft has no tag yet, so MinVer is told the version it is going to get.
+      - name: Take the version from the draft tag
+        if: inputs.draft_tag != ''
+        env:
+          DRAFT_TAG: ${{ inputs.draft_tag }}
+        run: echo "MinVerVersionOverride=${DRAFT_TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Build the zip and the installer
+        run: scripts/package/windows.sh ${{ matrix.rid }} dist
+
+      - name: Check what was produced
+        run: |
+          ls -lh dist/
+          test -n "$(find dist -name '*-${{ matrix.rid }}.zip')"       || { echo "no zip";       exit 1; }
+          test -n "$(find dist -name '*-${{ matrix.rid }}-setup.exe')" || { echo "no installer"; exit 1; }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: composa-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  # macOS artifacts arrive in Phase 4. They are deliberately absent rather than stubbed, so a green
+  # run means every artifact this workflow claims to build was built.
 
   publish:
-    needs: [linux]
+    needs: [linux, windows]
     runs-on: ubuntu-22.04
     # Either a real release, or a dispatch that named a draft to fill.
     if: github.event_name == 'release' || inputs.draft_tag != ''

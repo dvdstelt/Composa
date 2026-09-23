@@ -8,6 +8,7 @@ using static Composa.Core.Tests.TestImages;
 namespace Composa.Core.Tests;
 
 /// <summary>Duplicate Layer over several layers, and Copy and Paste of layers taken whole.</summary>
+[Collection(ClipboardCollection.Name)]
 public class LayerClipboardTests
 {
     private static EditorSession ThreeLayers(out Layer a, out Layer b, out Layer c)

@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Composa.App;
 
-/// <summary>Preferences remembered between launches, stored under the XDG config directory.</summary>
+/// <summary>Preferences remembered between launches, stored in the platform's config directory (<see cref="AppPaths.Config"/>).</summary>
 public sealed class Settings
 {
     public List<string> RecentFiles { get; set; } = [];
@@ -25,15 +25,7 @@ public sealed class Settings
     /// <summary>A version the user dismissed. Only that one stays quiet; the next is announced.</summary>
     public string? SkippedVersion { get; set; }
 
-    private static string FilePath
-    {
-        get
-        {
-            var root = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
-            if (string.IsNullOrEmpty(root)) root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config");
-            return Path.Combine(root, "composa", "settings.json");
-        }
-    }
+    private static string FilePath => Path.Combine(AppPaths.Config, "settings.json");
 
     /// <summary>Tests and other hosts switch persistence off so they never touch the user's files.</summary>
     public static bool Persist { get; set; } = true;

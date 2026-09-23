@@ -45,7 +45,25 @@
 
   <content_rating type="oars-1.1"/>
 
-  <!-- The release workflow prepends an entry here for each published version. -->
+  <!--
+    Newest first. GNOME Software and KDE Discover show this as the version history. A new entry is
+    added along with the CHANGELOG.md section when a release is cut; see RELEASING.md.
+  -->
   <releases>
+    <release version="1.0.0" date="2026-09-23">
+      <description>
+        <p>The first stable release, and the first for Windows: an installer and a portable zip for x64 and arm64, with ImageMagick included so HEIC, AVIF, TIFF and camera RAW open without anything else installed.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-09-23">
+      <description>
+        <p>The Camera Raw Filter, finishing filters, blur and noise adjustment layers, the Inner Glow effect, layer copy and paste, Image Trim, and a notice when a newer version is available.</p>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-09-23">
+      <description>
+        <p>The first release with downloadable packages for Linux.</p>
+      </description>
+    </release>
   </releases>
 </component>

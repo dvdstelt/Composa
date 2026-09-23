@@ -20,24 +20,13 @@ public static class ImageFiles
             using var stream = File.OpenRead(path);
             return Load(stream, Path.GetFileName(path));
         }
-        catch (InvalidDataException) when (ConvertWithImageMagick(path) is { } converted)
+        catch (InvalidDataException) when (ImageMagick.IsAvailable)
         {
-            // Skia has no HEIC, AVIF or TIFF decoder; ImageMagick, when installed, fills the gap.
-            using var stream = new MemoryStream(converted);
+            // Skia has no HEIC, AVIF or TIFF decoder; ImageMagick fills the gap. When it cannot read
+            // the file either, its reason is the one worth reporting, since it was the last to try.
+            using var stream = new MemoryStream(ImageMagick.Convert(path, ImageMagickOutput.Png)!);
             return Load(stream, Path.GetFileName(path));
         }
-    }
-
-    private static byte[]? ConvertWithImageMagick(string path)
-    {
-        using var process = ImageMagick.Start(path + "[0]", "-auto-orient", "png:-");
-        if (process == null) return null; // Not installed; the caller reports the original decode error.
-        using var output = new MemoryStream();
-        var errors = process.StandardError.ReadToEndAsync();
-        process.StandardOutput.BaseStream.CopyTo(output);
-        process.WaitForExit(60_000);
-        _ = errors.Result;
-        return process.ExitCode == 0 && output.Length > 0 ? output.ToArray() : null;
     }
 
     public static SKBitmap Load(Stream stream, string name = "image")

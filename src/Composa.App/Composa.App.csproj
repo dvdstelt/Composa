@@ -6,6 +6,30 @@
     <ApplicationIcon>../../packaging/icons/composa.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
+  <!--
+    ImageMagick is bundled everywhere except Linux. Distributions all ship it and the .deb and .rpm
+    recommend it, so a Linux download stays 36 MB smaller and redistributes nothing; Windows and macOS
+    have no package manager to lean on. A developer build has no RuntimeIdentifier and bundles it, so
+    the library is built and tested on every machine even though Linux packages leave it out.
+  -->
+  <PropertyGroup>
+    <BundleImageMagick Condition="'$(BundleImageMagick)' == '' and $(RuntimeIdentifier.StartsWith('linux'))">false</BundleImageMagick>
+    <BundleImageMagick Condition="'$(BundleImageMagick)' == ''">true</BundleImageMagick>
+    <DefineConstants Condition="'$(BundleImageMagick)' == 'true'">$(DefineConstants);BUNDLED_IMAGEMAGICK</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(BundleImageMagick)' == 'true'">
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="14.17.1" GeneratePathProperty="true" />
+    <!--
+      Bundling redistributes ImageMagick and the LGPL libraries compiled into it, so the notices go
+      wherever the library goes. They are tied to the reference here rather than to a packaging
+      script, so no build can carry the library without them.
+    -->
+    <None Include="../../packaging/THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="$(PkgMagick_NET-Q16-AnyCPU)/Notice.txt" Link="ImageMagick-NOTICE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(BundleImageMagick)' != 'true'">
+    <Compile Remove="BundledImageMagick.cs" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="$(AvaloniaVersion)" />
     <PackageReference Include="Avalonia.Controls.ColorPicker" Version="$(AvaloniaVersion)" />
@@ -21,4 +45,13 @@
     -->
     <AssemblyMetadata Include="UpdateChannel" Value="$(UpdateChannel)" Condition="'$(UpdateChannel)' != ''" />
   </ItemGroup>
+  <!--
+    SkiaSharp and HarfBuzzSharp ship debug symbols for their native Windows libraries, 105 MB of them,
+    and DebugType=none only governs Composa's own. Nobody debugs a native library from a download.
+  -->
+  <Target Name="LeaveOutDebugSymbols" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
 </Project>

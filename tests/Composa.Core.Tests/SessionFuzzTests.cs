@@ -12,6 +12,7 @@ namespace Composa.Core.Tests;
 /// Drives an <see cref="EditorSession"/> with a long random sequence of edits, undos and redos, checking after every
 /// step that no layer holds a disposed or mismatched bitmap, no edit is left pending, and the document still renders.
 /// </summary>
+[Collection(ClipboardCollection.Name)]
 public class SessionFuzzTests
 {
     [Theory]
