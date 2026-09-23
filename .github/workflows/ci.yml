@@ -42,6 +42,33 @@ jobs:
           path: artifacts/screenshots/
           if-no-files-found: ignore
 
+  # The same suite on Windows, headless UI tests included. Composa is developed on Linux, so this is
+  # the only place a path separator, a line ending or a platform folder is tested the other way round.
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Test
+        run: dotnet test --configuration Release --no-build
+
+      - name: Upload screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screenshots-windows
+          path: artifacts/screenshots/
+          if-no-files-found: ignore
+
   packaging:
     runs-on: ubuntu-22.04
     steps:
@@ -90,3 +117,33 @@ jobs:
           test -n "$(find dist -name '*.deb')"      || { echo "no deb";      exit 1; }
           test -n "$(find dist -name '*.rpm')"      || { echo "no rpm";      exit 1; }
           test -n "$(find dist -name '*.AppImage')" || { echo "no AppImage"; exit 1; }
+
+  # The Windows zip and installer, for the same reason the Linux packages are built above: a release
+  # must not be the first thing to run these scripts. The installer needs Inno Setup, which is
+  # Windows only, so this runs there. x64 only, as on Linux; arm64 differs only in the RID.
+  packages-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # MinVer needs the tags, or it versions everything 0.0.0.
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) { choco install innosetup --yes --no-progress }
+
+      - name: Build the zip and the installer
+        run: scripts/package/windows.sh win-x64 dist
+
+      - name: Check what was produced
+        run: |
+          ls -lh dist/
+          test -n "$(find dist -name '*-win-x64.zip')"       || { echo "no zip";       exit 1; }
+          test -n "$(find dist -name '*-win-x64-setup.exe')" || { echo "no installer"; exit 1; }
