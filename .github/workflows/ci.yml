@@ -118,6 +118,14 @@ jobs:
           test -n "$(find dist -name '*.rpm')"      || { echo "no rpm";      exit 1; }
           test -n "$(find dist -name '*.AppImage')" || { echo "no AppImage"; exit 1; }
 
+      # Kept for a week, so a change can be tried on a real machine before it is released.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: composa-linux-x64
+          path: dist/*
+          retention-days: 7
+          if-no-files-found: error
+
   # The Windows zip and installer, for the same reason the Linux packages are built above: a release
   # must not be the first thing to run these scripts. The installer needs Inno Setup, which is
   # Windows only, so this runs there. x64 only, as on Linux; arm64 differs only in the RID.
@@ -147,3 +155,12 @@ jobs:
           ls -lh dist/
           test -n "$(find dist -name '*-win-x64.zip')"       || { echo "no zip";       exit 1; }
           test -n "$(find dist -name '*-win-x64-setup.exe')" || { echo "no installer"; exit 1; }
+
+      # Composa is developed on Linux, so this is how a change reaches a Windows machine before it
+      # is released. Kept for a week.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: composa-win-x64
+          path: dist/*
+          retention-days: 7
+          if-no-files-found: error
