@@ -141,7 +141,7 @@ public sealed partial class MainWindow
             Item("Edit Adjustment…", () => _ = EditAdjustmentLayer(session!.ActiveLayer!, false), enabled: () => session!.ActiveLayer?.IsAdjustment == true),
             Line(),
             Item("Transform Layer", () => { canvas.ShowTransformControls = true; SelectTool(Tool.Move); }, Key.T, ctrl),
-            Item("Duplicate Layer / Layer via Copy", () => session!.LayerViaCopy(), Key.J, ctrl),
+            Item("Duplicate Layer / Layer via Copy", () => session!.LayerViaCopy(), Key.J, ctrl, () => session!.ActiveLayer != null),
             Item("Rename Layer…", layers.BeginRename, Key.F2, enabled: () => session!.ActiveLayer != null),
             Item("Delete Layer", layers.DeleteLayerOrMask, enabled: () => session!.ActiveLayer != null),
             Line(),
@@ -615,6 +615,7 @@ public sealed partial class MainWindow
     private async Task Copy(bool merged)
     {
         if (session == null || !(merged ? session.CopyMerged() : session.Copy())) { ShowProblem("There is nothing to copy here."); return; }
+        if (EditorSession.Clipboard == null) { await ClearExternalClipboard(); return; }
         await PublishClipboard();
     }
 
@@ -637,6 +638,14 @@ public sealed partial class MainWindow
             await Clipboard.SetBitmapAsync(bitmap);
         }
         catch { /* The in-app clipboard still works when the desktop's clipboard refuses the image. */ }
+    }
+
+    /// <summary>Layers with nothing to show other apps (an adjustment) leave the desktop's clipboard empty, so Paste here is not mistaken for an outside image.</summary>
+    private async Task ClearExternalClipboard()
+    {
+        if (Clipboard == null) return;
+        try { await Clipboard.ClearAsync(); }
+        catch { /* Nothing to share; the in-app clipboard still has the layers. */ }
     }
 
     private async Task Paste()
