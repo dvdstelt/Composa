@@ -120,7 +120,7 @@ public class SessionFuzzTests
             ("fill", () => session.Fill(new SKColor((uint)random.Next() | 0xFF000000))),
             ("clear", () => session.ClearSelection()),
             ("adjust", () => session.Adjust(random.Next(3) switch { 0 => new InvertAdjustment(), 1 => new LevelsAdjustment().WithRange(0, new LevelsRange { Gamma = 1.5 }), _ => new HueSaturationAdjustment().WithShift(HueRange.Master, new HslShift(40, 10, 5)) })),
-            ("filter", () => session.ApplyFilter(new FilterSettings { Kind = (FilterKind)random.Next(6), Radius = random.Next(1, 9), Amount = random.Next(5, 60), Distortion = 30 })),
+            ("filter", () => session.ApplyFilter(new FilterSettings { Kind = (FilterKind)random.Next(Enum.GetValues<FilterKind>().Length), Radius = random.Next(1, 9), Amount = random.Next(5, 60), Distortion = 30, BloomRadius = random.Next(1, 20) })),
             ("preview-cancel", () => { if (session.BeginPreview("p")) { session.PreviewFilter(new FilterSettings { Kind = FilterKind.GaussianBlur, Radius = 3 }); session.PreviewAdjustment(new InvertAdjustment()); session.CancelPreview(); } }),
             ("caf", () => session.ContentAwareFill()),
             ("stroke", () =>

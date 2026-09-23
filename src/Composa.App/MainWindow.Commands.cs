@@ -710,10 +710,11 @@ public sealed partial class MainWindow
     {
         if (session == null) return;
         var target = session;
-        if (!target.BeginPreview(FilterSettings.DisplayName(kind))) { ShowProblem("Select a pixel layer or a mask first."); return; }
+        if (!target.BeginFilter(kind)) { ShowProblem("Select a pixel layer or a mask first."); return; }
         var initial = new FilterSettings { Kind = kind, Radius = kind == FilterKind.Sharpen ? 2 : kind == FilterKind.MotionBlur ? 30 : 8, Amount = kind == FilterKind.Sharpen ? 60 : 20, Seed = (uint)Random.Shared.Next() };
         var result = await AdjustmentDialogs.EditFilter(this, initial, settings => Busy(() => target.PreviewFilter(settings)));
-        if (result == null) target.CancelPreview();
+        // A filter left at nothing (a vignette of zero) closes as Cancel does, without an undo step.
+        if (result == null || result.IsIdentity) target.CancelPreview();
         else { target.PreviewFilter(result); target.CommitPreview(); }
     }
 

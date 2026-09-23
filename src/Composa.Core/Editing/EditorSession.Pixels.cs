@@ -230,6 +230,31 @@ public sealed partial class EditorSession
         return (ColorToMask(color), 0, 0);
     });
 
+    /// <summary>
+    /// Starts a filter's live preview. Vignette also paints an empty layer, which has no pixels of its own yet: the
+    /// layer is grown to the canvas first, and the vignette then frames and fills the whole canvas.
+    /// </summary>
+    public bool BeginFilter(FilterKind kind)
+    {
+        var fillsCanvas = kind == FilterKind.Vignette && !IsEditingMask && EditableLayer is { Pixels: { } pixels } && IsClear(pixels);
+        if (!BeginPreview(FilterSettings.DisplayName(kind), coverCanvas: fillsCanvas)) return false;
+        previewFillsClear = fillsCanvas;
+        return true;
+    }
+
+    private bool previewFillsClear;
+
+    private static unsafe bool IsClear(SKBitmap pixels)
+    {
+        var data = (byte*)pixels.GetPixels();
+        for (var y = 0; y < pixels.Height; y++)
+        {
+            var row = data + (long)y * pixels.RowBytes;
+            for (var x = 3; x < pixels.Width * 4; x += 4) if (row[x] != 0) return false;
+        }
+        return true;
+    }
+
     public void PreviewFilter(FilterSettings settings)
     {
         // Radii and distances are given in document pixels; a scaled-down photo has several source pixels to each.
@@ -237,10 +262,18 @@ public sealed partial class EditorSession
         {
             var matrix = TargetMatrix(target);
             var scale = Math.Sqrt(Math.Abs(matrix.ScaleX * matrix.ScaleY - matrix.SkewX * matrix.SkewY));
-            if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3) settings = settings with { Radius = settings.Radius / scale };
+            if (scale > 1e-6 && Math.Abs(scale - 1) > 1e-3)
+                settings = settings with { Radius = settings.Radius / scale, BloomRadius = settings.BloomRadius / scale, TonalRadius = settings.TonalRadius / scale };
             // A floating layer's blur spreads past its edges; one that fills the canvas has nothing to spread into.
             var bounds = target.Pixels != null ? target.Bounds : new SKRect(0, 0, document.Width, document.Height);
             settings = settings with { ClampEdges = bounds.Left <= 0.5f && bounds.Top <= 0.5f && bounds.Right >= document.Width - 0.5f && bounds.Bottom >= document.Height - 0.5f };
+            if (settings.Kind == FilterKind.Vignette)
+            {
+                // An empty layer takes the vignette across the canvas; a layer with pixels is framed and recolored as it is.
+                SKRect? frame = null;
+                if (previewFillsClear && matrix.TryInvert(out var inverse)) frame = inverse.MapRect(new SKRect(0, 0, document.Width, document.Height));
+                settings = settings with { VignetteFillsClear = previewFillsClear, VignetteFrame = frame };
+            }
         }
         PreviewFilterCore(settings);
     }
@@ -319,7 +352,7 @@ public sealed partial class EditorSession
 
     public void ApplyFilter(FilterSettings settings)
     {
-        if (!BeginPreview(FilterSettings.DisplayName(settings.Kind))) return;
+        if (!BeginFilter(settings.Kind)) return;
         PreviewFilter(settings);
         CommitPreview();
     }
