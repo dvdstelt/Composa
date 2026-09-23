@@ -32,11 +32,31 @@ Composa is a from-scratch implementation of the macOS image editor [Compositor](
 - Brush Smoothing is a string length in screen points, so `EditorSession.ViewZoom` must be set by the canvas before a stroke starts and while it runs; the first dab always lands, the last one catches up to the pointer on release.
 - The Photoshop reader (`IO/Psd`) is written from Adobe's published Photoshop File Formats Specification and must stay free of code taken from GPL readers. `PsdReader` only parses and decodes; `PsdImport` turns records into layers and the conversion report, and `PsdVector` and `PsdAdjustments` map shapes and adjustments. Photoshop is read, never written. `tests/Composa.Core.Tests/PsdWriter.cs` builds fixture files and is shared into the app tests by source.
 
+## Releasing and packaging
+
+- **The version comes from the nearest git tag, through MinVer. Never hand-edit a version anywhere.** An untagged commit builds as a pre-release of the next patch, so a development build reports something like `0.3.1-alpha.0.4` and is never mistaken for a release. Every checkout in CI needs `fetch-depth: 0`, or MinVer sees no tags and silently versions everything `0.0.0`. `AppInfo.Version` is the single place that reads it back, stripping the `+<sha>` build metadata.
+- **A test must never compare against `AppInfo.Version`.** It changes with the tag: the same assertion exercises a stable version on the day of a release and a pre-release the day after. `UpdateCheck` takes the running version as a parameter for exactly this reason, and tests state the versions they are about.
+- **Linux artifacts build on `ubuntu-22.04`, never `ubuntu-latest`.** A self-contained build links against the build machine's glibc, and 24.04 output refuses to start on Debian 12 or Ubuntu 22.04. The pin is deliberate and commented in both workflows.
+- `scripts/package/all.sh [rid] [out]` builds every Linux format; `stage.sh` lays out the one tree that the `.deb`, `.rpm` and AppImage all pack, so a layout bug is fixed once. The tarball is the only single-file build. `scripts/publish.sh` is now a thin wrapper around the tarball.
+- **Packaging scripts resolve output and staging directories to absolute paths as they read them**, because several of them `cd` into a temporary directory before writing. CI passes a relative `dist`, and a script that skips this writes the package somewhere nobody looks.
+- Every format spells architectures differently (`amd64`/`arm64` for dpkg, `x86_64`/`aarch64` for rpm and AppImage, `x64`/`arm64` for the .NET RID) and neither dpkg nor rpm accepts the `-` in a MinVer pre-release. Both mappings live in `scripts/package/common.sh` and belong nowhere else.
+- CI builds all four package formats on x86-64 for every push and pull request. That job exists because these scripts were once exercised only by a release, which meant a release rehearsal was the first thing to discover they could not run from a clean checkout.
+- `RELEASING.md` is the procedure: fill a **draft** release through a workflow dispatch, check it, then publish. A published release with no artifacts attached is worse than no release, because the update check points people at whatever is latest. GitHub creates the tag when the release is published, so no tag is ever pushed from a terminal.
+
+## Rules for what the application tells the user about itself
+
+- `UpdateCheck` reports that a newer release exists and never downloads or installs anything. A stable build is never offered a pre-release; a pre-release sorts before the version it leads to; skipping applies to one version only.
+- **A build installed by a package manager must never mention updates.** The `UpdateChannel` build property is set to `managed` by the packaging scripts for the `.deb` and `.rpm`, read back from assembly metadata, and the Help menu then explains that apt or dnf owns updates instead of pointing people around them.
+- An automatic check that fails says nothing, but still records the attempt: otherwise someone offline or rate limited by GitHub sends another request on every launch.
+- `ImageMagick` (in `Composa.Core/IO`) resolves the tool once and asks each candidate to identify itself rather than trusting its name. **Never probe for `convert` on Windows**: `C:\Windows\System32\convert.exe` is the FAT-to-NTFS volume converter and is on the PATH of every Windows machine.
+
 ## Commands
 
 ```bash
 dotnet build
 dotnet test
 dotnet run --project src/Composa.App
-scripts/publish.sh
+scripts/package/all.sh          # every Linux package into dist/
+scripts/publish.sh              # just the portable tarball
+scripts/make-icons.sh           # only when packaging/composa.svg changes
 ```
