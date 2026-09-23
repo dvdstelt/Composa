@@ -279,6 +279,17 @@ public static class MacProject
                 return new GrainAdjustment { Amount = Number(n, "amount", 25), Size = Number(n, "size", 1.5), Roughness = Number(n, "roughness", 50), Seed = (uint)Number(n, "seed", 0) };
             case "Invert":
                 return new InvertAdjustment();
+            case "Gaussian Blur":
+                return new GaussianBlurAdjustment { Radius = Number(a, "blurRadius", 10) };
+            case "Motion Blur":
+                return new MotionBlurAdjustment { Angle = Number(a, "motionAngle", 0), Distance = Number(a, "motionDistance", 10) };
+            case "Add Noise":
+                return new AddNoiseAdjustment
+                {
+                    Amount = Number(a, "noiseAmount", 10), Seed = (uint)Number(a, "noiseSeed", 0),
+                    Gaussian = a.TryGetProperty("noiseGaussian", out var gaussian) && gaussian.ValueKind == JsonValueKind.True,
+                    Monochromatic = a.TryGetProperty("noiseMonochromatic", out var mono) && mono.ValueKind == JsonValueKind.True
+                };
             case "Black & White":
                 if (!a.TryGetProperty("blackWhiteSettings", out var bw)) return new BlackAndWhiteAdjustment();
                 return new BlackAndWhiteAdjustment

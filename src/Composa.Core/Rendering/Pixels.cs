@@ -60,6 +60,16 @@ public static class Pixels
         return copy;
     }
 
+    /// <summary>Copies one bitmap's pixels over another's of the same size and format, then drops what was cached for it.</summary>
+    public static unsafe void CopyPixels(SKBitmap from, SKBitmap to)
+    {
+        if (from.Width != to.Width || from.Height != to.Height || from.ColorType != to.ColorType) throw new ArgumentException("The bitmaps differ in size or format.");
+        byte* source = (byte*)from.GetPixels(), destination = (byte*)to.GetPixels();
+        long bytes = (long)from.Width * from.BytesPerPixel;
+        for (var y = 0; y < from.Height; y++) Buffer.MemoryCopy(source + y * (long)from.RowBytes, destination + y * (long)to.RowBytes, bytes, bytes);
+        Invalidate(to);
+    }
+
     // ---- Cached images and reduction pyramids -------------------------------------------------------------------
 
     /// <summary>Level 0 wraps the bitmap itself without copying; each further level is half the size of the one before.</summary>

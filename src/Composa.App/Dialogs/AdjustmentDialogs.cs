@@ -39,6 +39,12 @@ public static class AdjustmentDialogs
                 ("Amount", grain.Amount, 0, 100, 1, "0", v => Update(grain = grain with { Amount = v })),
                 ("Size", grain.Size, 0.5, 20, 0.1, "0.0", v => Update(grain = grain with { Size = v })),
                 ("Roughness", grain.Roughness, 0, 100, 1, "0", v => Update(grain = grain with { Roughness = v }))),
+            GaussianBlurAdjustment blur => Sliders(
+                ("Radius", blur.Radius, GaussianBlurAdjustment.MinRadius, GaussianBlurAdjustment.MaxRadius, 0.1, "0.0", v => Update(blur = blur with { Radius = v }))),
+            MotionBlurAdjustment motion => Sliders(
+                ("Angle", motion.Angle, -90, 90, 1, "0", v => Update(motion = motion with { Angle = v })),
+                ("Distance", motion.Distance, MotionBlurAdjustment.MinDistance, 500, 1, "0", v => Update(motion = motion with { Distance = v }))),
+            AddNoiseAdjustment noise => NoiseEditor(noise, Update),
             GradientMapAdjustment map => GradientMapEditor(owner, map, foreground, background, Update),
             BlackAndWhiteAdjustment bw => BlackAndWhiteEditor(bw, Update),
             ColorBalanceAdjustment balance => ColorBalanceEditor(balance, Update),
@@ -55,6 +61,9 @@ public static class AdjustmentDialogs
     private static Adjustment Identity(Adjustment like) => Adjustment.Create(like.Kind) switch
     {
         GrainAdjustment grain => grain with { Amount = 0 },
+        GaussianBlurAdjustment blur => blur with { Radius = 0 },
+        MotionBlurAdjustment motion => motion with { Distance = 0 },
+        AddNoiseAdjustment noise => noise with { Amount = 0 },
         GradientMapAdjustment => new BrightnessContrastAdjustment(),
         InvertAdjustment => new BrightnessContrastAdjustment(),
         BlackAndWhiteAdjustment => new BrightnessContrastAdjustment(),
@@ -66,6 +75,16 @@ public static class AdjustmentDialogs
         var panel = new StackPanel { Spacing = 8 };
         foreach (var r in rows) panel.Children.Add(Ui.SliderRow(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, 240, 80).Row);
         return panel;
+    }
+
+    private static readonly string[] NoiseDistributions = ["Uniform", "Gaussian"];
+
+    private static Control NoiseEditor(AddNoiseAdjustment noise, Action<Adjustment> update)
+    {
+        var amount = Ui.SliderRow("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", 240, 80).Row;
+        var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => d, d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
+        var mono = Ui.Check("Monochromatic", noise.Monochromatic, v => update(noise = noise with { Monochromatic = v }));
+        return Ui.Column(10, amount, Ui.Row(10, Ui.Label("Distribution", Palette.Secondary), distribution), mono);
     }
 
     private static Control LevelsEditor(LevelsAdjustment levels, Histogram? histogram, Action<Adjustment> update)
@@ -244,6 +263,8 @@ public static class AdjustmentDialogs
                 break;
             case FilterKind.AddNoise:
                 Slider("Amount", initial.Amount, 0, 100, v => current with { Amount = v });
+                panel.Children.Add(Ui.Row(10, Ui.Label("Distribution", Palette.Secondary),
+                    Ui.Combo(NoiseDistributions, initial.Gaussian ? "Gaussian" : "Uniform", d => d, d => Update(current with { Gaussian = d == "Gaussian" }), 120)));
                 panel.Children.Add(Ui.Check("Monochromatic", initial.Monochrome, v => Update(current with { Monochrome = v })));
                 break;
             case FilterKind.LensCorrection:

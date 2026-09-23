@@ -295,7 +295,9 @@ public sealed partial class EditorSession
     {
         if (layer.Pixels == null) return document.Bounds;
         var bounds = Geometry.RoundOut(layer.VisibleBounds);
-        bounds.Inflate(2, 2);
+        // A blur adjustment above spreads the change as far as it samples.
+        var margin = 2 + (int)Math.Ceiling(DocumentRenderer.SamplingMargin(document));
+        bounds.Inflate(margin, margin);
         // A clipping base also changes what its clipped layers show.
         var siblings = document.SiblingsOf(layer.Id);
         if (siblings != null)

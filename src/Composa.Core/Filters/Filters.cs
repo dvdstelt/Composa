@@ -17,6 +17,8 @@ public sealed record FilterSettings
     /// <summary>Noise amount, sharpen strength, or background tolerance: 0…100.</summary>
     public double Amount { get; init; } = 20;
     public bool Monochrome { get; init; } = true;
+    /// <summary>Add Noise: a bell-shaped spread instead of an even one.</summary>
+    public bool Gaussian { get; init; }
     /// <summary>Lens distortion, -100 (pincushion) … 100 (barrel correction).</summary>
     public double Distortion { get; init; }
     /// <summary>Vignette, -100 (darken corners) … 100 (lighten corners).</summary>
@@ -70,7 +72,7 @@ public static unsafe class ImageFilters
             case FilterKind.Sharpen:
                 return (Sharpen(source, settings.Radius, settings.Amount / 100 * 2), 0, 0);
             case FilterKind.AddNoise:
-                return (AddNoise(source, settings.Amount, settings.Monochrome, settings.Seed), 0, 0);
+                return (AddNoise(source, settings.Amount, settings.Gaussian, settings.Monochrome, settings.Seed), 0, 0);
             case FilterKind.LensCorrection:
                 return (LensCorrection(source, settings.Distortion / 100, settings.Vignette / 100), 0, 0);
             case FilterKind.RemoveBackground:
@@ -101,7 +103,33 @@ public static unsafe class ImageFilters
         return true;
     }
 
-    private static (SKBitmap, int, int) MotionBlur(SKBitmap source, double distance, double angle, bool clamp)
+    /// <summary>Softens a bitmap in place with a Gaussian of <paramref name="sigma"/>, its edges continued outward so nothing fades into transparency.</summary>
+    public static void BlurInPlace(SKBitmap bitmap, float sigma)
+    {
+        sigma = Math.Max(0.1f, sigma);
+        using var filter = SKImageFilter.CreateBlur(sigma, sigma, SKShaderTileMode.Clamp);
+        using var source = Pixels.Clone(bitmap);
+        using var canvas = new SKCanvas(bitmap);
+        using var paint = new SKPaint { ImageFilter = filter, BlendMode = SKBlendMode.Src };
+        canvas.DrawBitmap(source, 0, 0, paint);
+        canvas.Flush();
+        Pixels.Invalidate(bitmap);
+    }
+
+    /// <summary>
+    /// Seeded noise for a document pixel and channel, -1…1: even across the range, or bell-shaped (the mean of three
+    /// draws, widened back to the same spread) when <paramref name="gaussian"/>.
+    /// </summary>
+    public static float Noise(int x, int y, uint seed, int channel, bool gaussian)
+    {
+        var key = unchecked(seed + (uint)channel * 0x9E3779B9u);
+        var n = GrainAdjustment.Hash(x, y, key);
+        if (!gaussian) return n;
+        var sum = n + GrainAdjustment.Hash(x, y, unchecked(key + 0x7F4A7C15u)) + GrainAdjustment.Hash(x, y, unchecked(key + 0x3C6EF372u));
+        return Math.Clamp(sum / 3 * 1.7f, -1, 1);
+    }
+
+    internal static (SKBitmap Result, int GrowX, int GrowY) MotionBlur(SKBitmap source, double distance, double angle, bool clamp)
     {
         var length = Math.Max(1, (int)Math.Round(distance));
         double radians = angle * Math.PI / 180, dx = Math.Cos(radians), dy = -Math.Sin(radians);
@@ -158,11 +186,11 @@ public static unsafe class ImageFilters
         return result;
     }
 
-    private static SKBitmap AddNoise(SKBitmap source, double amount, bool monochrome, uint seed)
+    private static SKBitmap AddNoise(SKBitmap source, double amount, bool gaussian, bool monochrome, uint seed)
     {
         var result = Pixels.Clone(source);
         var dst = (byte*)result.GetPixels();
-        var strength = (float)(Math.Clamp(amount, 0, 100) / 100 * 128);
+        var spread = (float)(Math.Clamp(amount, 0, AddNoiseAdjustment.MaxAmount) / 100 * 127.5);
         Parallel.For(0, source.Height, y =>
         {
             var row = dst + (long)y * result.RowBytes;
@@ -171,10 +199,10 @@ public static unsafe class ImageFilters
                 var p = row + x * 4;
                 int a = p[3];
                 if (a == 0) continue;
-                var shared = GrainAdjustment.Hash(x, y, seed) * strength;
+                var shared = Noise(x, y, seed, 0, gaussian) * spread;
                 for (var c = 0; c < 3; c++)
                 {
-                    var n = monochrome ? shared : GrainAdjustment.Hash(x, y, seed + (uint)c * 7919u) * strength;
+                    var n = monochrome ? shared : Noise(x, y, seed, c, gaussian) * spread;
                     p[c] = (byte)Math.Clamp(p[c] + n * a / 255f + 0.5f, 0, a);
                 }
             }

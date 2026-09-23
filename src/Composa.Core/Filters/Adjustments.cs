@@ -3,7 +3,7 @@ using SkiaSharp;
 
 namespace Composa.Filters;
 
-public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMap, Grain, Invert, BrightnessContrast, BlackAndWhite, ColorBalance }
+public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMap, Grain, Invert, BrightnessContrast, BlackAndWhite, ColorBalance, GaussianBlur, MotionBlur, AddNoise }
 
 /// <summary>
 /// A color adjustment. The same settings drive a destructive Image menu command and a live adjustment layer.
@@ -20,11 +20,19 @@ public enum AdjustmentKind { HueSaturation, Levels, Curves, Exposure, GradientMa
 [JsonDerivedType(typeof(BrightnessContrastAdjustment), "brightnessContrast")]
 [JsonDerivedType(typeof(BlackAndWhiteAdjustment), "blackAndWhite")]
 [JsonDerivedType(typeof(ColorBalanceAdjustment), "colorBalance")]
+[JsonDerivedType(typeof(GaussianBlurAdjustment), "gaussianBlur")]
+[JsonDerivedType(typeof(MotionBlurAdjustment), "motionBlur")]
+[JsonDerivedType(typeof(AddNoiseAdjustment), "addNoise")]
 public abstract record Adjustment
 {
     [JsonIgnore] public abstract AdjustmentKind Kind { get; }
     [JsonIgnore] public abstract string DisplayName { get; }
     [JsonIgnore] public virtual bool IsIdentity => false;
+    /// <summary>
+    /// How far, in document pixels, a pixel's result depends on its neighbours. Zero for the color adjustments; the
+    /// blurs need this much of the picture around any area that is rendered on its own.
+    /// </summary>
+    [JsonIgnore] public virtual double SamplingMargin => 0;
 
     /// <summary>Builds the per-pixel operation. <paramref name="originX"/>/<paramref name="originY"/> locate the buffer in the document.</summary>
     internal abstract PixelOp CreateOp();
@@ -40,7 +48,7 @@ public abstract record Adjustment
     /// <paramref name="originY"/>) and neighbouring pixels are <paramref name="step"/> document pixels apart, so
     /// position-dependent adjustments (grain) keep their pattern fixed to the document at any zoom.
     /// </summary>
-    public unsafe void Apply(SKBitmap bitmap, SKRectI area, double originX = 0, double originY = 0, double step = 1, bool parallel = true)
+    public virtual unsafe void Apply(SKBitmap bitmap, SKRectI area, double originX = 0, double originY = 0, double step = 1, bool parallel = true)
     {
         if (IsIdentity) return;
         area = Model.Geometry.Intersect(area, new SKRectI(0, 0, bitmap.Width, bitmap.Height));
@@ -97,6 +105,9 @@ public abstract record Adjustment
         AdjustmentKind.Invert => new InvertAdjustment(),
         AdjustmentKind.BlackAndWhite => new BlackAndWhiteAdjustment(),
         AdjustmentKind.ColorBalance => new ColorBalanceAdjustment(),
+        AdjustmentKind.GaussianBlur => new GaussianBlurAdjustment(),
+        AdjustmentKind.MotionBlur => new MotionBlurAdjustment(),
+        AdjustmentKind.AddNoise => new AddNoiseAdjustment { Seed = (uint)Random.Shared.Next() },
         _ => new BrightnessContrastAdjustment()
     };
 }
@@ -378,6 +389,92 @@ public sealed record GrainAdjustment : Adjustment
             var weight = 4 * luma * (1 - luma) * 0.75f + 0.25f;
             var delta = (int)MathF.Round(noise * amount * weight);
             r = Math.Clamp(r + delta, 0, 255); g = Math.Clamp(g + delta, 0, 255); b = Math.Clamp(b + delta, 0, 255);
+        };
+    }
+}
+
+/// <summary>
+/// Gaussian Blur as a live layer: softens everything beneath it, as Photoshop's Smart Filter would. The radius is in
+/// document pixels, so a zoomed-out view blurs by the same amount of picture.
+/// </summary>
+public sealed record GaussianBlurAdjustment : Adjustment
+{
+    public const double MinRadius = 0.1, MaxRadius = 250;
+    public double Radius { get; init; } = 10;
+    public override AdjustmentKind Kind => AdjustmentKind.GaussianBlur;
+    public override string DisplayName => "Gaussian Blur";
+    public override bool IsIdentity => Radius <= 0;
+    public override double SamplingMargin => Math.Clamp(Radius, 0, MaxRadius) * 3 + 2;
+    internal override PixelOp CreateOp() => (ref int _, ref int _, ref int _, int _, int _) => { };
+
+    public override void Apply(SKBitmap bitmap, SKRectI area, double originX = 0, double originY = 0, double step = 1, bool parallel = true)
+    {
+        if (IsIdentity) return;
+        ImageFilters.BlurInPlace(bitmap, (float)(Math.Clamp(Radius, MinRadius, MaxRadius) / Math.Max(step, 1e-6)));
+    }
+}
+
+/// <summary>Motion Blur as a live layer: smears what lies beneath along one direction.</summary>
+public sealed record MotionBlurAdjustment : Adjustment
+{
+    public const double MinDistance = 1, MaxDistance = 2000;
+    /// <summary>Direction in degrees, -90…90.</summary>
+    public double Angle { get; init; }
+    /// <summary>Length of the smear in document pixels.</summary>
+    public double Distance { get; init; } = 10;
+    public override AdjustmentKind Kind => AdjustmentKind.MotionBlur;
+    public override string DisplayName => "Motion Blur";
+    public override bool IsIdentity => Distance <= 0;
+    public override double SamplingMargin => Math.Clamp(Distance, 0, MaxDistance) / 2 + 2;
+    internal override PixelOp CreateOp() => (ref int _, ref int _, ref int _, int _, int _) => { };
+
+    public override void Apply(SKBitmap bitmap, SKRectI area, double originX = 0, double originY = 0, double step = 1, bool parallel = true)
+    {
+        if (IsIdentity) return;
+        var distance = Math.Clamp(Distance, MinDistance, MaxDistance) / Math.Max(step, 1e-6);
+        if (distance < 1) return;
+        using var blurred = ImageFilters.MotionBlur(bitmap, distance, Math.Clamp(Angle, -90, 90), clamp: true).Result;
+        Rendering.Pixels.CopyPixels(blurred, bitmap);
+    }
+}
+
+/// <summary>
+/// Add Noise as a live layer. Each pixel's noise depends only on its document position and the seed, so a piece of
+/// the canvas redrawn on its own gets the same grain as that part of the whole.
+/// </summary>
+public sealed record AddNoiseAdjustment : Adjustment
+{
+    public const double MinAmount = 0.1, MaxAmount = 400;
+    /// <summary>Percent of the full 0…255 range the noise may swing, 0.1…400.</summary>
+    public double Amount { get; init; } = 10;
+    /// <summary>A bell-shaped spread instead of an even one.</summary>
+    public bool Gaussian { get; init; }
+    /// <summary>Brightness only, the same change on every channel.</summary>
+    public bool Monochromatic { get; init; }
+    public uint Seed { get; init; }
+    public override AdjustmentKind Kind => AdjustmentKind.AddNoise;
+    public override string DisplayName => "Add Noise";
+    public override bool IsIdentity => Amount <= 0;
+
+    // Zoomed out, each screen pixel averages many noisy ones; one sample at full strength would look far noisier than the export.
+    internal override PixelOp? CreateOp(double step) => (this with { Amount = Amount / step }).CreateOp();
+
+    internal override PixelOp CreateOp()
+    {
+        var spread = (float)(Math.Clamp(Amount, 0, MaxAmount) / 100 * 127.5);
+        bool gaussian = Gaussian, mono = Monochromatic;
+        var seed = Seed;
+        return [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)] (ref int r, ref int g, ref int b, int x, int y) =>
+        {
+            if (mono)
+            {
+                var n = ImageFilters.Noise(x, y, seed, 0, gaussian) * spread;
+                r = Math.Clamp((int)MathF.Round(r + n), 0, 255); g = Math.Clamp((int)MathF.Round(g + n), 0, 255); b = Math.Clamp((int)MathF.Round(b + n), 0, 255);
+                return;
+            }
+            r = Math.Clamp((int)MathF.Round(r + ImageFilters.Noise(x, y, seed, 0, gaussian) * spread), 0, 255);
+            g = Math.Clamp((int)MathF.Round(g + ImageFilters.Noise(x, y, seed, 1, gaussian) * spread), 0, 255);
+            b = Math.Clamp((int)MathF.Round(b + ImageFilters.Noise(x, y, seed, 2, gaussian) * spread), 0, 255);
         };
     }
 }
