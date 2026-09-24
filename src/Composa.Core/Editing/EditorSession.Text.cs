@@ -96,12 +96,15 @@ public sealed partial class EditorSession
         return null;
     }
 
-    /// <summary>Starts new point text at a document point: no box of its own, so what is typed decides how big the layer is.</summary>
+    /// <summary>
+    /// Starts new point text at a clicked document point: no box of its own, so what is typed decides how big the layer
+    /// is. The click lands on the first baseline, as Photoshop's does, so the letters rise from where the pointer was.
+    /// </summary>
     public TextEditor BeginText(SKPoint at)
     {
         FinishText();
         var style = TextDefaults with { Text = "", BoxWidth = null, BoxHeight = null, Color = (uint)Foreground | 0xFF000000 };
-        var layer = AddText(at, style, commit: false);
+        var layer = AddText(new SKPoint(at.X, at.Y - new TextLayout(style).Ascent), style, commit: false);
         return OpenTextEditor(layer, isNew: true);
     }
 
