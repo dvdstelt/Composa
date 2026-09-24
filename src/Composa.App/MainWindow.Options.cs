@@ -147,10 +147,7 @@ public sealed partial class MainWindow
         var updating = false;
         void Change(Func<TextStyle, TextStyle> change)
         {
-            if (updating) return;
-            var wasEditing = s.IsEditingText;
-            s.ChangeTextStyle(change);
-            if (!wasEditing && s.IsEditingText) { canvas.Focus(); RebuildOptions(); UpdateStatus(); }
+            if (!updating) s.ChangeTextStyle(change);
         }
         var style = s.CurrentTextStyle;
         var families = EditorSession.FontFamilies;

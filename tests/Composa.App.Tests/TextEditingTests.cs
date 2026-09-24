@@ -214,6 +214,28 @@ public class TextEditingTests
     }
 
     [AvaloniaFact]
+    public void Typing_a_size_in_the_bar_restyles_the_layer_without_opening_it_for_typing()
+    {
+        var layer = session.AddText(new SKPoint(100, 100), new TextStyle { Text = "Hello", Size = 73, FontFamily = session.TextDefaults.FontFamily });
+        window.SelectTool(Tool.Text); // Rebuilds the bar for the new layer.
+        Dispatcher.UIThread.RunJobs();
+        var size = window.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Value == 73);
+        var box = size.GetVisualDescendants().OfType<TextBox>().First();
+        box.Focus();
+        box.SelectAll();
+        window.KeyPressQwerty(PhysicalKey.Backspace, RawInputModifiers.None);
+        window.KeyTextInput("61");
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(session.IsEditingText);
+        Assert.Equal("Hello", layer.Text!.Text);
+        Assert.Equal(61, layer.Text.Size);
+        Assert.Same(box, window.FocusManager!.GetFocusedElement()); // The keyboard stays in the field.
+        Assert.Equal("Change Text Style", session.History.UndoName);
+        session.Undo();
+        Assert.Equal(73, session.Document.Find(layer.Id)!.Text!.Size);
+    }
+
+    [AvaloniaFact]
     public void Clicking_existing_text_places_the_caret_and_the_bar_changes_the_style()
     {
         var layer = session.AddText(new SKPoint(100, 100), new TextStyle { Text = "Hello", Size = 60, FontFamily = session.TextDefaults.FontFamily });
