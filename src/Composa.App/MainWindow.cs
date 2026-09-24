@@ -393,10 +393,22 @@ public sealed partial class MainWindow : Window
     private async Task PickColor(bool foreground)
     {
         if (session == null) return;
-        var picked = await Dialogs.Prompts.Color(this, foreground ? "Foreground Color" : "Background Color", foreground ? session.Foreground : session.Background);
-        if (picked is not { } color) return;
-        if (foreground) session.Foreground = color; else session.Background = color;
+        var target = session;
+        // Text being typed follows the foreground color, so it previews the picker's working color as the Type bar's own
+        // swatch does, and goes back to its own color on Cancel.
+        var editing = foreground ? target.TextEdit : null;
+        var original = target.CurrentTextStyle.Color;
+        void Recolor(SKColor color) { if (editing != null && target.TextEdit == editing) target.ChangeTextStyle(st => st with { Color = (uint)color | 0xFF000000 }); }
+        var picked = await Dialogs.Prompts.Color(this, foreground ? "Foreground Color" : "Background Color", foreground ? target.Foreground : target.Background, editing != null ? Recolor : null);
+        if (picked is not { } color)
+        {
+            Recolor(new SKColor(original));
+            return;
+        }
+        if (foreground) target.Foreground = color; else target.Background = color;
+        Recolor(color);
         UpdateColors();
+        refreshOptions?.Invoke();
     }
 
     /// <summary>Opens a text layer for typing on the canvas.</summary>

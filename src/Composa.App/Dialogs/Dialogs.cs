@@ -75,13 +75,15 @@ public static class Prompts
         return await dialog.Ask(owner) ? result : null;
     }
 
-    public static async Task<SKColor?> Color(Window owner, string title, SKColor initial)
+    /// <param name="preview">Called with the working color as it changes while the dialog is open, so what it colors can follow along. The caller puts the original back on Cancel.</param>
+    public static async Task<SKColor?> Color(Window owner, string title, SKColor initial, Action<SKColor>? preview = null)
     {
         var view = new ColorView
         {
             Color = initial.ToAvalonia(), IsAlphaEnabled = false, IsAlphaVisible = false, IsColorPaletteVisible = true,
             IsColorModelVisible = true, IsHexInputVisible = true, Width = 360
         };
+        if (preview != null) view.ColorChanged += (_, e) => preview(e.NewColor.ToSkia().WithAlpha(255));
         var swatches = Ui.Row(0,
             new Border { Width = 60, Height = 28, Background = new SolidColorBrush(initial.ToAvalonia()) },
             new Border { Width = 60, Height = 28, [!Border.BackgroundProperty] = view.GetObservable(ColorView.ColorProperty).Select(c => (IBrush)new SolidColorBrush(c)).ToBinding() });
