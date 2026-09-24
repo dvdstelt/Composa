@@ -60,6 +60,25 @@ public class ToolInputTests
     }
 
     [AvaloniaFact]
+    public void Shift_squares_a_marquee_unless_it_chose_the_add_mode()
+    {
+        window.SelectTool(Tool.Marquee);
+        // With nothing to add to, a Shift held from the start squares the marquee.
+        Drag(new SKPoint(100, 100), new SKPoint(180, 140), RawInputModifiers.Shift);
+        Assert.Equal(new SKRectI(100, 100, 180, 180), SelectionMask.Bounds(session.Selection!));
+        // With a selection, a Shift held before the press adds to it and the marquee keeps the shape it is dragged in.
+        Drag(new SKPoint(300, 100), new SKPoint(360, 140), RawInputModifiers.Shift);
+        Assert.Equal(new SKRectI(100, 100, 360, 180), SelectionMask.Bounds(session.Selection!));
+        // Letting Shift go mid-drag and pressing it again squares the marquee while it still adds.
+        window.MouseDown(At(400, 300), MouseButton.Left, RawInputModifiers.Shift);
+        window.MouseMove(At(430, 320), RawInputModifiers.LeftMouseButton);
+        window.MouseMove(At(460, 330), RawInputModifiers.LeftMouseButton | RawInputModifiers.Shift);
+        window.MouseUp(At(460, 330), MouseButton.Left, RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(new SKRectI(100, 100, 460, 360), SelectionMask.Bounds(session.Selection!));
+    }
+
+    [AvaloniaFact]
     public void Lasso_wand_and_polygon_select()
     {
         window.SelectTool(Tool.Lasso);

@@ -37,7 +37,7 @@ public sealed partial class CanvasView
         {
             var shift = dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift);
             var alt = dragModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt);
-            var rect = drag == Drag.Shape ? MarqueeRect(shift, alt) : MarqueeRect(shift && dragMode != Selections.SelectionMode.Add || shift && alt, false);
+            var rect = drag == Drag.Shape ? MarqueeRect(shift, alt) : MarqueeRect(ConstrainsMarquee(dragModifiers), false);
             var ellipse = drag == Drag.Marquee ? session.MarqueeKind == MarqueeKind.Ellipse : session.ShapeKind == Model.ShapeKind.Ellipse;
             var radius = drag == Drag.Shape && session.ShapeKind == Model.ShapeKind.RoundedRectangle ? (float)session.ShapeCornerRadius : 0;
             var fill = drag == Drag.Shape ? session.Foreground : (SKColor?)null;

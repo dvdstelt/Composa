@@ -23,6 +23,8 @@ public sealed partial class CanvasView
     private bool cursorInside;
     private SelectionMode dragMode;
     private KeyModifiers dragModifiers;
+    /// <summary>Shift was let go during a marquee drag, so pressing it again squares the marquee (see <see cref="ConstrainsMarquee"/>).</summary>
+    private bool shiftReleased;
     /// <summary>A Ctrl-drag with another tool is moving layers: Photoshop's temporary Move tool.</summary>
     private bool temporaryMove;
     /// <summary>Ctrl is held over the canvas with another tool, so the cursor promises a move.</summary>
@@ -191,6 +193,9 @@ public sealed partial class CanvasView
                 break;
             case Tool.Marquee:
                 dragMode = ModeFor(e.KeyModifiers & ~KeyModifiers.Control);
+                // Adding to no selection is replacing, so a Shift held from the start squares the marquee instead of choosing a mode.
+                if (session.Selection == null && dragMode == SelectionMode.Add) dragMode = SelectionMode.Replace;
+                shiftReleased = false;
                 if (control && InsideSelection(pressDocument) && session.BeginMovePixels(duplicate: alt)) { drag = Drag.MovePixels; break; }
                 drag = dragMode == SelectionMode.Replace && InsideSelection(pressDocument) ? Drag.MoveSelection : Drag.Marquee;
                 break;
@@ -319,6 +324,7 @@ public sealed partial class CanvasView
                 break;
         }
         if (drag == Drag.None) SetControlHover(e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        if (drag == Drag.Marquee && !shift) shiftReleased = true;
         dragModifiers = e.KeyModifiers;
         InvalidateVisual();
     }
@@ -349,7 +355,7 @@ public sealed partial class CanvasView
             case Drag.Stroke: session.EndStroke(); break;
             case Drag.Marquee:
                 if (!moved) { if (dragMode == SelectionMode.Replace) session.Deselect(); break; }
-                var rect = MarqueeRect(shift && dragMode != SelectionMode.Add || shift && alt, false);
+                var rect = MarqueeRect(ConstrainsMarquee(e.KeyModifiers), false);
                 if (session.MarqueeKind == MarqueeKind.Ellipse) session.SelectEllipse(rect, dragMode); else session.SelectRect(rect, dragMode);
                 break;
             case Drag.MoveSelection:
@@ -448,6 +454,14 @@ public sealed partial class CanvasView
     }
 
     private SKPoint ConstrainAngle(SKPoint to, bool constrain) => ConstrainAngle(pressDocument, to, constrain);
+
+    /// <summary>
+    /// Whether Shift squares the marquee being dragged. A Shift held before the press chose the Add or Intersect mode
+    /// and keeps meaning that; letting it go and pressing it again mid-drag squares the marquee, as it does in
+    /// Photoshop. Any other Shift squares it right away.
+    /// </summary>
+    private bool ConstrainsMarquee(KeyModifiers modifiers) =>
+        modifiers.HasFlag(KeyModifiers.Shift) && (dragMode is not (SelectionMode.Add or SelectionMode.Intersect) || shiftReleased);
 
     /// <summary>The rectangle dragged from the press point, optionally square and/or grown from its center.</summary>
     private SKRect MarqueeRect(bool square, bool fromCenter)
@@ -659,7 +673,16 @@ public sealed partial class CanvasView
     /// </summary>
     public void ModifierKeyChanged(Key key, KeyModifiers modifiers, bool down)
     {
-        if (drag != Drag.None) return;
+        if (drag != Drag.None)
+        {
+            // The pointer need not move while Shift or Alt changes, so the drag takes the change from the key and redraws.
+            var flag = key is Key.LeftShift or Key.RightShift ? KeyModifiers.Shift : key is Key.LeftAlt or Key.RightAlt ? KeyModifiers.Alt : KeyModifiers.None;
+            if (flag == KeyModifiers.None) return;
+            dragModifiers = down ? dragModifiers | flag : dragModifiers & ~flag;
+            if (drag == Drag.Marquee && flag == KeyModifiers.Shift && !down) shiftReleased = true;
+            InvalidateVisual();
+            return;
+        }
         var control = key is Key.LeftCtrl or Key.RightCtrl ? down : modifiers.HasFlag(KeyModifiers.Control);
         SetControlHover(control);
     }
