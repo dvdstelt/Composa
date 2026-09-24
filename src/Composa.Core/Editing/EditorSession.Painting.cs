@@ -66,7 +66,9 @@ public sealed partial class EditorSession
             BrushMode.Erase => "Eraser", BrushMode.Clone => "Clone Stamp", BrushMode.Heal => "Spot Healing Brush",
             BrushMode.Liquify => "Liquify", BrushMode.Blur => "Blur", BrushMode.Smudge => "Smudge", BrushMode.Dodge => "Dodge", BrushMode.Burn => "Burn", _ => "Brush"
         });
-        if (!IsEditingMask) EnsureCoversCanvas(layer);
+        // A brush on a mask can paint anywhere on the canvas, as Photoshop's does, growing the mask past its layer. The
+        // smearing brushes work the mask's own pixels and stay within it.
+        if (!IsEditingMask || mode is BrushMode.Paint or BrushMode.Erase) GrowToCanvas(layer);
         var target = Target(layer);
         var matrix = TargetMatrix(layer);
         if (!matrix.TryInvert(out strokeToLayer)) { Cancel(); problem = "The layer is too small to paint on."; return false; }

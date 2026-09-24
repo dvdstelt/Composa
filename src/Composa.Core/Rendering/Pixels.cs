@@ -24,6 +24,32 @@ public static class Pixels
         return bitmap;
     }
 
+    /// <summary>
+    /// What a mask is past its pixels, and so what new mask area starts as when it grows: black (0) when its border
+    /// mostly hides, white (255) otherwise. A reveal-all mask with strokes inside stays white; a hide-all mask stays black.
+    /// </summary>
+    public static unsafe byte MaskBackground(SKBitmap mask)
+    {
+        var pixels = (byte*)mask.GetPixels();
+        int width = mask.Width, height = mask.Height;
+        long total = 0, count = 0;
+        for (var y = 0; y < height; y++)
+        {
+            var row = pixels + (long)y * mask.RowBytes;
+            if (y == 0 || y == height - 1)
+            {
+                for (var x = 0; x < width; x++) total += row[x];
+                count += width;
+            }
+            else
+            {
+                total += row[0] + row[width - 1];
+                count += 2;
+            }
+        }
+        return count == 0 || total * 2 >= count * 255 ? (byte)255 : (byte)0;
+    }
+
     private const int ChunkRows = 256;
 
     private static unsafe void Fill(SKBitmap bitmap, byte value)

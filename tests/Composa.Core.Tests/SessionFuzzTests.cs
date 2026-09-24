@@ -135,7 +135,7 @@ public class SessionFuzzTests
                 if (random.Next(6) == 0) session.CancelStroke(); else session.EndStroke();
             }),
             ("stroke-interrupted", () => { session.Tool = Tool.Brush; if (session.BeginStroke(P(), out _)) { session.ContinueStroke(P()); session.SelectAll(); session.ContinueStroke(P()); session.EndStroke(); } }),
-            ("gradient", () => { if (session.EditableLayer is { } l) { session.GradientRadial = random.Next(2) == 0; session.GradientToTransparent = random.Next(2) == 0; session.Begin("Gradient"); if (!session.IsEditingMask) session.EnsureCoversCanvas(l); var o = session.IsEditingMask ? l.Mask! : l.Pixels!; session.DrawGradient(l, o, P(), P()); session.DrawGradient(l, o, P(), P()); if (random.Next(4) == 0) session.Cancel(); else session.Commit(); } }),
+            ("gradient", () => { if (session.EditableLayer is { } l) { session.GradientRadial = random.Next(2) == 0; session.GradientToTransparent = random.Next(2) == 0; var o = session.BeginGradient(l); session.DrawGradient(l, o, P(), P()); session.DrawGradient(l, o, P(), P()); if (random.Next(4) == 0) session.Cancel(); else session.Commit(); } }),
             ("transform", () =>
             {
                 if (session.BeginTransform() is not { } e) return;

@@ -248,10 +248,8 @@ public sealed partial class CanvasView
                 if (session.EditableLayer is not { } target) { Problem?.Invoke("Select a pixel layer or a mask to draw a gradient on."); break; }
                 gradientMovesStart = false;
                 gradientFrom = gradientTo = pressDocument;
-                session.Begin("Gradient");
-                if (!session.IsEditingMask) session.EnsureCoversCanvas(target);
+                gradientOriginal = session.BeginGradient(target);
                 gradientLayer = target;
-                gradientOriginal = session.IsEditingMask ? target.Mask : target.Pixels;
                 drag = Drag.Gradient;
                 break;
             case Tool.Shape:

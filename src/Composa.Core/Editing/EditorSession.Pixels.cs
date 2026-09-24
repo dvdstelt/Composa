@@ -72,18 +72,31 @@ public sealed partial class EditorSession
         var grown = Pixels.NewColor(want.Width, want.Height);
         using (var canvas = new SKCanvas(grown)) canvas.DrawBitmap(pixels, have.Left - want.Left, have.Top - want.Top);
         layer.Pixels = grown;
-        if (layer.Mask is { } mask)
-        {
-            // A hide-all mask stays hide-all over the new area; any other mask reveals it.
-            var hidesAll = mask.GetPixel(0, 0).Alpha == 0 && mask.GetPixel(mask.Width - 1, 0).Alpha == 0
-                && mask.GetPixel(0, mask.Height - 1).Alpha == 0 && mask.GetPixel(mask.Width - 1, mask.Height - 1).Alpha == 0;
-            var grownMask = Pixels.NewMask(want.Width, want.Height, hidesAll ? (byte)0 : (byte)255);
-            using var canvas = new SKCanvas(grownMask);
-            using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
-            canvas.DrawBitmap(mask, new SKRect(have.Left - want.Left, have.Top - want.Top, have.Right - want.Left, have.Bottom - want.Top), paint);
-            layer.Mask = grownMask;
-        }
+        if (layer.Mask is { } mask) layer.Mask = GrownMask(mask, want.Width, want.Height, have.Left - want.Left, have.Top - want.Top);
         layer.Transform = LayerTransform.Identity(want.Width, want.Height) with { X = want.Left, Y = want.Top };
+    }
+
+    /// <summary>
+    /// Grows the layer to the canvas for an edit that may reach past the layer's own pixels. Editing a mask, the mask
+    /// grows with its layer, as it shares the layer's grid; the mask of live text or a live shape stays as it is,
+    /// because the layer's pixels are remade from the text or shape and would not keep the growth.
+    /// </summary>
+    private void GrowToCanvas(Layer layer)
+    {
+        if (!IsEditingMask || !layer.IsLive) EnsureCoversCanvas(layer);
+    }
+
+    /// <summary>
+    /// The mask placed at (<paramref name="left"/>, <paramref name="top"/>) on a larger one. New area is the mask's
+    /// background (<see cref="Pixels.MaskBackground"/>): a hide-all mask stays black, any other mask reveals it.
+    /// </summary>
+    private static SKBitmap GrownMask(SKBitmap mask, int width, int height, int left, int top)
+    {
+        var grown = Pixels.NewMask(width, height, Pixels.MaskBackground(mask));
+        using var canvas = new SKCanvas(grown);
+        using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
+        canvas.DrawBitmap(mask, new SKRect(left, top, left + mask.Width, top + mask.Height), paint);
+        return grown;
     }
 
     /// <summary>
@@ -105,15 +118,7 @@ public sealed partial class EditorSession
         var grown = Pixels.NewColor((int)width, (int)height);
         using (var canvas = new SKCanvas(grown)) canvas.DrawBitmap(pixels, left, top);
         layer.Pixels = grown;
-        if (layer.Mask is { } mask)
-        {
-            var hidesAll = mask.GetPixel(0, 0).Alpha == 0 && mask.GetPixel(mask.Width - 1, mask.Height - 1).Alpha == 0;
-            var grownMask = Pixels.NewMask((int)width, (int)height, hidesAll ? (byte)0 : (byte)255);
-            using var canvas = new SKCanvas(grownMask);
-            using var paint = new SKPaint { BlendMode = SKBlendMode.Src };
-            canvas.DrawBitmap(mask, new SKRect(left, top, left + pixels.Width, top + pixels.Height), paint);
-            layer.Mask = grownMask;
-        }
+        if (layer.Mask is { } mask) layer.Mask = GrownMask(mask, (int)width, (int)height, left, top);
 
         // In the unrotated frame the padding extends the box; flips swap which side it lands on.
         double sx = t.Width / pixels.Width, sy = t.Height / pixels.Height;
@@ -160,7 +165,8 @@ public sealed partial class EditorSession
         if (EditableLayer is not { } layer) return;
         Apply(name, () =>
         {
-            if (!IsEditingMask) EnsureCoversCanvas(layer);
+            // On a mask too, a fill covers the whole canvas, past the mask's own area, as the brush can.
+            GrowToCanvas(layer);
             var original = Target(layer);
             var filled = Pixels.Clone(original);
             if (IsEditingMask) filled.GetPixelSpan().Fill((byte)((color.Red * 54 + color.Green * 183 + color.Blue * 19) >> 8));
@@ -399,7 +405,19 @@ public sealed partial class EditorSession
 
     // ---- Gradient and shapes ------------------------------------------------------------------------------------
 
-    /// <summary>Draws a gradient between two document points onto the pending edit's original pixels (call Begin first).</summary>
+    /// <summary>
+    /// Opens the edit a gradient drag will draw into and returns the pixels (or mask) it starts from, for
+    /// <see cref="DrawGradient"/>. The layer is grown to the canvas first, so the gradient can cover all of it; a mask
+    /// grows too, as the brush can paint a mask anywhere on the canvas.
+    /// </summary>
+    public SKBitmap BeginGradient(Layer layer)
+    {
+        Begin("Gradient");
+        GrowToCanvas(layer);
+        return Target(layer);
+    }
+
+    /// <summary>Draws a gradient between two document points onto the pending edit's original pixels (call <see cref="BeginGradient"/> first).</summary>
     public void DrawGradient(Layer layer, SKBitmap original, SKPoint from, SKPoint to)
     {
         if (!IsInteracting || document.Find(layer.Id) != layer) return; // The edit this drag belonged to is over.
