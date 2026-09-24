@@ -208,6 +208,13 @@ public class SliderFieldTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(22, Field("Feather").Value);
         Capture("43-slider-fields-marquee");
+        session.AddText(new SKPoint(100, 100), session.TextDefaults with { Text = "Hello" });
+        window.SelectTool(Tool.Text);
+        Dispatcher.UIThread.RunJobs();
+        Capture("44-options-bar-type");
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+        Capture("45-options-bar-move");
     }
 
     private void Capture(string name)

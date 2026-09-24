@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         refreshOptions = null;
         if (session == null) { optionsHost.Child = null; return; }
         var s = session;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center, Classes = { "options" } };
         void Add(params Control[] controls) => row.Children.AddRange(controls);
         Control Title(string text) => Ui.Label(text, weight: Avalonia.Media.FontWeight.SemiBold);
 

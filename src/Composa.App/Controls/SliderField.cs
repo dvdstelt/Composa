@@ -15,7 +15,7 @@ namespace Composa.App.Controls;
 /// </summary>
 public sealed class SliderField : Control
 {
-    public const double DefaultHeight = 24;
+    public const double DefaultHeight = 26;
     /// <summary>Pointer travel before a press counts as a drag, so the first click of a double-click leaves the value alone.</summary>
     public const double DragThreshold = 3;
     /// <summary>How much slower the value moves under the pointer while Alt is held.</summary>

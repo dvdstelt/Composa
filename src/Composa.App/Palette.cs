@@ -25,6 +25,30 @@ public static class Palette
         styles.Resources["ComposaForeground"] = Foreground;
         styles.Add(new Style(x => x.OfType<Window>()) { Setters = { new Setter(TemplatedControl.BackgroundProperty, Window), new Setter(TemplatedControl.FontSizeProperty, 12.5) } });
         styles.Add(new Style(x => x.OfType<TextBlock>()) { Setters = { new Setter(Layoutable.VerticalAlignmentProperty, VerticalAlignment.Center) } });
+        // The options bar under the tabs: every control takes the slider fields' height, so combos, number boxes, buttons and fields
+        // share one centre line instead of each keeping the height its theme gives it.
+        var optionsHeight = Controls.SliderField.DefaultHeight;
+        foreach (var type in new[] { typeof(ComboBox), typeof(NumericUpDown), typeof(TextBox), typeof(Button) })
+            styles.Add(new Style(x => x.OfType<StackPanel>().Class("options").Descendant().Is(type))
+            {
+                Setters = { new Setter(Layoutable.HeightProperty, optionsHeight), new Setter(Layoutable.MinHeightProperty, 0.0) }
+            });
+        styles.Add(new Style(x => x.OfType<StackPanel>().Class("options").Descendant().OfType<NumericUpDown>())
+        {
+            Setters = { new Setter(NumericUpDown.VerticalContentAlignmentProperty, VerticalAlignment.Center) }
+        });
+        styles.Add(new Style(x => x.OfType<StackPanel>().Class("options").Descendant().OfType<TextBox>())
+        {
+            Setters =
+            {
+                new Setter(Layoutable.MinHeightProperty, 0.0), new Setter(TemplatedControl.PaddingProperty, new Thickness(6, 0)),
+                new Setter(TextBox.VerticalContentAlignmentProperty, VerticalAlignment.Center)
+            }
+        });
+        styles.Add(new Style(x => x.OfType<StackPanel>().Class("options").Descendant().OfType<Button>())
+        {
+            Setters = { new Setter(TemplatedControl.PaddingProperty, new Thickness(10, 0)), new Setter(ContentControl.VerticalContentAlignmentProperty, VerticalAlignment.Center) }
+        });
         styles.Add(new Style(x => x.OfType<Button>().Class("flat"))
         {
             Setters =
