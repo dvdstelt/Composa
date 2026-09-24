@@ -19,6 +19,12 @@ public interface IImageMagick
     /// <see cref="InvalidDataException"/> with ImageMagick's own reason when the file cannot be read.
     /// </summary>
     byte[] Convert(string path, ImageMagickOutput output);
+
+    /// <summary>
+    /// Draws a vector file (an SVG) into a PNG over a transparent background, at <paramref name="scale"/> times the
+    /// size it declares. Throws <see cref="InvalidDataException"/> with ImageMagick's own reason when it cannot.
+    /// </summary>
+    byte[] Rasterize(string path, double scale);
 }
 
 /// <summary>
@@ -72,8 +78,15 @@ public sealed class ImageMagickTool : IImageMagick
             ? [path + "[0]", "-auto-orient", "png:-"]
             : [path + "[0]", "-auto-orient", "-depth", "16", "pam:-"];
         // A RAW decode is several seconds of work on a large sensor, so it gets longer than an image.
-        var timeout = output == ImageMagickOutput.Png ? 60_000 : 180_000;
+        return Run(path, arguments, output == ImageMagickOutput.Png ? 60_000 : 180_000);
+    }
 
+    /// <summary>ImageMagick sizes an SVG from its resolution, 96 dots per inch being the size the file declares; the background must be set before the file is read.</summary>
+    public byte[] Rasterize(string path, double scale) =>
+        Run(path, ["-background", "none", "-density", (96 * scale).ToString("0.####", System.Globalization.CultureInfo.InvariantCulture), path + "[0]", "png:-"], 60_000);
+
+    private byte[] Run(string path, string[] arguments, int timeout)
+    {
         using var process = Start(arguments) ?? throw new InvalidDataException($"{Path.GetFileName(path)} could not be read: ImageMagick did not start.");
         using var result = new MemoryStream();
         var errors = process.StandardError.ReadToEndAsync();

@@ -75,6 +75,26 @@ public class BundledImageMagickTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>SVG import draws through the bundled library's librsvg, at the resolution that gives the size asked for.</summary>
+    [Fact]
+    public void Rasterizes_an_svg_at_the_scale_asked_for()
+    {
+        var magick = Load();
+        Assert.Contains(Magick.MagickNET.SupportedFormats, f => f.Format == Magick.MagickFormat.Svg && f.SupportsReading);
+        var path = Path.Combine(Path.GetTempPath(), "composa-" + Guid.NewGuid().ToString("N") + ".svg");
+        File.WriteAllText(path, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"50\"><circle cx=\"50\" cy=\"25\" r=\"20\" fill=\"#ff0000\"/></svg>");
+        try
+        {
+            using var declared = SKBitmap.Decode(magick.Rasterize(path, 1));
+            Assert.Equal((100, 50), (declared.Width, declared.Height));
+            Assert.Equal(0, declared.GetPixel(2, 2).Alpha);
+            using var doubled = SKBitmap.Decode(magick.Rasterize(path, 2));
+            Assert.Equal((200, 100), (doubled.Width, doubled.Height));
+            Assert.Equal(SKColors.Red, doubled.GetPixel(100, 50));
+        }
+        finally { File.Delete(path); }
+    }
+
     [Fact]
     public void A_file_it_cannot_read_is_invalid_data_naming_the_file()
     {

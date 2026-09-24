@@ -481,7 +481,9 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path) : ImageFiles.Load(path);
+                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path)
+                        : SvgImporter.IsSvg(path) ? await Busy(() => Task.Run(() => SvgImporter.Render(path))) // At the size the file declares.
+                        : ImageFiles.Load(path);
                     if (pixels == null) continue;
                     var document = new Document(pixels.Width, pixels.Height);
                     var layer = Layer.Raster(Path.GetFileNameWithoutExtension(path), pixels);
@@ -531,6 +533,16 @@ public sealed partial class MainWindow
                     if (await DevelopRaw(path) is not { } developed) continue;
                     if (target != session) { developed.Dispose(); continue; }
                     session.AddImageLayer(name, developed, at);
+                }
+                else if (SvgImporter.IsSvg(path))
+                {
+                    // Fitted to the canvas as it is drawn, so a small icon comes in sharp rather than enlarged from a few pixels.
+                    var target = session;
+                    var canvas = new SKSizeI(target.Document.Width, target.Document.Height);
+                    var budget = DocumentLimits.DocumentPixelBudget - target.Document.RasterPixels();
+                    var fitted = await Busy(() => Task.Run(() => SvgImporter.Render(path, canvas, budget)));
+                    if (target != session) { fitted.Dispose(); continue; }
+                    session.AddImageLayer(name, fitted, at);
                 }
                 else session.AddImageLayer(name, ImageFiles.Load(path), at);
             }

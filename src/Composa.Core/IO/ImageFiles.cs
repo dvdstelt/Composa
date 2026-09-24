@@ -8,8 +8,8 @@ public enum ExportFormat { Png, Jpeg, Webp }
 
 public static class ImageFiles
 {
-    /// <summary>What Open and Place accept. Photoshop files are among them; they take the <c>Psd.PsdImport</c> route rather than <see cref="Load(string)"/>.</summary>
-    public static readonly string[] ImportExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".heic", ".heif", ".avif", ".tif", ".tiff", ".psd", ".psb"];
+    /// <summary>What Open and Place accept. Photoshop files take the <c>Psd.PsdImport</c> route and SVG files <see cref="SvgImporter"/> rather than <see cref="Load(string)"/>.</summary>
+    public static readonly string[] ImportExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".heic", ".heif", ".avif", ".tif", ".tiff", ".svg", ".psd", ".psb"];
 
     /// <summary>Decodes an image file to RGBA premultiplied pixels, upright according to its EXIF orientation.</summary>
     public static SKBitmap Load(string path)

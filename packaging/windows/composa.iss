@@ -88,6 +88,7 @@ Root: HKA; Subkey: "Software\Classes\Composa.Image\shell\open\command"; ValueTyp
 #emit OpenWith(".heic")
 #emit OpenWith(".heif")
 #emit OpenWith(".avif")
+#emit OpenWith(".svg")
 #emit OpenWith(".psd")
 #emit OpenWith(".psb")
 
