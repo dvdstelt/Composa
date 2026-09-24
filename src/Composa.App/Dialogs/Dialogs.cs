@@ -78,10 +78,13 @@ public static class Prompts
     /// <param name="preview">Called with the working color as it changes while the dialog is open, so what it colors can follow along. The caller puts the original back on Cancel.</param>
     public static async Task<SKColor?> Color(Window owner, string title, SKColor initial, Action<SKColor>? preview = null)
     {
+        // Saturation across and brightness up in the square, hue on the strip, as Photoshop lays it out. The control's
+        // default puts brightness on the strip, where a black starting color leaves it at zero and every click in the
+        // square stays black.
         var view = new ColorView
         {
             Color = initial.ToAvalonia(), IsAlphaEnabled = false, IsAlphaVisible = false, IsColorPaletteVisible = true,
-            IsColorModelVisible = true, IsHexInputVisible = true, Width = 360
+            IsColorModelVisible = true, IsHexInputVisible = true, Width = 360, ColorSpectrumComponents = ColorSpectrumComponents.SaturationValue
         };
         if (preview != null) view.ColorChanged += (_, e) => preview(e.NewColor.ToSkia().WithAlpha(255));
         var swatches = Ui.Row(0,
