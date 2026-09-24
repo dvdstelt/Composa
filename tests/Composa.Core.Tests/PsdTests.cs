@@ -379,6 +379,64 @@ public class PsdTests
         Assert.True((long)DocumentLimits.MaxSide * DocumentLimits.MaxSide > DocumentLimits.DocumentPixelBudget); // A square at the side limit is still too large.
     }
 
+    /// <summary>A 4 x 4 canvas with one 6 x 3 layer and mask hanging two columns off its left edge.</summary>
+    private static PsdWriter Overhang(int compression, int version = 1)
+    {
+        var writer = new PsdWriter { Width = 4, Height = 4, Compression = compression, Version = (ushort)version };
+        var mask = Pixels.NewMask(6, 3);
+        for (var y = 0; y < 3; y++) for (var x = 0; x < 6; x++) mask.SetPixel(x, y, new SKColor(0, 0, 0, (byte)(x * 40 + y * 3)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Overhang", Image = Gradient(6, 3), Left = -2, Top = 1, Mask = mask, MaskLeft = -2, MaskTop = 1 });
+        return writer;
+    }
+
+    [Fact]
+    public void A_file_that_fits_keeps_every_pixel_of_a_layer_hanging_off_the_canvas()
+    {
+        var import = PsdImport.Load(Overhang(1).Build(), pixelBudget: 100);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal((-2d, 1d, 6d, 3d), (layer.Transform.X, layer.Transform.Y, layer.Transform.Width, layer.Transform.Height));
+        using var source = Gradient(6, 3);
+        Assert.Equal(source.Bytes, layer.Pixels!.Bytes);
+        Assert.Empty(import.Conversions);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    public void A_file_over_budget_crops_its_layers_and_masks_to_the_canvas_and_says_so(int compression, int version)
+    {
+        // 6 x 3 pixels plus a 6 x 3 mask is 36; cropped to the canvas, 4 x 3 twice is 24. The budget sits between.
+        var import = PsdImport.Load(Overhang(compression, version).Build(), pixelBudget: 24);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal((0d, 1d, 4d, 3d), (layer.Transform.X, layer.Transform.Y, layer.Transform.Width, layer.Transform.Height));
+        using var source = Gradient(6, 3);
+        for (var y = 0; y < 3; y++)
+            for (var x = 0; x < 4; x++)
+            {
+                AssertColor(source.GetPixel(x + 2, y), layer.Pixels!.GetPixel(x, y));
+                Assert.Equal((x + 2) * 40 + y * 3, layer.Mask!.GetPixel(x, y).Alpha);
+            }
+        var note = Assert.Single(import.Conversions);
+        Assert.Equal(("Overhang", PsdImport.CroppedNote), (note.LayerName, note.Message));
+        // Cropped, the file still needs 24 pixels: one less and it is refused.
+        Assert.Throws<PsdException>(() => PsdImport.Load(Overhang(compression, version).Build(), pixelBudget: 23));
+    }
+
+    [Fact]
+    public void A_layer_entirely_off_the_canvas_is_kept_empty_when_cropping()
+    {
+        var writer = new PsdWriter { Width = 4, Height = 4 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Outside", Image = Solid(2, 2, SKColors.Red), Left = 5, Top = 0 });
+        var import = PsdImport.Load(writer.Build(), pixelBudget: 1);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal("Outside", layer.Name);
+        Assert.Equal(0, layer.Pixels!.GetPixel(0, 0).Alpha); // Nothing of it is inside the canvas.
+        Assert.Contains(import.Conversions, c => c.LayerName == "Outside" && c.Message == PsdImport.CroppedNote);
+    }
+
     [Fact]
     public void Unsupported_and_damaged_files_are_refused_with_a_reason()
     {

@@ -104,6 +104,14 @@ internal static class PsdReader
             var count = Math.Abs((int)cursor.I16());
             if (count > MaxLayers) throw PsdException.TooLarge();
             for (var i = 0; i < count; i++) file.Layers.Add(ReadRecord(ref cursor, largeDocument));
+            // A file whose layers fit imports whole, every pixel kept. Only one that would be refused falls back: each
+            // layer and mask reaching past the canvas is cut to it and the budget checked again. The decision is made
+            // from the records before a pixel is read, with the same test the decoder applies, so the two cannot disagree.
+            if (!FitsBudget(file.Layers, pixelBudget))
+            {
+                foreach (var layer in file.Layers) CropToCanvas(layer, width, height);
+                if (!FitsBudget(file.Layers, pixelBudget)) throw PsdException.TooLarge();
+            }
             foreach (var layer in file.Layers)
             {
                 DecodeChannels(ref cursor, layer, pixelBudget - used, largeDocument);
@@ -125,6 +133,7 @@ internal static class PsdReader
     private static PsdLayer ReadRecord(ref PsdCursor cursor, bool largeDocument)
     {
         var layer = new PsdLayer { Top = cursor.I32(), Left = cursor.I32(), Bottom = cursor.I32(), Right = cursor.I32() };
+        (layer.SourceTop, layer.SourceLeft, layer.SourceBottom, layer.SourceRight) = (layer.Top, layer.Left, layer.Bottom, layer.Right);
         var channelCount = cursor.U16();
         if (channelCount > 56) throw PsdException.TooLarge();
         for (var i = 0; i < channelCount; i++)
@@ -152,6 +161,7 @@ internal static class PsdReader
             layer.MaskLeft = cursor.I32();
             layer.MaskBottom = cursor.I32();
             layer.MaskRight = cursor.I32();
+            (layer.SourceMaskTop, layer.SourceMaskLeft, layer.SourceMaskBottom, layer.SourceMaskRight) = (layer.MaskTop, layer.MaskLeft, layer.MaskBottom, layer.MaskRight);
             layer.MaskDefault = cursor.U8();
             var maskFlags = cursor.U8();
             layer.MaskLinked = (maskFlags & 1) == 0;
@@ -203,8 +213,10 @@ internal static class PsdReader
                 var compression = cursor.U16();
                 var payload = cursor.Bytes(length - 2);
                 var isMask = id == -2;
+                // The plane is laid out at the size the file gives; the crop picks the imported part out of it.
+                int sourceW = isMask ? layer.SourceMaskWidth : layer.SourceWidth, sourceH = isMask ? layer.SourceMaskHeight : layer.SourceHeight;
                 int w = isMask ? maskWidth : width, h = isMask ? maskHeight : height;
-                if (w > 0 && h > 0) planes[id] = PsdChannels.Decode(compression, w, h, payload, largeDocument);
+                if (w > 0 && h > 0) planes[id] = PsdChannels.Decode(compression, sourceW, sourceH, payload, largeDocument, isMask ? layer.MaskCrop : layer.ImageCrop);
             }
             cursor.Seek(start + (long)Math.Max(0, length));
         }
@@ -214,13 +226,69 @@ internal static class PsdReader
         layer.Image = PsdChannels.ColorImage(width, height, Plane(planes, 0), Plane(planes, 1), Plane(planes, 2), Plane(planes, -1));
     }
 
-    /// <summary>Whether a layer's pixels and mask each fit one surface and together fit what is left of the budget.</summary>
+    private static bool FitsBudget(List<PsdLayer> layers, long pixelBudget)
+    {
+        var used = 0L;
+        foreach (var layer in layers)
+        {
+            if (!FitsBudget(layer.Width, layer.Height, layer.MaskWidth, layer.MaskHeight, layer.HasMask, pixelBudget - used)) return false;
+            used += (long)layer.Width * layer.Height;
+            if (layer.HasMask) used += (long)layer.MaskWidth * layer.MaskHeight;
+        }
+        return true;
+    }
+
+    /// <summary>Cuts the layer's pixel rectangle and mask rectangle to the canvas, remembering which part of each plane that leaves.</summary>
+    private static void CropToCanvas(PsdLayer layer, int canvasWidth, int canvasHeight)
+    {
+        var image = Crop(layer.Left, layer.Top, layer.Right, layer.Bottom, canvasWidth, canvasHeight);
+        if (image is { } crop)
+        {
+            layer.Left += crop.X;
+            layer.Top += crop.Y;
+            layer.Right = layer.Left + crop.Width;
+            layer.Bottom = layer.Top + crop.Height;
+            layer.ImageCrop = crop;
+            layer.Cropped = true;
+        }
+        if (!layer.HasMask) return;
+        if (Crop(layer.MaskLeft, layer.MaskTop, layer.MaskRight, layer.MaskBottom, canvasWidth, canvasHeight) is { } maskCrop)
+        {
+            layer.MaskLeft += maskCrop.X;
+            layer.MaskTop += maskCrop.Y;
+            layer.MaskRight = layer.MaskLeft + maskCrop.Width;
+            layer.MaskBottom = layer.MaskTop + maskCrop.Height;
+            layer.MaskCrop = maskCrop;
+            layer.Cropped = true;
+        }
+    }
+
+    /// <summary>The part of a rectangle inside the canvas, as an offset and size within it, or null when nothing needs cutting.</summary>
+    private static PsdCrop? Crop(int left, int top, int right, int bottom, int canvasWidth, int canvasHeight)
+    {
+        var croppedLeft = Math.Min(canvasWidth, Math.Max(0, left));
+        var croppedTop = Math.Min(canvasHeight, Math.Max(0, top));
+        var croppedRight = Math.Max(croppedLeft, Math.Min(canvasWidth, right));
+        var croppedBottom = Math.Max(croppedTop, Math.Min(canvasHeight, bottom));
+        var crop = new PsdCrop(croppedLeft - left, croppedTop - top, croppedRight - croppedLeft, croppedBottom - croppedTop);
+        return crop.X == 0 && crop.Y == 0 && crop.Width == right - left && crop.Height == bottom - top ? null : crop;
+    }
+
+    /// <summary>Whether a layer's pixels and mask each fit one surface and, added together, what is left of the budget.</summary>
     private static bool FitsBudget(int width, int height, int maskWidth, int maskHeight, bool hasMask, long remainingPixels)
     {
-        var budget = Math.Max(0, remainingPixels);
-        if (width > 0 && height > 0 && (!DocumentLimits.FitsSurface(width, height) || (long)width * height > budget)) return false;
-        if (hasMask && maskWidth > 0 && maskHeight > 0 && (!DocumentLimits.FitsSurface(maskWidth, maskHeight) || (long)maskWidth * maskHeight > budget)) return false;
-        return true;
+        var needed = 0L;
+        if (width > 0 && height > 0)
+        {
+            if (!DocumentLimits.FitsSurface(width, height)) return false;
+            needed += (long)width * height;
+        }
+        if (hasMask && maskWidth > 0 && maskHeight > 0)
+        {
+            if (!DocumentLimits.FitsSurface(maskWidth, maskHeight)) return false;
+            needed += (long)maskWidth * maskHeight;
+        }
+        return needed <= Math.Max(0, remainingPixels);
     }
 
     private static byte[]? Plane(Dictionary<short, byte[]> planes, short id) => planes.TryGetValue(id, out var plane) ? plane : null;

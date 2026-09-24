@@ -89,6 +89,9 @@ public sealed class PsdImport
         // Dissolve, Darker Color and Lighter Color have no equivalent here and fall through to Normal with a conversion listed.
     };
 
+    /// <summary>Listed for every layer the reader had to cut to the canvas to make the file fit.</summary>
+    public const string CroppedNote = "Cropped to the canvas so the file fits in memory. Pixels outside the canvas weren't imported.";
+
     private static readonly string[] TextKeys = ["TySh", "tySh", "txt2"];
     private static readonly string[] VectorKeys = ["vmsk", "vsms", "vogk"];
     private static readonly string[] SmartObjectKeys = ["SoLd", "SoLE"];
@@ -127,6 +130,7 @@ public sealed class PsdImport
                 continue;
             }
             var name = record.Name.Length == 0 ? "Layer" : record.Name;
+            if (record.Cropped) conversions.Add(new PsdConversion(name, CroppedNote));
             var target = openGroups.Count > 0 ? pending[openGroups.Peek()] : roots;
             Layer? layer;
             if (record.IsGroup)
