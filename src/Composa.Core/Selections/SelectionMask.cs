@@ -180,6 +180,43 @@ public static class SelectionMask
         return null;
     }
 
+    /// <summary>
+    /// The outline as it reads at one screen pixel per <paramref name="block"/> document pixels, in document coordinates. A
+    /// Magic Wand outline on detailed artwork has hundreds of thousands of edges, one per pixel step; stroked in full while
+    /// zoomed out they pile into a few screen pixels and one redraw can take seconds. This traces a mask reduced by the
+    /// block instead, so the path never has more edges than the screen has pixels to show. A reduced pixel is selected
+    /// when any selected pixel falls in its block: thin parts stay outlined rather than vanishing.
+    /// </summary>
+    public static unsafe SKPath ReducedOutline(SKBitmap mask, int block)
+    {
+        if (block <= 1) return Outline(mask);
+        int width = (mask.Width + block - 1) / block, height = (mask.Height + block - 1) / block;
+        using var small = Pixels.NewMask(width, height);
+        var source = (nint)mask.GetPixels();
+        var target = (nint)small.GetPixels();
+        int sourceRowBytes = mask.RowBytes, targetRowBytes = small.RowBytes, sourceWidth = mask.Width, sourceHeight = mask.Height;
+        Parallel.For(0, height, y =>
+        {
+            var row = (byte*)target + (long)y * targetRowBytes;
+            var end = Math.Min(sourceHeight, (y + 1) * block);
+            for (var sy = y * block; sy < end; sy++)
+            {
+                var line = new ReadOnlySpan<byte>((byte*)source + (long)sy * sourceRowBytes, sourceWidth);
+                for (var x = 0; x < width; x++)
+                {
+                    if (row[x] != 0) continue;
+                    var start = x * block;
+                    if (IndexOfAtLeast(line.Slice(start, Math.Min(block, sourceWidth - start)), 128) >= 0) row[x] = 255;
+                }
+            }
+        });
+        Pixels.Invalidate(small);
+        using var traced = Outline(small);
+        var result = new SKPath();
+        traced.Transform(SKMatrix.CreateScale(block, block), result);
+        return result;
+    }
+
     /// <summary>The boundary between selected (at least half covered) and unselected pixels, for the marching ants.</summary>
     public static unsafe SKPath Outline(SKBitmap mask)
     {

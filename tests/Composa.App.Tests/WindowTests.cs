@@ -257,4 +257,25 @@ public class ZoomTests
         Save(window, "09b-zoomed-in-grid");
         Assert.Equal(12, window.Canvas.Zoom);
     }
+
+    /// <summary>A Magic Wand outline with tens of thousands of edges is drawn from a screen-resolution trace when zoomed out, and in full at 1:1 and above.</summary>
+    [AvaloniaFact]
+    public void Complex_selections_render_zoomed_out_and_in()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var session = EditorSession.NewCanvas(3000, 2000, SKColors.White);
+        window.AddSession(session);
+        var mask = Rendering.Pixels.NewMask(3000, 2000);
+        var span = mask.GetPixelSpan();
+        for (var y = 400; y < 1600; y++) for (var x = 600; x < 2400; x++) if (((x / 8) + (y / 8)) % 2 == 0) span[y * mask.RowBytes + x] = 255;
+        Rendering.Pixels.Invalidate(mask);
+        session.Select(mask, Selections.SelectionMode.Replace);
+        using (var outline = Selections.SelectionMask.Outline(session.Selection!)) Assert.True(outline.PointCount > 20_000);
+        Save(window, "08b-complex-selection-zoomed-out");
+        Assert.True(window.Canvas.Zoom < 0.5);
+        window.Canvas.ZoomTo(2, new Point(window.Canvas.Bounds.Width / 2, window.Canvas.Bounds.Height / 2));
+        Save(window, "08c-complex-selection-zoomed-in");
+        Assert.Equal(2, window.Canvas.Zoom);
+    }
 }

@@ -56,7 +56,7 @@ public sealed partial class CanvasView
             });
         }
 
-        if (drag == Drag.MoveSelection && selectionOutline is { } outline)
+        if (drag == Drag.MoveSelection && AntsOutline() is { } outline)
         {
             var shift = SKMatrix.CreateTranslation(MathF.Round(currentDocument.X - pressDocument.X), MathF.Round(currentDocument.Y - pressDocument.Y));
             var moved = shift.PostConcat(view);

@@ -26,6 +26,17 @@ public sealed partial class CanvasView : Control
     private bool outlineStale = true;
     private float antsPhase;
     private readonly DispatcherTimer antsTimer;
+    /// <summary>A tick invalidated the view and the redraw has not happened yet; the next tick waits for it.</summary>
+    private bool antsRedrawPending;
+
+    // Marching ants level of detail. A Magic Wand outline on detailed artwork can have hundreds of thousands of edges,
+    // one per pixel step. Stroked in full every tick while zoomed out, they pile into a few screen pixels and one
+    // redraw took seconds, which froze the app while the timer queued redraws faster than they finished. Below 1:1 a
+    // complex outline is drawn from one traced at screen resolution instead, cached per power-of-two zoom step.
+    /// <summary>Outlines with at most this many points are always drawn in full; marquees and lassos stay exact.</summary>
+    private const int FullDetailPoints = 20_000;
+    private bool outlineComplex;
+    private (SKPath Path, int Block)? antsLevel;
 
     // What is on screen, rendered straight from the layers at screen resolution. Its cost follows the window size,
     // not the document size, which keeps 24-megapixel documents as responsive as small ones.
@@ -41,7 +52,10 @@ public sealed partial class CanvasView : Control
         antsTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(120), DispatcherPriority.Background, (_, _) =>
         {
             if (session?.Selection == null && polygon.Count == 0 && session?.TextEdit == null) return;
+            // A redraw still pending skips this tick: a slow outline stutters rather than queuing redraws forever.
+            if (antsRedrawPending) return;
             antsPhase = (antsPhase + 1) % 8;
+            antsRedrawPending = true;
             InvalidateVisual();
         });
         antsTimer.Start();
@@ -237,6 +251,7 @@ public sealed partial class CanvasView : Control
 
     public override void Render(DrawingContext context)
     {
+        antsRedrawPending = false;
         if (fitPending && FitCore()) Dispatcher.UIThread.Post(() => ViewChanged?.Invoke());
         var size = Bounds.Size;
         if (session == null)
@@ -247,6 +262,8 @@ public sealed partial class CanvasView : Control
         if (outlineStale)
         {
             selectionOutline = session.Selection != null ? SelectionMask.Outline(session.Selection) : null;
+            outlineComplex = selectionOutline?.PointCount > FullDetailPoints;
+            antsLevel = null;
             outlineStale = false;
         }
         // Everything the render thread needs is captured here, on the UI thread.
@@ -259,7 +276,7 @@ public sealed partial class CanvasView : Control
         var grid = ShowPixelGrid && zoom >= 8;
         var nearest = zoom >= 1;
         // While the selection is being dragged, the overlay draws it at its new place; the outline it left behind stays hidden.
-        var outline = drag == Drag.MoveSelection ? null : selectionOutline;
+        var outline = drag == Drag.MoveSelection ? null : AntsOutline();
         var phase = antsPhase;
         var scaling = (float)Scaling;
 
@@ -285,6 +302,17 @@ public sealed partial class CanvasView : Control
             overlay?.Invoke(canvas);
             rulers?.Invoke(canvas);
         }));
+    }
+
+    /// <summary>What the ants stroke: the selection's outline, or when zoomed out on a complex one, the outline traced at screen resolution.</summary>
+    private SKPath? AntsOutline()
+    {
+        if (selectionOutline == null || !outlineComplex || zoom >= 1 || session?.Selection is not { } selection) return selectionOutline;
+        // Document pixels per screen pixel, rounded down to a power of two so zooming doesn't retrace on every frame.
+        var block = 1 << (int)Math.Floor(Math.Log2(1 / Math.Max(zoom, 1 / 4096.0)));
+        if (block <= 1) return selectionOutline;
+        if (antsLevel?.Block != block) antsLevel = (SelectionMask.ReducedOutline(selection, block), block);
+        return antsLevel.Value.Path;
     }
 
     /// <summary>Brings the on-screen render up to date and returns it with the rectangles to draw it from and to.</summary>
