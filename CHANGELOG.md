@@ -4,6 +4,11 @@ All notable changes to Composa are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- Photoshop Large Document (`.psb`) files open through the same importer as `.psd`.
+- Simple Photoshop text arrives as editable text: horizontal type layers keep their wording, font, size, color, alignment, tracking and leading. Vertical, sheared or unevenly scaled text still becomes pixels, and the import report says what was dropped.
+
 ## [1.0.0] - 2026-09-23
 
 The first stable release, and the first for Windows.
