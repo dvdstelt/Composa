@@ -5,7 +5,7 @@ namespace Composa.Model;
 /// <summary>The canvas, its layer tree and the current selection.</summary>
 public sealed class Document
 {
-    public const int MaxSide = 30_000;
+    public const int MaxSide = DocumentLimits.MaxSide;
 
     public int Width { get; set; }
     public int Height { get; set; }
@@ -26,6 +26,9 @@ public sealed class Document
     }
 
     public SKRectI Bounds => new(0, 0, Width, Height);
+
+    /// <summary>The raster the document holds: every layer's pixels and mask, counted against <see cref="DocumentLimits.DocumentPixelBudget"/> when more is imported.</summary>
+    public long RasterPixels() => AllLayers().Sum(l => (long)(l.Pixels?.Width ?? 0) * (l.Pixels?.Height ?? 0) + (long)(l.Mask?.Width ?? 0) * (l.Mask?.Height ?? 0));
     public Layer? ActiveLayer => ActiveLayerId is { } id ? Find(id) : null;
 
     public Document Clone()

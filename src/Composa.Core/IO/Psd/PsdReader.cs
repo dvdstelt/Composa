@@ -1,3 +1,4 @@
+using Composa.Model;
 using SkiaSharp;
 
 namespace Composa.IO.Psd;
@@ -12,8 +13,6 @@ namespace Composa.IO.Psd;
 /// </summary>
 internal static class PsdReader
 {
-    public const int MaxSide = 30_000;
-    public const long MaxPixels = 100_000_000;
     public const int MaxLayers = 10_000;
 
     private static readonly byte[] Magic = "8BPS"u8.ToArray();
@@ -47,7 +46,7 @@ internal static class PsdReader
         return (long)value;
     }
 
-    public static PsdFile Read(ReadOnlySpan<byte> data, long pixelBudget = MaxPixels)
+    public static PsdFile Read(ReadOnlySpan<byte> data, long pixelBudget)
     {
         var cursor = new PsdCursor(data);
         if (!Matches(data)) throw new PsdException("This is not a Photoshop file.");
@@ -61,7 +60,9 @@ internal static class PsdReader
         var width = cursor.I32();
         var depth = cursor.U16();
         var mode = cursor.U16();
-        if (width < 1 || height < 1 || width > MaxSide || height > MaxSide || (long)width * height > pixelBudget) throw PsdException.TooLarge();
+        // The canvas is a size, not an allocation: only its layers count against the budget, and only when the
+        // file is flattened is the merged image (one canvas-sized surface) read at all.
+        if (!DocumentLimits.FitsSurface(width, height)) throw PsdException.TooLarge();
         if (depth != 8 || mode != 3) throw new PsdException("Only 8-bit RGB Photoshop files can be imported.");
         var file = new PsdFile { Width = width, Height = height, LargeDocument = largeDocument };
 
@@ -192,9 +193,7 @@ internal static class PsdReader
     private static void DecodeChannels(ref PsdCursor cursor, PsdLayer layer, long remainingPixels, bool largeDocument)
     {
         int width = layer.Width, height = layer.Height, maskWidth = layer.MaskWidth, maskHeight = layer.MaskHeight;
-        var budget = Math.Max(0, remainingPixels);
-        if (width > 0 && height > 0 && (width > MaxSide || height > MaxSide || (long)width * height > budget)) throw PsdException.TooLarge();
-        if (layer.HasMask && maskWidth > 0 && maskHeight > 0 && (maskWidth > MaxSide || maskHeight > MaxSide || (long)maskWidth * maskHeight > budget)) throw PsdException.TooLarge();
+        if (!FitsBudget(width, height, maskWidth, maskHeight, layer.HasMask, remainingPixels)) throw PsdException.TooLarge();
         var planes = new Dictionary<short, byte[]>();
         foreach (var (id, length) in layer.Channels)
         {
@@ -213,6 +212,15 @@ internal static class PsdReader
             layer.MaskImage = PsdChannels.MaskImage(maskWidth, maskHeight, gray);
         if (width <= 0 || height <= 0) return;
         layer.Image = PsdChannels.ColorImage(width, height, Plane(planes, 0), Plane(planes, 1), Plane(planes, 2), Plane(planes, -1));
+    }
+
+    /// <summary>Whether a layer's pixels and mask each fit one surface and together fit what is left of the budget.</summary>
+    private static bool FitsBudget(int width, int height, int maskWidth, int maskHeight, bool hasMask, long remainingPixels)
+    {
+        var budget = Math.Max(0, remainingPixels);
+        if (width > 0 && height > 0 && (!DocumentLimits.FitsSurface(width, height) || (long)width * height > budget)) return false;
+        if (hasMask && maskWidth > 0 && maskHeight > 0 && (!DocumentLimits.FitsSurface(maskWidth, maskHeight) || (long)maskWidth * maskHeight > budget)) return false;
+        return true;
     }
 
     private static byte[]? Plane(Dictionary<short, byte[]> planes, short id) => planes.TryGetValue(id, out var plane) ? plane : null;

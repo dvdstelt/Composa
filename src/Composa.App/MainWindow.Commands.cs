@@ -465,7 +465,7 @@ public sealed partial class MainWindow
                 if (PsdImport.IsPsd(path))
                 {
                     // Photoshop files open as unsaved documents; what had to be converted is shown before anything is applied.
-                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    if (await ImportPhotoshop(path, DocumentLimits.DocumentPixelBudget) is not { } import) continue;
                     AddSession(EditorSession.OpenPhotoshop(import, Path.GetFileNameWithoutExtension(path)));
                 }
                 else if (MacProject.IsProject(path))
@@ -520,7 +520,8 @@ public sealed partial class MainWindow
                 {
                     // Into an existing document, a Photoshop file's layers arrive inside a folder named after it.
                     var target = session;
-                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    // The file's layers join what the document already holds, so they get what is left of its budget.
+                    if (await ImportPhotoshop(path, DocumentLimits.DocumentPixelBudget - session.Document.RasterPixels()) is not { } import) continue;
                     if (target != session) { import.Discard(); continue; }
                     session.PlacePhotoshop(import, name, at);
                 }
@@ -550,9 +551,9 @@ public sealed partial class MainWindow
     }
 
     /// <summary>Reads a Photoshop file and, when anything has to be converted, asks before going on. Null means the user declined.</summary>
-    private async Task<PsdImport?> ImportPhotoshop(string path)
+    private async Task<PsdImport?> ImportPhotoshop(string path, long pixelBudget)
     {
-        var import = await Task.Run(() => PsdImport.Load(path));
+        var import = await Task.Run(() => PsdImport.Load(path, pixelBudget));
         if (import.Conversions.Count == 0 || await PsdConversionDialog.Confirm(this, Path.GetFileName(path), import.Conversions)) return import;
         import.Discard();
         return null;

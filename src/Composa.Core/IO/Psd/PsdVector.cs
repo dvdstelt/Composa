@@ -59,7 +59,7 @@ internal static class PsdVector
         fillEnabled &= fill != null;
         strokeEnabled &= strokeColor != null;
         if (!fillEnabled && !strokeEnabled) return null;
-        if (!double.IsFinite(strokeWidth) || strokeWidth < 0 || strokeWidth > PsdReader.MaxSide) throw PsdException.TooLarge();
+        if (!double.IsFinite(strokeWidth) || strokeWidth < 0 || strokeWidth > DocumentLimits.MaxSide) throw PsdException.TooLarge();
         var box = path.TightBounds;
         if (strokeEnabled) box.Inflate((float)Math.Ceiling(strokeWidth / 2 + 1), (float)Math.Ceiling(strokeWidth / 2 + 1));
         box = SKRect.Create(MathF.Floor(box.Left), MathF.Floor(box.Top), MathF.Ceiling(box.Right) - MathF.Floor(box.Left), MathF.Ceiling(box.Bottom) - MathF.Floor(box.Top));
@@ -95,7 +95,7 @@ internal static class PsdVector
     private static SKSizeI? PixelSize(SKRect box, long remainingPixels)
     {
         if (!float.IsFinite(box.Left) || !float.IsFinite(box.Top) || !float.IsFinite(box.Width) || !float.IsFinite(box.Height)) return null;
-        if (Math.Abs(box.Width) > PsdReader.MaxSide || Math.Abs(box.Height) > PsdReader.MaxSide) throw PsdException.TooLarge();
+        if (Math.Abs(box.Width) > DocumentLimits.MaxSide || Math.Abs(box.Height) > DocumentLimits.MaxSide) throw PsdException.TooLarge();
         if (box.Width < 1 || box.Height < 1) return null;
         int width = Math.Max(1, (int)Math.Round(box.Width)), height = Math.Max(1, (int)Math.Round(box.Height));
         if ((long)width * height > Math.Max(0, remainingPixels)) throw PsdException.TooLarge();

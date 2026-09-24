@@ -32,14 +32,19 @@ public sealed class PsdImport
     public static bool IsPsd(string path) => PsdReader.Matches(path);
     public static bool IsPsd(ReadOnlySpan<byte> data) => PsdReader.Matches(data);
 
-    public static PsdImport Load(string path, long pixelBudget = PsdReader.MaxPixels)
+    /// <summary>Reads a file that is to become a document of its own, so the whole document budget is its to use.</summary>
+    public static PsdImport Load(string path) => Load(path, DocumentLimits.DocumentPixelBudget);
+    public static PsdImport Load(byte[] data) => Load(data, DocumentLimits.DocumentPixelBudget);
+
+    /// <param name="pixelBudget">How much raster the file may add: the document budget, less what the target document already holds.</param>
+    public static PsdImport Load(string path, long pixelBudget)
     {
         var info = new FileInfo(path);
         if (info.Length > int.MaxValue) throw PsdException.TooLarge();
         return Load(File.ReadAllBytes(path), pixelBudget);
     }
 
-    public static PsdImport Load(byte[] data, long pixelBudget = PsdReader.MaxPixels)
+    public static PsdImport Load(byte[] data, long pixelBudget)
     {
         var file = PsdReader.Read(data, pixelBudget);
         try { return Build(file, pixelBudget); }

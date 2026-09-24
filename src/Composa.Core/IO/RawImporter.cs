@@ -65,8 +65,8 @@ public sealed class RawImage
             }
         }
         if (width <= 0 || height <= 0 || depth is not (3 or 4) || maxValue is not (255 or 65535)) throw new InvalidDataException("The decoded frame was not in the expected format.");
-        if ((long)width * height > ImageFiles.MaxPixels || width > Model.Document.MaxSide || height > Model.Document.MaxSide)
-            throw new InvalidDataException("The image is larger than the supported 100 megapixels.");
+        if (!Model.DocumentLimits.FitsSurface(width, height))
+            throw new InvalidDataException($"The image is larger than the supported {Model.DocumentLimits.MaxSide:N0} pixels a side and {Model.DocumentLimits.MaxSurfaceMegapixels} megapixels.");
         var bytesPerSample = maxValue == 65535 ? 2 : 1;
         var offset = end + "ENDHDR\n".Length;
         if (data.Length - offset < (long)width * height * depth * bytesPerSample) throw new InvalidDataException("The decoded frame was cut short.");

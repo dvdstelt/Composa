@@ -360,6 +360,26 @@ public class PsdTests
     }
 
     [Fact]
+    public void The_budget_counts_layers_not_the_canvas_and_each_layer_must_fit_one_surface()
+    {
+        // A 10 x 10 canvas holding one 4 x 4 layer needs 16 pixels of raster, not 100: the canvas is a size, not an allocation.
+        var writer = new PsdWriter { Width = 10, Height = 10 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Small", Image = Solid(4, 4, SKColors.Red), Left = 3, Top = 3 });
+        var import = PsdImport.Load(writer.Build(), pixelBudget: 16);
+        Assert.Equal("Small", Assert.Single(import.Layers).Name);
+        Assert.Contains("larger", Assert.Throws<PsdException>(() => PsdImport.Load(writer.Build(), pixelBudget: 15)).Message);
+
+        // Two layers share the budget, so together they can need more than either does alone.
+        writer.Layers.Add(new PsdWriterLayer { Name = "Second", Image = Solid(4, 4, SKColors.Blue) });
+        Assert.Equal(2, PsdImport.Load(writer.Build(), pixelBudget: 32).Layers.Count);
+        Assert.Throws<PsdException>(() => PsdImport.Load(writer.Build(), pixelBudget: 31));
+
+        Assert.True(DocumentLimits.DocumentPixelBudget >= DocumentLimits.MaxSurfacePixels);
+        Assert.True(DocumentLimits.DocumentPixelBudget <= 800_000_000);
+        Assert.True((long)DocumentLimits.MaxSide * DocumentLimits.MaxSide > DocumentLimits.DocumentPixelBudget); // A square at the side limit is still too large.
+    }
+
+    [Fact]
     public void Unsupported_and_damaged_files_are_refused_with_a_reason()
     {
         byte[] Plain() { var w = new PsdWriter { Width = 10, Height = 10 }; w.Layers.Add(new PsdWriterLayer { Image = Solid(10, 10, SKColors.Red) }); return w.Build(); }

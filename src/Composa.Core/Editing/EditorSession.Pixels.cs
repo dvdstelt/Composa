@@ -68,7 +68,7 @@ public sealed partial class EditorSession
         int x = (int)layer.Transform.X, y = (int)layer.Transform.Y;
         var have = new SKRectI(x, y, x + pixels.Width, y + pixels.Height);
         var want = Geometry.Union(have, document.Bounds);
-        if (want == have || (long)want.Width * want.Height > IO.ImageFiles.MaxPixels * 2) return;
+        if (want == have || (long)want.Width * want.Height > DocumentLimits.MaxSurfacePixels) return;
         var grown = Pixels.NewColor(want.Width, want.Height);
         using (var canvas = new SKCanvas(grown)) canvas.DrawBitmap(pixels, have.Left - want.Left, have.Top - want.Top);
         layer.Pixels = grown;
@@ -100,7 +100,7 @@ public sealed partial class EditorSession
         int right = Math.Max(0, (int)Math.Ceiling(needed.Right - pixels.Width)), bottom = Math.Max(0, (int)Math.Ceiling(needed.Bottom - pixels.Height));
         if (left + top + right + bottom == 0) return;
         long width = pixels.Width + left + right, height = pixels.Height + top + bottom;
-        if (width > Document.MaxSide || height > Document.MaxSide || width * height > IO.ImageFiles.MaxPixels * 2) return;
+        if (!DocumentLimits.FitsSurface(width, height)) return;
 
         var grown = Pixels.NewColor((int)width, (int)height);
         using (var canvas = new SKCanvas(grown)) canvas.DrawBitmap(pixels, left, top);
@@ -495,7 +495,7 @@ public sealed partial class EditorSession
 
     private Layer? AddShapeLayer(ShapeStyle style, SKRect rect, string stem)
     {
-        if ((long)rect.Width * (long)rect.Height > IO.ImageFiles.MaxPixels) { Problem?.Invoke("That shape is too large. A shape can cover up to 100 megapixels."); return null; }
+        if ((long)rect.Width * (long)rect.Height > DocumentLimits.MaxSurfacePixels) { Problem?.Invoke($"That shape is too large. A shape can cover up to {DocumentLimits.MaxSurfaceMegapixels} megapixels."); return null; }
         var layer = Layer.Raster(document.UniqueName(stem), RenderShape(style, (int)rect.Width, (int)rect.Height), rect.Left, rect.Top);
         layer.Shape = style;
         Apply(stem, () => document.InsertAboveActive(layer));

@@ -1,3 +1,4 @@
+using Composa.Model;
 using Composa.Rendering;
 using SkiaSharp;
 
@@ -9,8 +10,6 @@ public static class ImageFiles
 {
     /// <summary>What Open and Place accept. Photoshop files are among them; they take the <c>Psd.PsdImport</c> route rather than <see cref="Load(string)"/>.</summary>
     public static readonly string[] ImportExtensions = [".png", ".jpg", ".jpeg", ".webp", ".bmp", ".gif", ".ico", ".heic", ".heif", ".avif", ".tif", ".tiff", ".psd", ".psb"];
-
-    public const long MaxPixels = 100_000_000;
 
     /// <summary>Decodes an image file to RGBA premultiplied pixels, upright according to its EXIF orientation.</summary>
     public static SKBitmap Load(string path)
@@ -34,8 +33,8 @@ public static class ImageFiles
         using var codec = SKCodec.Create(stream, out var status)
             ?? throw new InvalidDataException($"{name} could not be read ({status}). Supported formats are PNG, JPEG, WebP, BMP and GIF; HEIC, AVIF and TIFF open when ImageMagick is installed.");
         var info = codec.Info;
-        if ((long)info.Width * info.Height > MaxPixels || info.Width > Model.Document.MaxSide || info.Height > Model.Document.MaxSide)
-            throw new InvalidDataException($"{name} is larger than the supported 100 megapixels.");
+        if (!DocumentLimits.FitsSurface(info.Width, info.Height))
+            throw new InvalidDataException($"{name} is larger than the supported {DocumentLimits.MaxSide:N0} pixels a side and {DocumentLimits.MaxSurfaceMegapixels} megapixels.");
         var bitmap = new SKBitmap(Pixels.ColorInfo(info.Width, info.Height));
         var result = codec.GetPixels(bitmap.Info, bitmap.GetPixels());
         if (result is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))

@@ -1,3 +1,4 @@
+using Composa.Model;
 using SkiaSharp;
 
 namespace Composa.IO.Psd;
@@ -6,7 +7,7 @@ namespace Composa.IO.Psd;
 public sealed class PsdException(string message) : IOException(message)
 {
     public static PsdException Truncated() => new("The Photoshop file could not be read. It may be damaged or incomplete.");
-    public static PsdException TooLarge() => new("The Photoshop file is larger than the supported 30,000 pixels a side and 100 megapixels.");
+    public static PsdException TooLarge() => new($"The Photoshop file is larger than Composa can hold: {DocumentLimits.MaxSide:N0} pixels a side and {DocumentLimits.MaxSurfaceMegapixels} megapixels for any one layer, {DocumentLimits.DocumentBudgetMegapixels} megapixels of layers in all.");
 }
 
 /// <summary>One thing that had to change on the way in, reported per layer before anything is applied.</summary>
