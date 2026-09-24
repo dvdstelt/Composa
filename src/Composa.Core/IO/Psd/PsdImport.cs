@@ -184,7 +184,17 @@ public sealed class PsdImport
             layer.Name = name;
             return layer;
         }
-        if (kind == PsdLayerKind.Text) Note("Editable Photoshop text becomes pixels and can't be retyped.");
+        if (kind == PsdLayerKind.Text)
+        {
+            // Horizontal type keeps its wording, font, size, color, alignment, tracking and leading, so it can be retyped.
+            if (PsdText.Parse(extra) is { } source && PsdText.Place(source, name, ref remaining) is { } text)
+            {
+                record.Image?.Dispose();
+                foreach (var note in source.Notes) Note(note);
+                return text;
+            }
+            Note(PsdText.RasterizedNote);
+        }
         if (kind == PsdLayerKind.SmartObject) Note("The smart object was rasterized. Linked contents can't be edited.");
         if (kind == PsdLayerKind.Other) Note("Gradient and pattern fills aren't supported; the layer was imported empty.");
 

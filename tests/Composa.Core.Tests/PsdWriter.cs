@@ -302,6 +302,128 @@ internal sealed class PsdWriter
     }
     public static byte[] Exposure(float exposure, float offset, float gamma) { var b = new Buffer(); b.U16(1); b.F32(exposure); b.F32(offset); b.F32(gamma); return b.ToArray(); }
 
+    // ---- Type tool object setting ------------------------------------------------------------------------------------
+
+    /// <summary>What a type layer's fixture says; the defaults are 24-point black left-aligned Helvetica at (40, 50).</summary>
+    public sealed class TypeTool
+    {
+        public string Text = "Hello";
+        public string Font = "Helvetica";
+        public double FontSize = 24;
+        public SKColor Color = SKColors.Black;
+        /// <summary>0 left, 1 right, 2 center; anything else is a justification this editor lacks.</summary>
+        public int Justification;
+        public double Tracking;
+        public double? Leading;
+        public bool FauxBold, FauxItalic, Vertical, Warp;
+        /// <summary>A second style run that differs from the first, when set.</summary>
+        public double? SecondSize;
+        /// <summary>The 2×3 transform: xx, xy, yx, yy and the translation.</summary>
+        public double Xx = 1, Xy, Yx, Yy = 1, Tx = 40, Ty = 50;
+        /// <summary>Paragraph text: the frame and the glyphs' box, in text-space units.</summary>
+        public SKRect? Bounds, GlyphBounds;
+        /// <summary>Leave out the engine data, so only the text itself is known.</summary>
+        public bool NoEngine;
+
+        public byte[] Build()
+        {
+            var block = new Buffer();
+            block.U16(1);
+            foreach (var value in new[] { Xx, Xy, Yx, Yy, Tx, Ty }) block.F64(value);
+            block.U16(50);
+            var text = new Descriptor().Add("Txt ", Descriptor.Text(Text)).Add("Ornt", Descriptor.Enum("Ornt", Vertical ? "Vrtc" : "Hrzn"));
+            if (Bounds is { } bounds) text.Add("bounds", Descriptor.Objc(Rect(bounds)));
+            if (GlyphBounds is { } glyphs) text.Add("boundingBox", Descriptor.Objc(Rect(glyphs)));
+            if (!NoEngine) text.Add("EngineData", Descriptor.Raw(Encoding.Latin1.GetBytes(Engine())));
+            block.U32(16);
+            block.Bytes(text.ToArray());
+            block.U16(1);
+            block.U32(16);
+            block.Bytes(new Descriptor().Add("warpStyle", Descriptor.Enum("warpStyle", Warp ? "warpArc" : "warpNone")).ToArray());
+            return block.ToArray();
+        }
+
+        private static Descriptor Rect(SKRect box) => new Descriptor().Add("Left", Descriptor.UntF("#Pnt", box.Left)).Add("Top ", Descriptor.UntF("#Pnt", box.Top))
+            .Add("Rght", Descriptor.UntF("#Pnt", box.Right)).Add("Btom", Descriptor.UntF("#Pnt", box.Bottom));
+
+        private string Run(double size) => $$"""
+            <<
+            /StyleSheet
+            <<
+            /StyleSheetData
+            <<
+            /Font 0
+            /FontSize {{N(size)}}
+            /FauxBold {{(FauxBold ? "true" : "false")}}
+            /FauxItalic {{(FauxItalic ? "true" : "false")}}
+            /AutoLeading {{(Leading == null ? "true" : "false")}}
+            /Leading {{N(Leading ?? size * 1.2)}}
+            /Tracking {{N(Tracking)}}
+            /FillColor
+            <<
+            /Type 1
+            /Values [ 1.0 {{N(Color.Red / 255.0)}} {{N(Color.Green / 255.0)}} {{N(Color.Blue / 255.0)}} ]
+            >>
+            >>
+            >>
+            >>
+            """;
+
+        private static string N(double value) => value.ToString("0.0###", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>The engine dictionary: the text as UTF-16 with a byte order mark inside parentheses, one paragraph run and one or two style runs.</summary>
+        private string Engine()
+        {
+            var utf16 = Encoding.BigEndianUnicode.GetBytes(Text);
+            var escaped = new StringBuilder("(\\376\\377");
+            foreach (int b in utf16) escaped.Append(b is '(' or ')' or '\\' ? "\\" + (char)b : b is < 0x20 or > 0x7E ? $"\\{Convert.ToString(b, 8).PadLeft(3, '0')}" : ((char)b).ToString());
+            escaped.Append(')');
+            var runs = SecondSize is { } second ? Run(FontSize) + "\n" + Run(second) : Run(FontSize);
+            return $$"""
+                <<
+                /EngineDict
+                <<
+                /Editor
+                <<
+                /Text {{escaped}}
+                >>
+                /ParagraphRun
+                <<
+                /RunArray
+                [
+                <<
+                /ParagraphSheet
+                <<
+                /Properties
+                <<
+                /Justification {{Justification}}
+                >>
+                >>
+                >>
+                ]
+                >>
+                /StyleRun
+                <<
+                /RunArray
+                [
+                {{runs}}
+                ]
+                >>
+                >>
+                /ResourceDict
+                <<
+                /FontSet
+                [
+                <<
+                /Name ({{Font}})
+                >>
+                ]
+                >>
+                >>
+                """;
+        }
+    }
+
     // ---- Descriptor structure ----------------------------------------------------------------------------------------
 
     public sealed class Descriptor
@@ -326,6 +448,9 @@ internal sealed class PsdWriter
         public static byte[] Long(int value) { var b = new Buffer(); b.Ascii("long"); b.I32(value); return b.ToArray(); }
         public static byte[] Objc(Descriptor descriptor) { var b = new Buffer(); b.Ascii("Objc"); b.Bytes(descriptor.ToArray()); return b.ToArray(); }
         public static byte[] List(params byte[][] items) { var b = new Buffer(); b.Ascii("VlLs"); b.U32((uint)items.Length); foreach (var item in items) b.Bytes(item); return b.ToArray(); }
+        public static byte[] Text(string text) { var b = new Buffer(); b.Ascii("TEXT"); b.U32((uint)text.Length + 1); b.Bytes(Encoding.BigEndianUnicode.GetBytes(text)); b.U16(0); return b.ToArray(); }
+        public static byte[] Enum(string type, string value) { var b = new Buffer(); b.Ascii("enum"); b.Key(type); b.Key(value); return b.ToArray(); }
+        public static byte[] Raw(byte[] payload) { var b = new Buffer(); b.Ascii("tdta"); b.U32((uint)payload.Length); b.Bytes(payload); return b.ToArray(); }
     }
 
     public sealed class Buffer

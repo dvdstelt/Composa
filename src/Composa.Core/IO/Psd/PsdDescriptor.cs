@@ -20,6 +20,18 @@ internal static class PsdDescriptor
         catch (UnknownItem) { return null; }
     }
 
+    /// <summary>A versioned descriptor read in place, leaving the cursor after it so what follows can still be read; null on anything unexpected.</summary>
+    public static Dictionary<string, object?>? ReadVersioned(ref PsdCursor cursor)
+    {
+        try
+        {
+            if (cursor.U32() != 16) return null;
+            return Read(ref cursor);
+        }
+        catch (PsdException) { return null; }
+        catch (UnknownItem) { return null; }
+    }
+
     public static Dictionary<string, object?>? TryRead(ReadOnlySpan<byte> data)
     {
         try
@@ -75,22 +87,55 @@ internal static class PsdDescriptor
                 return list;
             }
             case "TEXT": return cursor.Unicode();
-            case "enum": _ = cursor.Key(); return cursor.Key();
+            case "enum": _ = cursor.Key(); return new EnumValue(cursor.Key());
             case "long": return (double)cursor.I32();
             case "comp": return (double)(long)cursor.U64();
             case "bool": return cursor.U8() != 0;
             case "type":
             case "GlbC":
                 _ = cursor.Unicode(); return cursor.Key();
-            case "alis":
             case "tdta":
+            {
+                var length = cursor.U32();
+                if (length > 8_000_000) throw PsdException.Truncated();
+                return cursor.Bytes(length).ToArray();
+            }
+            case "alis":
             case "Pth ":
                 cursor.Skip(cursor.U32()); return null;
+            case "obj ":
+                Reference(ref cursor); return null;
             default:
                 throw new UnknownItem();
         }
     }
 
+    /// <summary>An <c>enum</c> item's value, kept apart from text so a name is never mistaken for what the user typed.</summary>
+    public sealed record EnumValue(string Value);
+
+    /// <summary>Skips a descriptor reference so a later item can still be read.</summary>
+    private static void Reference(ref PsdCursor cursor)
+    {
+        var count = cursor.U32();
+        if (count > 10_000) throw PsdException.Truncated();
+        for (var i = 0; i < count; i++)
+        {
+            switch (cursor.Ascii(4))
+            {
+                case "prop": _ = cursor.Unicode(); _ = cursor.Key(); _ = cursor.Key(); break;
+                case "Clss": _ = cursor.Unicode(); _ = cursor.Key(); break;
+                case "Enmr": _ = cursor.Unicode(); _ = cursor.Key(); _ = cursor.Key(); _ = cursor.Key(); break;
+                case "rele": _ = cursor.Unicode(); _ = cursor.Key(); _ = cursor.I32(); break;
+                case "Idnt" or "indx": _ = cursor.I32(); break;
+                case "name": _ = cursor.Unicode(); break;
+                default: throw new UnknownItem();
+            }
+        }
+    }
+
+    public static string? Text(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) ? v as string : null;
+    public static string? Enumeration(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) && v is EnumValue e ? e.Value : null;
+    public static byte[]? Data(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) ? v as byte[] : null;
     public static double? Number(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) && v is double d && double.IsFinite(d) ? d : null;
     public static bool? Flag(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) && v is bool b ? b : null;
     public static Dictionary<string, object?>? Child(Dictionary<string, object?>? items, string key) => items != null && items.TryGetValue(key, out var v) ? v as Dictionary<string, object?> : null;

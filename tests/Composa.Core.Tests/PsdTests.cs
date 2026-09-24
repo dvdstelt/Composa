@@ -153,6 +153,97 @@ public class PsdTests
         Assert.Equal((50, 50), (import.Layers[3].Pixels!.Width, import.Layers[3].Pixels.Height));
     }
 
+    private static PsdImport LoadText(PsdWriter.TypeTool type, int width = 300, int height = 200)
+    {
+        var writer = new PsdWriter { Width = width, Height = height };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Headline", Image = Solid(30, 10, SKColors.Black), Left = 40, Top = 30 }.With("TySh", type.Build()));
+        return PsdImport.Load(writer.Build());
+    }
+
+    [Fact]
+    public void Simple_photoshop_text_stays_editable_with_its_style_and_place()
+    {
+        var installed = EditorSession.FontFamilies.FirstOrDefault(f => f.Contains("Sans", StringComparison.OrdinalIgnoreCase)) ?? EditorSession.FontFamilies[0];
+        var import = LoadText(new PsdWriter.TypeTool
+        {
+            Text = "Hello\rworld", Font = installed.Replace(" ", "") + "-BoldItalic", FontSize = 24, Color = new SKColor(20, 40, 200),
+            Justification = 1, Tracking = 100, Leading = 30, Tx = 40, Ty = 50
+        });
+        var layer = Assert.Single(import.Layers);
+        var text = layer.Text;
+        Assert.NotNull(text);
+        Assert.Equal("Hello\nworld", text!.Text);                           // Photoshop's return becomes a line break.
+        Assert.Equal(installed, text.FontFamily);
+        Assert.True(text.Bold && text.Italic);
+        Assert.Equal(24, text.Size);
+        Assert.Equal(0xFF1428C8u, text.Color);
+        Assert.Equal(TextAlignment.Right, text.Alignment);
+        Assert.Equal(2.4, text.Tracking, 3);                               // 100/1000 em at 24 px.
+        Assert.Equal(30, text.Leading);
+        Assert.DoesNotContain(import.Conversions, c => c.Message.Contains("retyped") || c.Message.Contains("installed"));
+        // Right-aligned point text hangs from its first baseline at (tx, ty): the first line ends there.
+        var layout = new Composa.Text.TextLayout(text);
+        var first = layout.Lines[0];
+        Assert.Equal(40, layer.Transform.X + first.X + first.VisibleWidth, 0.5);
+        Assert.Equal(50, layer.Transform.Y + first.Baseline, 0.5);
+        Assert.Equal((0d, false), (layer.Transform.Rotation, layer.Transform.FlipVertical));
+        // The glyphs are drawn in the text's color: some pixel along the first line's middle is a solid blue.
+        var band = Enumerable.Range((int)first.X, (int)first.VisibleWidth).Select(x => layer.Pixels!.GetPixel(x, (int)(first.Baseline - 6)));
+        Assert.Contains(band, p => p.Alpha > 200 && p.Blue > 150 && p.Red < 60);
+    }
+
+    [Fact]
+    public void Text_the_model_cannot_hold_stays_pixels_and_the_rest_is_reported()
+    {
+        foreach (var type in new[] { new PsdWriter.TypeTool { Vertical = true }, new PsdWriter.TypeTool { Xy = 0.4 }, new PsdWriter.TypeTool { Xx = 2, Yy = 1 } })
+        {
+            var import = LoadText(type);
+            var layer = Assert.Single(import.Layers);
+            Assert.Null(layer.Text);
+            AssertColor(SKColors.Black, layer.Pixels!.GetPixel(0, 0));
+            Assert.Contains(import.Conversions, c => c.Message.Contains("retyped"));
+        }
+        var noted = LoadText(new PsdWriter.TypeTool { Warp = true, FauxBold = true, Justification = 3, SecondSize = 40, Font = "NoSuchFace-Regular" });
+        Assert.NotNull(Assert.Single(noted.Layers).Text);
+        var messages = noted.Conversions.Select(c => c.Message).ToList();
+        Assert.Contains(PsdText.WarpNote, messages);
+        Assert.Contains(PsdText.FauxNote, messages);
+        Assert.Contains(PsdText.JustifyNote, messages);
+        Assert.Contains(PsdText.FirstStyleNote, messages);
+        Assert.Contains(messages, m => m.Contains("NoSuchFace") && m.Contains("installed"));
+        Assert.Equal(TextAlignment.Left, noted.Layers[0].Text!.Alignment);
+        // Without engine data the words still come across, at 12 points.
+        var bare = LoadText(new PsdWriter.TypeTool { Text = "Plain", NoEngine = true });
+        Assert.Equal(("Plain", 12d), (bare.Layers[0].Text!.Text, bare.Layers[0].Text!.Size));
+    }
+
+    [Fact]
+    public void Scaled_rotated_and_boxed_photoshop_text_keeps_its_placement()
+    {
+        // A 30° turn at twice the size: cos 30 = 0.866, sin 30 = 0.5, scale 2.
+        double cos = Math.Cos(Math.PI / 6) * 2, sin = Math.Sin(Math.PI / 6) * 2;
+        var turned = LoadText(new PsdWriter.TypeTool { FontSize = 24, Xx = cos, Xy = -sin, Yx = sin, Yy = cos, Tx = 100, Ty = 80 });
+        var layer = Assert.Single(turned.Layers);
+        Assert.Equal(48, layer.Text!.Size);                                 // Engine points times the matrix scale.
+        Assert.Equal(30, layer.Transform.Rotation, 1);
+        // The baseline start lands on (tx, ty) after the turn.
+        var layout = new Composa.Text.TextLayout(layer.Text);
+        var anchor = layer.Matrix.MapPoint(layout.Lines[0].X, layout.Lines[0].Baseline);
+        Assert.Equal(100, anchor.X, 0.6);
+        Assert.Equal(80, anchor.Y, 0.6);
+
+        var flipped = LoadText(new PsdWriter.TypeTool { Yy = -1 });
+        Assert.True(Assert.Single(flipped.Layers).Transform.FlipVertical);
+
+        var boxed = LoadText(new PsdWriter.TypeTool { Text = "A paragraph that wraps inside its frame", Bounds = new SKRect(0, 0, 120, 60), GlyphBounds = new SKRect(0, 0, 100, 20), Tx = 30, Ty = 40 });
+        var paragraph = Assert.Single(boxed.Layers);
+        Assert.True(paragraph.Text!.IsBox);
+        Assert.Equal(120 + 2 * Composa.Text.TextLayout.Padding, paragraph.Text.BoxWidth!.Value, 0.5);
+        Assert.Equal(60 + 2 * Composa.Text.TextLayout.Padding, paragraph.Text.BoxHeight!.Value, 0.5);
+        Assert.Equal((30 - Composa.Text.TextLayout.Padding, 40 - Composa.Text.TextLayout.Padding), (paragraph.Transform.X, paragraph.Transform.Y));
+        Assert.True(new Composa.Text.TextLayout(paragraph.Text).Lines.Count > 1, "the frame wraps the sentence");
+    }
+
     [Fact]
     public void Solid_fill_rectangles_and_ellipses_stay_live_shapes()
     {
