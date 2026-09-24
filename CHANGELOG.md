@@ -4,8 +4,16 @@ All notable changes to Composa are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-25
+
+Catches up with Compositor 1.2.7 to 1.2.10 and reworks every slider.
+
 ### Added
 
+- Sliders in the options bar and in every dialog are now fields whose fill is the slider: drag to change, Alt-drag for ten times finer steps, double-click to type a value, and the wheel and arrow keys step by one.
+- Shadow effects turn their light with a dial beside the angle field. The bright dot points at the light and the dim stub marks where the shadow falls.
+- Shift squares a marquee held from the start when there is no selection to add to. While adding to one, letting Shift go and pressing it again squares the marquee, as in Photoshop.
+- A selected text layer previews the Type bar's color picker as the color changes, without being opened for typing.
 - Photoshop Large Document (`.psb`) files open through the same importer as `.psd`.
 - Simple Photoshop text arrives as editable text: horizontal type layers keep their wording, font, size, color, alignment, tracking and leading. Vertical, sheared or unevenly scaled text still becomes pixels, and the import report says what was dropped.
 - SVG files open and place as image layers, drawn by ImageMagick's SVG renderer. Opened, an SVG becomes a document at the size it declares; placed, it is drawn to fit the canvas, so a small icon still comes in sharp.
@@ -18,6 +26,12 @@ All notable changes to Composa are recorded here. The format follows [Keep a Cha
 - A document's total raster now has its own budget, separate from the limit on any one layer: a quarter of the machine's memory, between 200 and 800 megapixels. One layer, canvas or export may be up to 200 megapixels (was 100). A print banner with dozens of large layers no longer fails to open against a limit meant for a single image.
 - Marching ants around a detailed Magic Wand selection are drawn from a screen-resolution outline when zoomed out, so a selection with hundreds of thousands of edges no longer takes seconds per redraw.
 - Clicking with the Type tool puts the first baseline at the pointer, as Photoshop does, so the letters rise from where you clicked instead of appearing a line lower.
+- The color picker puts saturation and brightness in the square and hue on the strip, as Photoshop does. Starting from black, one click in the square finds a color; before, the strip held the brightness and stayed at zero.
+
+### Fixed
+
+- Changing a size, font or color in the Type bar for a text layer that was not being typed opened it for typing and moved the keyboard to the canvas, so the rest of what was typed in the field landed in the text. The layer is now restyled in place, and a run of changes undoes as one step.
+- With an effect row highlighted in the Layers panel, Delete removed the effect even after a selection was drawn. Changing the selection now drops the highlight, so Delete clears the selected pixels.
 
 ## [1.0.0] - 2026-09-23
 

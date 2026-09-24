@@ -50,6 +50,11 @@
     added along with the CHANGELOG.md section when a release is cut; see RELEASING.md.
   -->
   <releases>
+    <release version="1.1.0" date="2026-09-25">
+      <description>
+        <p>Photoshop Large Document files, editable Photoshop text, SVG import, a memory budget for the whole document, sliders you drag, scrub or type into, a dial for shadow angles, and a color picker laid out as Photoshop's.</p>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-09-23">
       <description>
         <p>The first stable release, and the first for Windows: an installer and a portable zip for x64 and arm64, with ImageMagick included so HEIC, AVIF, TIFF and camera RAW open without anything else installed.</p>
