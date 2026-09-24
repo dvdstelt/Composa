@@ -72,6 +72,17 @@ public sealed partial class CanvasView
         drag = Drag.TextBox;
     }
 
+    /// <summary>A double-click with the Move tool: opens the topmost live text under the pointer for typing, the caret at the click.</summary>
+    private bool BeginLiveTextEdit(bool shift)
+    {
+        if (session?.TextLayerAt(pressDocument) is not { } layer || session.EditText(layer) is not { } editor) return false;
+        editor.ClickAt(LocalTextPoint(layer, pressDocument), shift);
+        drag = Drag.TextSelect;
+        UpdateCursor();
+        TextEditingChanged?.Invoke();
+        return true;
+    }
+
     private void DragTextSelection()
     {
         if (session?.TextEdit is not { } editor || session.TextEditLayer is not { } layer) return;

@@ -75,7 +75,8 @@ public sealed partial class MainWindow : Window
         canvas.PointerAt += point => positionText.Text = point is { } p ? $"{p.X}, {p.Y}" : "";
         canvas.Problem += message => { problem = message; UpdateStatus(); };
         canvas.ToolStateChanged += () => { refreshOptions?.Invoke(); UpdateColors(); };
-        canvas.TextEditingChanged += () => { RebuildOptions(); UpdateStatus(); };
+        // Opening text from the canvas with another tool switches to the Type tool, so the toolbar has to follow.
+        canvas.TextEditingChanged += () => { if (session != null) ShowTool(session.Tool); RebuildOptions(); UpdateStatus(); };
         layers.EditTextRequested += BeginTextEdit;
         layers.EditAdjustmentRequested += layer => _ = EditAdjustmentLayer(layer, isNew: false);
         layers.NewAdjustmentRequested += kind => _ = NewAdjustmentLayer(kind);
@@ -426,15 +427,22 @@ public sealed partial class MainWindow : Window
         if (session == null) { foreach (var button in toolButtons.Values) button.IsChecked = false; return; }
         session.Tool = tool;
         problem = null;
+        ShowTool(tool);
+        canvas.ToolChanged();
+        RebuildOptions();
+        UpdateStatus();
+    }
+
+    /// <summary>Marks the tool's button and gives the buttons with variants their current icon.</summary>
+    private void ShowTool(Tool tool)
+    {
+        if (session == null) return;
         foreach (var (key, button) in toolButtons) button.IsChecked = key == tool;
         toolButtons[Tool.Marquee].Content = Icons.Create(session.MarqueeKind == MarqueeKind.Ellipse ? Icons.MarqueeEllipse : Icons.Marquee, 19);
         toolButtons[Tool.Lasso].Content = Icons.Create(session.LassoKind == LassoKind.Polygonal ? Icons.PolygonLasso : Icons.Lasso, 19);
         toolButtons[Tool.Brush].Content = Icons.Create(session.EraserMode ? Icons.Eraser : Icons.Brush, 19);
         toolButtons[Tool.Wand].Content = Icons.Create(session.WandMode == WandMode.Object ? Icons.ObjectSelect : Icons.Wand, 19);
         toolButtons[Tool.Shape].Content = Icons.Create(session.ShapeKind == ShapeKind.Line ? Icons.Line : Icons.Shape, 19);
-        canvas.ToolChanged();
-        RebuildOptions();
-        UpdateStatus();
     }
 
     private void UpdateStatus()

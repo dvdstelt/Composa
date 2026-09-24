@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.VisualTree;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -181,6 +182,35 @@ public class TextEditingTests
         Assert.Equal(0xFF108030u, layer.Text!.Color);
         Assert.Equal(new SKColor(0x10, 0x80, 0x30), session.Foreground);   // OK: the text color is the foreground color.
         Assert.Equal("Color", layer.Text.Text);
+    }
+
+    /// <summary>With the Move tool, a double-click on live text opens it for typing where the pointer is; the toolbar follows to the Type tool.</summary>
+    [AvaloniaFact]
+    public void Double_clicking_live_text_with_the_move_tool_opens_it_for_typing()
+    {
+        var layer = session.AddText(new SKPoint(100, 100), session.TextDefaults with { Text = "Hello" });
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+        // A little in from the right edge of the letters, so the caret lands at the end of the word.
+        var x = (float)(layer.Transform.X + layer.Transform.Width - Text.TextLayout.Padding - 2);
+        var y = (float)(layer.Transform.Y + layer.Transform.Height / 2);
+        Click(x, y);
+        Assert.False(session.IsEditingText);            // One click moves, as before.
+        Click(x, y);                                     // The second click of a double-click.
+        Assert.True(session.IsEditingText);
+        Assert.Equal(layer.Id, session.TextEditLayer!.Id);
+        Assert.Equal(Tool.Text, session.Tool);
+        Assert.Equal(5, session.TextEdit!.Caret);
+        var typeButton = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => (ToolTip.GetTip(b) as string)?.StartsWith("Type", StringComparison.Ordinal) == true);
+        var moveButton = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => (ToolTip.GetTip(b) as string)?.StartsWith("Move", StringComparison.Ordinal) == true);
+        Assert.True(typeButton.IsChecked);
+        Assert.False(moveButton.IsChecked);
+        window.KeyTextInput("!");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Hello!", session.TextEditLayer.Text!.Text);
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Edit Text", session.History.UndoName);
     }
 
     [AvaloniaFact]
