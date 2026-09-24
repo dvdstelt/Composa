@@ -229,6 +229,20 @@ public sealed partial class EditorSession
     }
 
     /// <summary>
+    /// Shows a style on a text layer that is not open for typing while a dialog is still choosing it. Call between a
+    /// <see cref="Begin"/> and a <see cref="Cancel"/>: the dialog's outcome then goes through
+    /// <see cref="ChangeTextStyle"/> like any bar change, so the preview itself leaves no undo step.
+    /// </summary>
+    public void PreviewTextStyle(Layer layer, Func<TextStyle, TextStyle> change)
+    {
+        if (!HasPendingEdit || TextEdit != null || layer.Text is not { } current || document.Find(layer.Id) != layer) return;
+        var style = change(current).Clamped();
+        if (style == current) return;
+        SetText(layer, style);
+        TextChanged?.Invoke();
+    }
+
+    /// <summary>
     /// Resizes the open text's box (turning point text into a box of that size first), in layer pixels. The point of
     /// the layer at the anchor fractions (0 to 1 across its pixels) stays where it is, so dragging one edge leaves the
     /// opposite one in place.

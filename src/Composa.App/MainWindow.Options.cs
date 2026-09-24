@@ -162,18 +162,29 @@ public sealed partial class MainWindow
         ToolTip.SetTip(swatch, "Text color");
         swatch.PointerPressed += async (_, _) =>
         {
-            // Text being typed previews the picker's working color on the canvas, and goes back to its own color on Cancel.
+            // The picker's working color shows on the canvas as it changes. Text being typed takes it as any bar change;
+            // a text layer that is not open for typing shows it inside an edit that is taken back when the dialog
+            // closes, and the pick then goes through Change so it undoes as one step like any other bar change.
             var original = s.CurrentTextStyle.Color;
             var editing = s.TextEdit;
-            void Preview(SKColor color) { if (editing != null && s.TextEdit == editing) Change(st => st with { Color = (uint)color | 0xFF000000 }); }
-            if (await Dialogs.Prompts.Color(this, "Text Color", new SKColor(original), editing != null ? Preview : null) is not { } picked)
+            var layer = editing == null && s.ActiveLayer is { Text: not null } active ? active : null;
+            if (layer != null) s.Begin("Change Text Style");
+            void Preview(SKColor color)
+            {
+                var opaque = (uint)color | 0xFF000000;
+                if (editing != null && s.TextEdit == editing) Change(st => st with { Color = opaque });
+                else if (layer != null) s.PreviewTextStyle(layer, st => st with { Color = opaque });
+            }
+            var picked = await Dialogs.Prompts.Color(this, "Text Color", new SKColor(original), editing != null || layer != null ? Preview : null);
+            if (layer != null) s.Cancel();
+            if (picked is not { } color)
             {
                 if (editing != null && s.TextEdit == editing) Change(st => st with { Color = original });
                 return;
             }
-            Change(st => st with { Color = (uint)picked | 0xFF000000 });
+            Change(st => st with { Color = (uint)color | 0xFF000000 });
             // The text color is the foreground color: picking one in the Type bar moves the swatch too.
-            s.Foreground = picked;
+            s.Foreground = color;
             UpdateColors();
             refreshOptions?.Invoke();
         };
