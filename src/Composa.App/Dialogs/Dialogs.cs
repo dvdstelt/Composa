@@ -70,7 +70,7 @@ public static class Prompts
     {
         var result = value;
         var box = Ui.Number(value, min, max, v => result = v, width: 120);
-        var dialog = new DialogWindow(title, Ui.Row(10, Ui.Label(label), box, Ui.Label(unit, Palette.Secondary)));
+        var dialog = new DialogWindow(title, Ui.Row(10, Ui.Scrub(Ui.Label(label), box), box, Ui.Label(unit, Palette.Secondary)));
         dialog.Opened += (_, _) => box.Focus();
         return await dialog.Ask(owner) ? result : null;
     }
@@ -241,6 +241,7 @@ public static class CanvasDialogs
         return accepted ? quality : null;
     }
 
+    /// <summary>Labelled rows. The label of a number field, or of a row that starts with one, drags the field's value.</summary>
     public static Grid Form(params (string Label, Control Field)[] rows)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,12,*") };
@@ -248,6 +249,7 @@ public static class CanvasDialogs
         {
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
             var label = Ui.Label(rows[i].Label, Palette.Secondary);
+            if ((rows[i].Field as NumericUpDown ?? (rows[i].Field as Panel)?.Children.FirstOrDefault() as NumericUpDown) is { } number) Ui.Scrub(label, number);
             label.Margin = new Thickness(0, 6);
             Grid.SetRow(label, i);
             grid.Children.Add(label);

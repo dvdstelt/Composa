@@ -190,6 +190,95 @@ public class EditingTests
     }
 
     [Fact]
+    public void A_mask_can_be_painted_past_its_layer()
+    {
+        // A 20 px layer in the middle of a 50 px canvas; its mask starts as small as the layer.
+        var session = EditorSession.NewCanvas(50, 50, SKColors.White);
+        var layer = session.AddImageLayer("top", Solid(20, 20, SKColors.Red), new SKPoint(25, 25));
+        session.AddMask(layer);
+        Assert.Equal(20, layer.Mask!.Width);
+        session.Tool = Tool.Brush;
+        session.Foreground = SKColors.Black;
+        session.Brush = new BrushSettings { Size = 6, Hardness = 1 };
+        session.BeginStroke(new SKPoint(5, 5), out var problem);
+        Assert.Null(problem);
+        session.EndStroke();
+        var painted = session.Document.Find(layer.Id)!;
+        // The mask grew to the canvas, black under the stroke and white elsewhere, and the layer's pixels stayed put.
+        Assert.Equal(50, painted.Mask!.Width);
+        Assert.Equal(0, painted.Mask.GetPixel(5, 5).Alpha);
+        Assert.Equal(255, painted.Mask.GetPixel(45, 45).Alpha);
+        AssertColor(SKColors.Red, session.Composite().GetPixel(25, 25));
+        // What the mask hides stays hidden once paint reaches it.
+        session.EditingMask = false;
+        session.Foreground = SKColors.Blue;
+        session.BeginStroke(new SKPoint(5, 5), out _);
+        session.EndStroke();
+        AssertColor(SKColors.White, session.Composite().GetPixel(5, 5));
+        // Undo puts the small mask back.
+        session.Undo();
+        session.Undo();
+        Assert.Equal(20, session.Document.Find(layer.Id)!.Mask!.Width);
+    }
+
+    [Fact]
+    public void A_hide_all_mask_grows_black()
+    {
+        var session = EditorSession.NewCanvas(50, 50, SKColors.White);
+        var layer = session.AddImageLayer("top", Solid(20, 20, SKColors.Red), new SKPoint(25, 25));
+        session.AddMask(layer, hideAll: true);
+        session.Tool = Tool.Brush;
+        session.Foreground = SKColors.White;
+        session.Brush = new BrushSettings { Size = 6, Hardness = 1 };
+        session.BeginStroke(new SKPoint(5, 5), out _);
+        session.EndStroke();
+        var mask = session.Document.Find(layer.Id)!.Mask!;
+        Assert.Equal(50, mask.Width);
+        Assert.Equal(255, mask.GetPixel(5, 5).Alpha);
+        Assert.Equal(0, mask.GetPixel(45, 45).Alpha);
+        Assert.Equal(0, mask.GetPixel(25, 25).Alpha);
+    }
+
+    [Fact]
+    public void A_fill_and_a_gradient_cover_the_canvas_on_a_mask()
+    {
+        var session = EditorSession.NewCanvas(50, 50, SKColors.White);
+        var layer = session.AddImageLayer("top", Solid(20, 20, SKColors.Red), new SKPoint(25, 25));
+        session.AddMask(layer);
+        session.Fill(SKColors.Black);
+        var filled = session.Document.Find(layer.Id)!.Mask!;
+        Assert.Equal(50, filled.Width);
+        Assert.Equal(0, filled.GetPixel(2, 2).Alpha);
+        Assert.Equal(0, filled.GetPixel(25, 25).Alpha);
+        session.Undo();
+        Assert.Equal(20, session.Document.Find(layer.Id)!.Mask!.Width);
+
+        session.Foreground = SKColors.Black;
+        session.Background = SKColors.White;
+        var target = session.Document.Find(layer.Id)!;
+        var original = session.BeginGradient(target);
+        session.DrawGradient(target, original, new SKPoint(0, 25), new SKPoint(50, 25));
+        session.Commit();
+        var graded = session.Document.Find(layer.Id)!.Mask!;
+        Assert.Equal(50, graded.Width);
+        Assert.True(graded.GetPixel(2, 25).Alpha < 40);
+        Assert.True(graded.GetPixel(47, 25).Alpha > 215);
+    }
+
+    [Fact]
+    public void Smearing_a_mask_stays_within_it()
+    {
+        var session = EditorSession.NewCanvas(50, 50, SKColors.White);
+        var layer = session.AddImageLayer("top", Solid(20, 20, SKColors.Red), new SKPoint(25, 25));
+        session.AddMask(layer);
+        session.Tool = Tool.Smear;
+        session.Brush = new BrushSettings { Size = 6, Hardness = 1 };
+        session.BeginStroke(new SKPoint(5, 5), out _);
+        session.EndStroke();
+        Assert.Equal(20, session.Document.Find(layer.Id)!.Mask!.Width);
+    }
+
+    [Fact]
     public void Clone_stamp_copies_from_the_source_point()
     {
         var session = EditorSession.NewCanvas(100, 50, SKColors.White);

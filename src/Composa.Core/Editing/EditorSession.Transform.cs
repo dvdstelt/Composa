@@ -300,17 +300,26 @@ public sealed partial class EditorSession
         CommitTransform();
     }
 
-    /// <summary>Sets exact values from the transform inspector.</summary>
+    private const string InspectorEditName = "Transform";
+    private (Guid LayerId, int Revision)? inspectorEdit;
+
+    /// <summary>
+    /// Sets exact values from the transform inspector. Every keystroke in a field, and every pixel of a drag on its
+    /// label, is a change of its own, so a run of them on one layer undoes as one step.
+    /// </summary>
     public void SetTransform(Layer layer, LayerTransform transform)
     {
         if (layer.Pixels == null || TransformEdit.Same(transform, layer.Transform)) return;
-        Apply("Transform", () =>
+        Apply(InspectorEditName, () =>
         {
             layer.Transform = transform;
             if (layer.Text != null) RescaleText(layer);
             if (layer.Shape != null)
                 ReplaceLivePixels(layer, RenderShape(layer.Shape, Math.Max(1, (int)Math.Round(transform.Width)), Math.Max(1, (int)Math.Round(transform.Height))));
         });
+        // Exactly one revision on: the commit above, with no other edit (or undo) between the two changes.
+        if (inspectorEdit is { } last && last.LayerId == layer.Id && last.Revision == Revision - 1) History.MergeLast(InspectorEditName);
+        inspectorEdit = (layer.Id, Revision);
         InvalidateAll();
         LayersChanged?.Invoke();
     }

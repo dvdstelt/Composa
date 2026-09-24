@@ -72,6 +72,64 @@ public static class Ui
         return box;
     }
 
+    /// <summary>How much slower a scrubbed value moves under the pointer while Alt is held.</summary>
+    private const double ScrubFineScale = 0.1;
+    /// <summary>Pixels a press must travel before a scrub starts, so a click leaves the value alone.</summary>
+    private const double ScrubThreshold = 3;
+
+    /// <summary>
+    /// Makes a label a drag target for the number field beside it, as in Photoshop: drag left or right to change the
+    /// value one whole unit per pixel, Alt for ten times finer. Typing in the field still takes decimals.
+    /// </summary>
+    public static T Scrub<T>(T label, NumericUpDown box) where T : Control
+    {
+        label.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeWestEast);
+        // Only what a control draws is hit; a label without a background would take the pointer on its glyphs alone.
+        if (label is TextBlock { Background: null } text) text.Background = Brushes.Transparent;
+        ToolTip.SetTip(label, "Drag to change the value (Alt: finer)");
+        ToolTip.SetShowDelay(label, 450);
+        double pressX = 0, lastX = 0, start = 0, travel = 0;
+        bool pressed = false, dragging = false;
+        label.PointerPressed += (_, e) =>
+        {
+            if (!e.GetCurrentPoint(label).Properties.IsLeftButtonPressed) return;
+            ToolTip.SetIsOpen(label, false);
+            pressX = lastX = e.GetPosition(label).X;
+            start = (double)(box.Value ?? 0);
+            travel = 0;
+            pressed = true;
+            dragging = false;
+            e.Pointer.Capture(label);
+            e.Handled = true;
+        };
+        label.PointerMoved += (_, e) =>
+        {
+            if (!pressed || !e.GetCurrentPoint(label).Properties.IsLeftButtonPressed) return;
+            var x = e.GetPosition(label).X;
+            if (!dragging)
+            {
+                if (Math.Abs(x - pressX) < ScrubThreshold) return;
+                dragging = true;
+                lastX = pressX;
+            }
+            travel += (x - lastX) * (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt) ? ScrubFineScale : 1);
+            lastX = x;
+            // Whole numbers, as Photoshop scrubs: the field's own step and format decide what typing accepts.
+            var value = Math.Clamp((decimal)Math.Round(start + travel), box.Minimum, box.Maximum);
+            if (box.Value != value) box.Value = value;
+            e.Handled = true;
+        };
+        void End(Avalonia.Input.IPointer pointer)
+        {
+            if (!pressed) return;
+            pressed = dragging = false;
+            if (Equals(pointer.Captured, label)) pointer.Capture(null);
+        }
+        label.PointerReleased += (_, e) => { var was = pressed; End(e.Pointer); e.Handled = was; };
+        label.PointerCaptureLost += (_, e) => End(e.Pointer);
+        return label;
+    }
+
     /// <summary>A Krita-style field whose fill is the slider: drag to change, Alt-drag for fine steps, double-click to type. See <see cref="Controls.SliderField"/>.</summary>
     public static Controls.SliderField SliderField(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0", double width = 120)
     {

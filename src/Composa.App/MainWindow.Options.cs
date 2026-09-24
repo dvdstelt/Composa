@@ -75,7 +75,7 @@ public sealed partial class MainWindow
                     {
                         var edge = Ui.Number(s.ObjectEdgeOffset, -10, 10, v => s.ObjectEdgeOffset = (int)v, 1, "0", 52);
                         ToolTip.SetTip(edge, "Positive values tighten the detected outline inward; negative values loosen it outward");
-                        Add(Ui.Row(5, Ui.Label("Edge", Palette.Secondary), edge, Ui.Label("px", Palette.Secondary)));
+                        Add(Ui.Row(5, Ui.Scrub(Ui.Label("Edge", Palette.Secondary), edge), edge, Ui.Label("px", Palette.Secondary)));
                     }
                     Add(Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
                 }
@@ -206,8 +206,8 @@ public sealed partial class MainWindow
         var cancel = Ui.TextButton("Cancel", () => { s.CancelText(); canvas.Focus(); RebuildOptions(); UpdateStatus(); });
         var edit = Ui.TextButton("Edit Text", () => { if (s.ActiveLayer is { Text: not null } layer) BeginTextEdit(layer); });
         foreach (var button in new[] { done, cancel, edit }) button.MinWidth = 0;
-        row.Children.AddRange([font, Ui.Row(4, size, Ui.Label("px", Palette.Secondary)), bold, italic, swatch, alignRow,
-            Ui.Row(5, Ui.Label("Tracking", Palette.Secondary), tracking), Ui.Row(5, Ui.Label("Leading", Palette.Secondary), leading), Ui.Separator()]);
+        row.Children.AddRange([font, Ui.Row(4, size, Ui.Scrub(Ui.Label("px", Palette.Secondary), size)), bold, italic, swatch, alignRow,
+            Ui.Row(5, Ui.Scrub(Ui.Label("Tracking", Palette.Secondary), tracking), tracking), Ui.Row(5, Ui.Scrub(Ui.Label("Leading", Palette.Secondary), leading), leading), Ui.Separator()]);
         if (s.IsEditingText) row.Children.AddRange([done, cancel]);
         else { edit.IsEnabled = s.ActiveLayer?.Text != null; row.Children.Add(edit); }
         refreshOptions = () =>
@@ -254,7 +254,7 @@ public sealed partial class MainWindow
                 if (updating || s.Document.Find(layer.Id) is not { } live) return;
                 s.SetTransform(live, set(live.Transform, v));
             }, 1, format, 74);
-            row.Children.Add(Ui.Row(5, Ui.Label(label, Palette.Secondary), box));
+            row.Children.Add(Ui.Row(5, Ui.Scrub(Ui.Label(label, Palette.Secondary), box), box));
             return box;
         }
         var x = Field("X", t => t.X, (t, v) => t with { X = v }, -100000, 100000, "0.#");
