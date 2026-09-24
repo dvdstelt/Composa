@@ -393,6 +393,8 @@ public sealed partial class MainWindow
             return;
         }
         if (focused is Control control && control.FindAncestorOfType<MenuItem>() != null) return;
+        // A slider field that was just dragged keeps the keys that step or jump its value; letters still reach the tool shortcuts.
+        if (focused is Controls.SliderField && e.Key is Key.Up or Key.Down or Key.Left or Key.Right or Key.Home or Key.End) return;
 
         if (canvas.HandleKeyDown(e)) { e.Handled = true; return; }
         // While text is being typed, letters are text, not tool keys or shortcuts; the key stays unhandled so the

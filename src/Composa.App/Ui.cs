@@ -90,6 +90,14 @@ public static class Ui
         return (Row(8, title, slider, readout), v => { silent = true; slider.Value = v; silent = false; });
     }
 
+    /// <summary>A Krita-style field whose fill is the slider: drag to change, Alt-drag for fine steps, double-click to type. See <see cref="Controls.SliderField"/>.</summary>
+    public static Controls.SliderField SliderField(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0", double width = 120)
+    {
+        var field = new Controls.SliderField(label, value, min, max, step, format) { Width = width };
+        field.Changed += changed;
+        return field;
+    }
+
     public static Border Separator(bool vertical = true) => vertical
         ? new Border { Width = 1, Background = Palette.Divider, Margin = new Thickness(4, 6) }
         : new Border { Height = 1, Background = Palette.Divider };
