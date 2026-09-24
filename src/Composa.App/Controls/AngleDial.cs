@@ -6,9 +6,10 @@ using Avalonia.Media;
 namespace Composa.App.Controls;
 
 /// <summary>
-/// Photoshop's angle dial: a circle with a hand that points where the value points, in degrees counterclockwise from the right.
-/// Press or drag anywhere on it to turn the hand to the pointer; Shift snaps to 15 degree steps; the wheel and the arrow keys turn it
-/// by one degree. Setting <see cref="Value"/> from code redraws without raising <see cref="Changed"/>.
+/// Photoshop's angle dial for a light: a circle with a hand that points at the light, in degrees counterclockwise from the right, with a
+/// bright dot at its tip, and a dim stub on the far side of the centre showing where the shadow falls. Press or drag anywhere on it to
+/// turn the hand to the pointer; Shift snaps to 15 degree steps; the wheel and the arrow keys turn it by one degree. Setting
+/// <see cref="Value"/> from code redraws without raising <see cref="Changed"/>.
 /// </summary>
 public sealed class AngleDial : Control
 {
@@ -20,6 +21,8 @@ public sealed class AngleDial : Control
     private static readonly IPen RimHoverPen = new Pen(new SolidColorBrush(Color.Parse("#6A6A6A")));
     private static readonly IPen RimFocusPen = new Pen(Palette.Accent);
     private static readonly IPen HandPen = new Pen(Palette.Foreground, 2, lineCap: PenLineCap.Round);
+    private static readonly IBrush LightBrush = new SolidColorBrush(Color.Parse("#FFD060"));
+    private static readonly IPen ShadowPen = new Pen(new SolidColorBrush(Color.Parse("#6A6A6A")), 3, lineCap: PenLineCap.Round);
     private static readonly IPen TickPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")));
 
     private readonly double min, max;
@@ -36,7 +39,7 @@ public sealed class AngleDial : Control
         Width = Height = DefaultSize;
         Focusable = true;
         Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(this, "Drag to turn the hand · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°");
+        ToolTip.SetTip(this, "The hand points at the light; the shadow falls the other way\nDrag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°");
         ToolTip.SetShowDelay(this, 450);
     }
 
@@ -90,8 +93,12 @@ public sealed class AngleDial : Control
                 context.DrawLine(TickPen, centre + new Vector(dx * (radius - 4), dy * (radius - 4)), centre + new Vector(dx * (radius - 1), dy * (radius - 1)));
             }
             var (hx, hy) = Direction(value);
-            context.DrawLine(HandPen, centre, centre + new Vector(hx * (radius - 3), hy * (radius - 3)));
+            // The shadow's side first, so the hand and the light sit on top of it.
+            context.DrawLine(ShadowPen, centre - new Vector(hx * (radius - 9), hy * (radius - 9)), centre - new Vector(hx * (radius - 4), hy * (radius - 4)));
+            var tip = centre + new Vector(hx * (radius - 5), hy * (radius - 5));
+            context.DrawLine(HandPen, centre, tip);
             context.DrawEllipse(Palette.Foreground, null, centre, 2, 2);
+            context.DrawEllipse(LightBrush, null, tip, 3, 3);
         }
     }
 
