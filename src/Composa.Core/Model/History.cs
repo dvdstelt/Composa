@@ -48,6 +48,15 @@ public sealed class History
         return entry.State;
     }
 
+    /// <summary>Folds the newest entry into the one before it, so two consecutive edits undo as one step named <paramref name="name"/>.</summary>
+    public void MergeLast(string name)
+    {
+        if (undo.Count < 2) return;
+        var before = undo[^2].State;
+        undo.RemoveRange(undo.Count - 2, 2);
+        undo.Add((name, before));
+    }
+
     /// <summary>Drops the newest undo entry without applying it, for edits that turned out to change nothing.</summary>
     public void DiscardLast()
     {

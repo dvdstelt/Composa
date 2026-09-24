@@ -50,7 +50,12 @@ public class DialogTests
         Capture(window, "16-canvas-size");
         _ = CanvasDialogs.ImageSize(window, 1920, 1080, 72);
         Capture(window, "17-image-size");
-        _ = Prompts.Color(window, "Foreground Color", new SKColor(0x20, 0xC0, 0xFF));
+        // From black, the strip is the hue and the square holds brightness, so one click in the square finds a color.
+        _ = Prompts.Color(window, "Foreground Color", SKColors.Black);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(ColorSpectrumComponents.SaturationValue, window.OwnedWindows.Last().GetVisualDescendants().OfType<ColorView>().Single().ColorSpectrumComponents);
+        // The spectrum's bitmap is built on a worker thread; without a moment for it the square captures black.
+        for (var i = 0; i < 10; i++) { Thread.Sleep(50); Dispatcher.UIThread.RunJobs(); AvaloniaHeadlessPlatform.ForceRenderTimerTick(); }
         Capture(window, "18-color");
         _ = AdjustmentDialogs.Edit(window, new BlackAndWhiteAdjustment { Tint = true }, _ => { }, histogram, SKColors.Black, SKColors.White);
         Capture(window, "27-black-white");

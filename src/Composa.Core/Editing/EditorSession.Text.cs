@@ -204,12 +204,42 @@ public sealed partial class EditorSession
     /// </summary>
     public TextStyle CurrentTextStyle => TextEdit?.Style ?? ActiveLayer?.Text ?? TextDefaults;
 
-    /// <summary>Changes a setting in the Type tool's bar.</summary>
+    private const string StyleEditName = "Change Text Style";
+    /// <summary>The last bar change made to a text layer that was not open for typing, and the revision it left.</summary>
+    private (Guid LayerId, int Revision)? styleEdit;
+
+    /// <summary>
+    /// Changes a setting in the Type tool's bar: of the text being typed, otherwise of the active text layer, otherwise
+    /// of the defaults new text takes. A text layer is restyled in place, without opening it for typing: the bar's
+    /// field keeps the keyboard, and the change is only to the style, so nothing selects the text. Every keystroke in
+    /// a field is a change of its own, so a run of them on one layer undoes as one step.
+    /// </summary>
     public void ChangeTextStyle(Func<TextStyle, TextStyle> change)
     {
-        if (TextEdit == null && ActiveLayer is { Text: not null } live) EditText(live);
-        if (TextEdit is { } editor) editor.ChangeStyle(change);
-        else TextDefaults = change(TextDefaults).Clamped() with { Text = "" };
+        if (TextEdit is { } editor) { editor.ChangeStyle(change); return; }
+        if (ActiveLayer is not { Text: { } current } live) { TextDefaults = change(TextDefaults).Clamped() with { Text = "" }; return; }
+        var style = change(current).Clamped();
+        if (style == current) return;
+        Apply(StyleEditName, () => SetText(live, style));
+        // Exactly one revision on: the commit above, with no other edit (or undo) between the two changes.
+        if (styleEdit is { } last && last.LayerId == live.Id && last.Revision == Revision - 1) History.MergeLast(StyleEditName);
+        styleEdit = (live.Id, Revision);
+        TextDefaults = style with { Text = "", BoxWidth = null, BoxHeight = null };
+        TextChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Shows a style on a text layer that is not open for typing while a dialog is still choosing it. Call between a
+    /// <see cref="Begin"/> and a <see cref="Cancel"/>: the dialog's outcome then goes through
+    /// <see cref="ChangeTextStyle"/> like any bar change, so the preview itself leaves no undo step.
+    /// </summary>
+    public void PreviewTextStyle(Layer layer, Func<TextStyle, TextStyle> change)
+    {
+        if (!HasPendingEdit || TextEdit != null || layer.Text is not { } current || document.Find(layer.Id) != layer) return;
+        var style = change(current).Clamped();
+        if (style == current) return;
+        SetText(layer, style);
+        TextChanged?.Invoke();
     }
 
     /// <summary>

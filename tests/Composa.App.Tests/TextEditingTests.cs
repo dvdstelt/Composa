@@ -184,6 +184,45 @@ public class TextEditingTests
         Assert.Equal("Color", layer.Text.Text);
     }
 
+    /// <summary>A text layer that is only selected previews the picker too, and the pick undoes as one step without opening the text for typing.</summary>
+    [AvaloniaFact]
+    public async Task A_selected_text_layer_previews_the_color_picker_without_opening_for_typing()
+    {
+        var layer = session.AddText(new SKPoint(100, 100), session.TextDefaults with { Text = "Hello", Color = 0xFF000000 });
+        window.SelectTool(Tool.Text);
+        Dispatcher.UIThread.RunJobs();
+        var steps = session.History.Count;
+
+        PressSwatch("Text color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        var dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x20, 0xC0, 0xFF);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0xFF20C0FFu, layer.Text!.Color);                    // Previewed live on the canvas.
+        Assert.False(session.IsEditingText);
+        dialog.Close(false);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Equal(0xFF000000u, session.Document.Find(layer.Id)!.Text!.Color); // Cancel: back to its own color.
+        Assert.Equal(steps, session.History.Count);                       // And no step left behind.
+
+        PressSwatch("Text color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x10, 0x80, 0x30);
+        Dispatcher.UIThread.RunJobs();
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x10, 0x80, 0x40);
+        Dispatcher.UIThread.RunJobs();
+        dialog.Close(true);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Equal(0xFF108040u, session.Document.Find(layer.Id)!.Text!.Color);
+        Assert.Equal(new SKColor(0x10, 0x80, 0x40), session.Foreground);   // OK: the text color is the foreground color.
+        Assert.False(session.IsEditingText);
+        Assert.Equal(steps + 1, session.History.Count);                   // The whole pick is one step.
+        Assert.Equal("Change Text Style", session.History.UndoName);
+        session.Undo();
+        Assert.Equal(0xFF000000u, session.Document.Find(layer.Id)!.Text!.Color);
+    }
+
     /// <summary>With the Move tool, a double-click on live text opens it for typing where the pointer is; the toolbar follows to the Type tool.</summary>
     [AvaloniaFact]
     public void Double_clicking_live_text_with_the_move_tool_opens_it_for_typing()
@@ -211,6 +250,28 @@ public class TextEditingTests
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Edit Text", session.History.UndoName);
+    }
+
+    [AvaloniaFact]
+    public void Typing_a_size_in_the_bar_restyles_the_layer_without_opening_it_for_typing()
+    {
+        var layer = session.AddText(new SKPoint(100, 100), new TextStyle { Text = "Hello", Size = 73, FontFamily = session.TextDefaults.FontFamily });
+        window.SelectTool(Tool.Text); // Rebuilds the bar for the new layer.
+        Dispatcher.UIThread.RunJobs();
+        var size = window.GetVisualDescendants().OfType<NumericUpDown>().First(n => n.Value == 73);
+        var box = size.GetVisualDescendants().OfType<TextBox>().First();
+        box.Focus();
+        box.SelectAll();
+        window.KeyPressQwerty(PhysicalKey.Backspace, RawInputModifiers.None);
+        window.KeyTextInput("61");
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(session.IsEditingText);
+        Assert.Equal("Hello", layer.Text!.Text);
+        Assert.Equal(61, layer.Text.Size);
+        Assert.Same(box, window.FocusManager!.GetFocusedElement()); // The keyboard stays in the field.
+        Assert.Equal("Change Text Style", session.History.UndoName);
+        session.Undo();
+        Assert.Equal(73, session.Document.Find(layer.Id)!.Text!.Size);
     }
 
     [AvaloniaFact]

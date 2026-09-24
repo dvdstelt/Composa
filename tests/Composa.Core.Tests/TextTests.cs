@@ -219,6 +219,39 @@ public class TextSessionTests
     }
 
     [Fact]
+    public void The_bar_restyles_a_text_layer_in_place_and_a_run_of_changes_undoes_as_one()
+    {
+        var session = EditorSession.NewCanvas(400, 200, SKColors.White);
+        var layer = session.AddText(new SKPoint(20, 20), new TextStyle { Text = "Hello", FontFamily = Family, Size = 73 });
+        var before = session.History.Count;
+        // Typing 61 over 73 in the size box changes the size three times: 7, 6 and 61.
+        session.ChangeTextStyle(s => s with { Size = 7 });
+        Assert.False(session.IsEditingText);
+        Assert.Equal(7, layer.Text!.Size);
+        session.ChangeTextStyle(s => s with { Size = 6 });
+        session.ChangeTextStyle(s => s with { Size = 61 });
+        Assert.Equal(61, layer.Text.Size);
+        Assert.Equal(before + 1, session.History.Count);
+        Assert.Equal("Change Text Style", session.History.UndoName);
+        Assert.Equal(61, session.TextDefaults.Size); // The next text starts from the style last set.
+        // An unchanged value leaves no step, and another edit in between keeps the steps apart.
+        session.ChangeTextStyle(s => s with { Size = 61 });
+        Assert.Equal(before + 1, session.History.Count);
+        session.SelectRect(new SKRect(0, 0, 10, 10));
+        session.ChangeTextStyle(s => s with { Bold = true });
+        Assert.Equal(before + 3, session.History.Count);
+        session.Undo();
+        Assert.False(session.Document.Find(layer.Id)!.Text!.Bold);
+        session.Undo();
+        session.Undo();
+        Assert.Equal(73, session.Document.Find(layer.Id)!.Text!.Size);
+        Assert.Equal(before, session.History.Count);
+        // An undo breaks the run too: the next change is a new step.
+        session.ChangeTextStyle(s => s with { Size = 20 });
+        Assert.Equal(before + 1, session.History.Count);
+    }
+
+    [Fact]
     public void Paragraph_boxes_keep_their_size_and_wrap()
     {
         var session = EditorSession.NewCanvas(400, 300, SKColors.White);
