@@ -11,7 +11,11 @@ internal sealed class PsdWriter
 {
     public int Width = 100, Height = 80;
     public double Resolution = 72;
+    /// <summary>1 writes a PSD, 2 a PSB (Large Document) with its widened length fields.</summary>
     public ushort Version = 1, Depth = 8, Mode = 3, Channels = 3;
+    public bool LargeDocument => Version == 2;
+    /// <summary>The additional-info keys a PSB stores with 8-byte lengths even under an 8BIM signature.</summary>
+    public static readonly string[] LargeKeys = ["LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn", "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD"];
     /// <summary>The compression every channel uses unless a layer says otherwise: 0 raw, 1 PackBits, 2 zip, 3 zip with prediction.</summary>
     public int Compression = 1;
     /// <summary>Bottom to top, as the file lists them.</summary>
@@ -48,10 +52,10 @@ internal sealed class PsdWriter
             var channelData = new List<byte[]>();
             foreach (var layer in Layers)
             {
-                var channels = layer.ChannelData(layer.Compression ?? Compression);
+                var channels = layer.ChannelData(layer.Compression ?? Compression, LargeDocument);
                 layerInfo.I32(layer.Top); layerInfo.I32(layer.Left); layerInfo.I32(layer.Top + layer.Height); layerInfo.I32(layer.Left + layer.Width);
                 layerInfo.U16((ushort)channels.Count);
-                foreach (var (id, data) in channels) { layerInfo.I16(id); layerInfo.U32((uint)data.Length); channelData.Add(data); }
+                foreach (var (id, data) in channels) { layerInfo.I16(id); layerInfo.Length((uint)data.Length, LargeDocument); channelData.Add(data); }
                 layerInfo.Ascii("8BIM");
                 layerInfo.Ascii(layer.Blend.PadRight(4)[..4]);
                 layerInfo.U8(layer.Opacity);
@@ -78,7 +82,7 @@ internal sealed class PsdWriter
                 {
                     extra.Ascii("8BIM");
                     extra.Ascii(key);
-                    extra.U32((uint)data.Length);
+                    extra.Length((uint)data.Length, LargeDocument && LargeKeys.Contains(key));
                     extra.Bytes(data);
                     if (data.Length % 2 == 1) extra.U8(0);
                 }
@@ -87,8 +91,8 @@ internal sealed class PsdWriter
             foreach (var data in channelData) layerInfo.Bytes(data);
         }
         var section = new Buffer();
-        if (Layers.Count > 0) { section.Block(layerInfo); section.U32(0); }
-        file.Block(section);
+        if (Layers.Count > 0) { section.Block(layerInfo, LargeDocument); section.U32(0); }
+        file.Block(section, LargeDocument);
 
         // The merged image: one compression for all planes, R, G, B (and A with four channels).
         var planes = new List<byte[]>();
@@ -97,7 +101,7 @@ internal sealed class PsdWriter
         if (Compression == 1)
         {
             var rows = planes.Select(p => PackRows(p, Width, Height)).ToList();
-            foreach (var packed in rows) foreach (var row in packed) file.U16((ushort)row.Length);
+            foreach (var packed in rows) foreach (var row in packed) file.Length((uint)row.Length, LargeDocument, shortForm: true);
             foreach (var packed in rows) foreach (var row in packed) file.Bytes(row);
         }
         else foreach (var plane in planes) file.Bytes(plane);
@@ -339,8 +343,15 @@ internal sealed class PsdWriter
         public void Zeros(int count) { for (var i = 0; i < count; i++) stream.WriteByte(0); }
         /// <summary>A four-character key as a zero length, any other as its length.</summary>
         public void Key(string key) { if (key.Length == 4) U32(0); else U32((uint)key.Length); Ascii(key); }
-        /// <summary>A length-prefixed block.</summary>
-        public void Block(Buffer inner) { var bytes = inner.ToArray(); U32((uint)bytes.Length); Bytes(bytes); }
+        /// <summary>A length-prefixed block; the length takes 8 bytes in a PSB.</summary>
+        public void Block(Buffer inner, bool large = false) { var bytes = inner.ToArray(); Length((uint)bytes.Length, large); Bytes(bytes); }
+        /// <summary>A PSD length field that a PSB widens: 4 bytes to 8, or (<paramref name="shortForm"/>, a PackBits row count) 2 bytes to 4.</summary>
+        public void Length(uint value, bool large, bool shortForm = false)
+        {
+            if (shortForm) { if (large) U32(value); else U16((ushort)value); }
+            else if (large) { U32(0); U32(value); }
+            else U32(value);
+        }
         public byte[] ToArray() => stream.ToArray();
     }
 }
@@ -370,23 +381,23 @@ internal sealed class PsdWriterLayer
 
     public PsdWriterLayer With(string key, byte[] data) { Extra.Add((key, data)); return this; }
 
-    public List<(short Id, byte[] Data)> ChannelData(int compression)
+    public List<(short Id, byte[] Data)> ChannelData(int compression, bool largeDocument = false)
     {
         var channels = new List<(short, byte[])>();
         if (Image != null)
         {
-            if (IncludeAlpha) channels.Add((-1, Encode(PsdWriter.Plane(Image, -1), Image.Width, Image.Height, compression)));
-            for (short c = 0; c < 3; c++) channels.Add((c, Encode(PsdWriter.Plane(Image, c), Image.Width, Image.Height, compression)));
+            if (IncludeAlpha) channels.Add((-1, Encode(PsdWriter.Plane(Image, -1), Image.Width, Image.Height, compression, largeDocument)));
+            for (short c = 0; c < 3; c++) channels.Add((c, Encode(PsdWriter.Plane(Image, c), Image.Width, Image.Height, compression, largeDocument)));
         }
         else
         {
-            for (short c = 0; c < 3; c++) channels.Add((c, Encode([], 0, 0, compression)));
+            for (short c = 0; c < 3; c++) channels.Add((c, Encode([], 0, 0, compression, largeDocument)));
         }
-        if (Mask != null) channels.Add((-2, Encode(PsdWriter.Plane(Mask, -2), Mask.Width, Mask.Height, compression)));
+        if (Mask != null) channels.Add((-2, Encode(PsdWriter.Plane(Mask, -2), Mask.Width, Mask.Height, compression, largeDocument)));
         return channels;
     }
 
-    private static byte[] Encode(byte[] plane, int width, int height, int compression)
+    private static byte[] Encode(byte[] plane, int width, int height, int compression, bool largeDocument)
     {
         var buffer = new PsdWriter.Buffer();
         if (width == 0 || height == 0) { buffer.U16(0); return buffer.ToArray(); }
@@ -396,7 +407,7 @@ internal sealed class PsdWriterLayer
             case 0: buffer.Bytes(plane); break;
             case 1:
                 var rows = PsdWriter.PackRows(plane, width, height);
-                foreach (var row in rows) buffer.U16((ushort)row.Length);
+                foreach (var row in rows) buffer.Length((uint)row.Length, largeDocument, shortForm: true);
                 foreach (var row in rows) buffer.Bytes(row);
                 break;
             default: buffer.Bytes(PsdWriter.Zip(plane, width, height, compression == 3)); break;

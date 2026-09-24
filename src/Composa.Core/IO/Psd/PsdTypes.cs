@@ -21,6 +21,8 @@ internal sealed class PsdFile
     public int Width;
     public int Height;
     public double Resolution = 72;
+    /// <summary>A Large Document (<c>.psb</c>, header version 2).</summary>
+    public bool LargeDocument;
     public List<PsdLayer> Layers = [];
     /// <summary>The merged image, decoded only when the file has no layers of its own.</summary>
     public SKBitmap? Composite;

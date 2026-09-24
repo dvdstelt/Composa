@@ -272,7 +272,7 @@ public class PsdTests
     public void Unsupported_and_damaged_files_are_refused_with_a_reason()
     {
         byte[] Plain() { var w = new PsdWriter { Width = 10, Height = 10 }; w.Layers.Add(new PsdWriterLayer { Image = Solid(10, 10, SKColors.Red) }); return w.Build(); }
-        Assert.Contains("psb", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Version = 2 }.Build())).Message);
+        Assert.Contains("format version", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Version = 3 }.Build())).Message);
         Assert.Contains("8-bit RGB", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Mode = 4 }.Build())).Message);
         Assert.Contains("8-bit RGB", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Depth = 16 }.Build())).Message);
         Assert.Contains("larger", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Width = 40_000, Height = 10 }.Build())).Message);
@@ -283,13 +283,42 @@ public class PsdTests
         Assert.True(PsdImport.IsPsd(Plain()));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Large_document_files_read_through_their_widened_lengths(int compression)
+    {
+        // A PSB is a PSD with 8-byte section, layer-info and channel lengths, 4-byte PackBits row counts, and 8-byte
+        // lengths for a fixed set of additional-info keys; everything else is unchanged.
+        using var gradient = Gradient(37, 23);
+        using var hole = Pixels.NewMask(10, 10);
+        var writer = new PsdWriter { Version = 2, Width = 60, Height = 40, Compression = compression, Resolution = 144 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Background", Image = Solid(60, 40, SKColors.Red) });
+        writer.Layers.Add(new PsdWriterLayer { Name = "</Layer group>", EmptyWidth = 0 }.With("lsct", PsdWriter.Section(3)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Picture", Image = gradient, Left = 2, Top = 3, Mask = hole, MaskLeft = 12, MaskTop = 13 }
+            .With("Lr16", new byte[6]).With("luni", PsdWriter.Unicode("Large picture")));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Folder", Blend = "pass" }.With("lsct", PsdWriter.Section(1)));
+        var import = Load(writer);
+        Assert.Equal((60, 40, 144d), (import.Width, import.Height, import.Resolution));
+        Assert.Equal(["Background", "Folder"], import.Layers.Select(l => l.Name));
+        var picture = Assert.Single(import.Layers[1].Children);
+        Assert.Equal("Large picture", picture.Name);                        // The key after the 8-byte-length block still reads.
+        Assert.Equal(gradient.Bytes, picture.Pixels!.Bytes);
+        Assert.Equal((2d, 3d), (picture.Transform.X, picture.Transform.Y));
+        Assert.Equal(0, picture.Mask!.GetPixel(15, 15).Alpha);
+        Assert.Equal(255, picture.Mask.GetPixel(0, 0).Alpha);
+        Assert.Empty(import.Conversions);
+        Assert.Contains(".psb", Composa.IO.ImageFiles.ImportExtensions);
+    }
+
     [Fact]
     public void A_flattened_file_becomes_one_layer_from_the_merged_image()
     {
         using var gradient = Gradient(30, 20);
-        foreach (var compression in new[] { 0, 1 })
+        foreach (var (compression, version) in new[] { (0, 1), (1, 1), (0, 2), (1, 2) })
         {
-            var writer = new PsdWriter { Width = 30, Height = 20, Composite = gradient, Compression = compression };
+            var writer = new PsdWriter { Width = 30, Height = 20, Composite = gradient, Compression = compression, Version = (ushort)version };
             var import = Load(writer);
             var layer = Assert.Single(import.Layers);
             Assert.Equal("Background", layer.Name);

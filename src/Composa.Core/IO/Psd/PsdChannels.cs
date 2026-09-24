@@ -11,8 +11,11 @@ internal static class PsdChannels
 {
     public const int Raw = 0, Rle = 1, Zip = 2, ZipWithPrediction = 3;
 
-    /// <summary>One plane of <paramref name="width"/> × <paramref name="height"/> bytes from one channel's data.</summary>
-    public static byte[] Decode(int compression, int width, int height, ReadOnlySpan<byte> data)
+    /// <summary>
+    /// One plane of <paramref name="width"/> × <paramref name="height"/> bytes from one channel's data. A Large Document
+    /// (<paramref name="largeDocument"/>, PSB) stores each PackBits row's byte count in 4 bytes rather than 2.
+    /// </summary>
+    public static byte[] Decode(int compression, int width, int height, ReadOnlySpan<byte> data, bool largeDocument = false)
     {
         var expected = (long)width * height;
         if (expected == 0) return [];
@@ -25,7 +28,7 @@ internal static class PsdChannels
             {
                 var cursor = new PsdCursor(data);
                 var counts = new int[height];
-                for (var row = 0; row < height; row++) counts[row] = cursor.U16();
+                for (var row = 0; row < height; row++) counts[row] = RowCount(ref cursor, largeDocument);
                 var plane = new byte[expected];
                 UnpackRows(data[cursor.Offset..], counts, width, height, plane, 0);
                 return plane;
@@ -45,6 +48,15 @@ internal static class PsdChannels
             default:
                 throw new PsdException("This Photoshop file uses a layer compression method that isn't supported.");
         }
+    }
+
+    /// <summary>A PackBits row's byte count: 2 bytes in a PSD, 4 in a PSB.</summary>
+    public static int RowCount(ref PsdCursor cursor, bool largeDocument)
+    {
+        if (!largeDocument) return cursor.U16();
+        var count = cursor.U32();
+        if (count > int.MaxValue) throw PsdException.Truncated();
+        return (int)count;
     }
 
     /// <summary>PackBits rows into <paramref name="plane"/> from <paramref name="planeOffset"/>; returns the bytes consumed.</summary>

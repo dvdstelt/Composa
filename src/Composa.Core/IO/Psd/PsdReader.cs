@@ -3,10 +3,12 @@ using SkiaSharp;
 namespace Composa.IO.Psd;
 
 /// <summary>
-/// Reads Photoshop <c>.psd</c> files following Adobe's published Photoshop File Formats Specification (File Header,
-/// Color Mode Data, Image Resources, Layer and Mask Information, Image Data). This is an original implementation of
-/// the <c>8BPS</c> header, layer records, PackBits and the additional layer information blocks; nothing here is
-/// copied from or derived from GIMP, psd-tools or any other reader.
+/// Reads Photoshop <c>.psd</c> and <c>.psb</c> files following Adobe's published Photoshop File Formats Specification
+/// (File Header, Color Mode Data, Image Resources, Layer and Mask Information, Image Data). This is an original
+/// implementation of the <c>8BPS</c> header, layer records, PackBits and the additional layer information blocks;
+/// nothing here is copied from or derived from GIMP, psd-tools or any other reader. A Large Document (PSB, header
+/// version 2) is the same format with a handful of fields widened: the layer section and layer info lengths, each
+/// channel's data length and a fixed set of additional-info keys carry 8-byte lengths, and PackBits row counts take 4.
 /// </summary>
 internal static class PsdReader
 {
@@ -34,13 +36,25 @@ internal static class PsdReader
     /// <summary>The channel IDs that are unpacked: transparency, red, green, blue and the user mask. Spot and other planes are skipped.</summary>
     private static bool Wanted(short id) => id is -1 or 0 or 1 or 2 or -2;
 
+    /// <summary>The additional-info keys whose length is 8 bytes in a PSB even under an <c>8BIM</c> signature.</summary>
+    private static readonly HashSet<string> LargeKeys = ["LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn", "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD"];
+
+    /// <summary>A length field that is 4 bytes in a PSD and 8 in a PSB, refused when it would not fit an offset.</summary>
+    private static long Length(ref PsdCursor cursor, bool largeDocument)
+    {
+        var value = largeDocument ? cursor.U64() : cursor.U32();
+        if (value > int.MaxValue) throw PsdException.TooLarge();
+        return (long)value;
+    }
+
     public static PsdFile Read(ReadOnlySpan<byte> data, long pixelBudget = MaxPixels)
     {
         var cursor = new PsdCursor(data);
         if (!Matches(data)) throw new PsdException("This is not a Photoshop file.");
         cursor.Skip(4);
         var version = cursor.U16();
-        if (version != 1) throw new PsdException("Large Document (.psb) Photoshop files aren't supported.");
+        if (version is not (1 or 2)) throw new PsdException("This Photoshop file uses a format version Composa can't read.");
+        var largeDocument = version == 2;
         cursor.Skip(6);
         _ = cursor.U16(); // channels in the merged image; read again with the image data
         var height = cursor.I32();
@@ -49,7 +63,7 @@ internal static class PsdReader
         var mode = cursor.U16();
         if (width < 1 || height < 1 || width > MaxSide || height > MaxSide || (long)width * height > pixelBudget) throw PsdException.TooLarge();
         if (depth != 8 || mode != 3) throw new PsdException("Only 8-bit RGB Photoshop files can be imported.");
-        var file = new PsdFile { Width = width, Height = height };
+        var file = new PsdFile { Width = width, Height = height, LargeDocument = largeDocument };
 
         // Color mode data: only indexed and duotone files have any.
         cursor.Skip(cursor.U32());
@@ -79,19 +93,19 @@ internal static class PsdReader
         cursor.Seek(resourcesEnd);
 
         // Layer and mask information.
-        var sectionLength = cursor.U32();
+        var sectionLength = Length(ref cursor, largeDocument);
         var sectionEnd = cursor.Offset + sectionLength;
         if (sectionEnd > cursor.Length) throw PsdException.Truncated();
         var used = 0L;
-        if (sectionLength >= 6)
+        if (sectionLength >= (largeDocument ? 10 : 6))
         {
-            _ = cursor.U32(); // layer info length
+            _ = Length(ref cursor, largeDocument); // layer info length
             var count = Math.Abs((int)cursor.I16());
             if (count > MaxLayers) throw PsdException.TooLarge();
-            for (var i = 0; i < count; i++) file.Layers.Add(ReadRecord(ref cursor));
+            for (var i = 0; i < count; i++) file.Layers.Add(ReadRecord(ref cursor, largeDocument));
             foreach (var layer in file.Layers)
             {
-                DecodeChannels(ref cursor, layer, pixelBudget - used);
+                DecodeChannels(ref cursor, layer, pixelBudget - used, largeDocument);
                 if (layer.Image != null) used += (long)layer.Image.Width * layer.Image.Height;
                 if (layer.MaskImage != null) used += (long)layer.MaskImage.Width * layer.MaskImage.Height;
             }
@@ -102,12 +116,12 @@ internal static class PsdReader
         if (file.Layers.Count == 0 && cursor.Remaining >= 2)
         {
             if ((long)width * height > pixelBudget - used) throw PsdException.TooLarge();
-            file.Composite = ReadComposite(ref cursor, data, width, height);
+            file.Composite = ReadComposite(ref cursor, data, width, height, largeDocument);
         }
         return file;
     }
 
-    private static PsdLayer ReadRecord(ref PsdCursor cursor)
+    private static PsdLayer ReadRecord(ref PsdCursor cursor, bool largeDocument)
     {
         var layer = new PsdLayer { Top = cursor.I32(), Left = cursor.I32(), Bottom = cursor.I32(), Right = cursor.I32() };
         var channelCount = cursor.U16();
@@ -115,9 +129,7 @@ internal static class PsdReader
         for (var i = 0; i < channelCount; i++)
         {
             var id = cursor.I16();
-            var length = cursor.U32();
-            if (length > int.MaxValue) throw PsdException.TooLarge();
-            layer.Channels.Add((id, (int)length));
+            layer.Channels.Add((id, (int)Length(ref cursor, largeDocument)));
         }
         if (cursor.Ascii(4) != "8BIM") throw PsdException.Truncated();
         layer.BlendKey = cursor.Ascii(4);
@@ -156,8 +168,9 @@ internal static class PsdReader
             var signature = cursor.Ascii(4);
             if (signature != "8BIM" && signature != "8B64") break;
             var key = cursor.Ascii(4);
-            var length = cursor.U32();
-            if (length > int.MaxValue || cursor.Offset + length > extraEnd) throw PsdException.Truncated();
+            // An 8B64 block always has an 8-byte length; in a PSB a fixed set of keys has one under 8BIM too.
+            var length = Length(ref cursor, signature == "8B64" || (largeDocument && LargeKeys.Contains(key)));
+            if (cursor.Offset + length > extraEnd) throw PsdException.Truncated();
             layer.Extra[key] = cursor.Bytes(length).ToArray();
             if (length % 2 == 1 && cursor.Offset < extraEnd) cursor.Skip(1);
         }
@@ -176,7 +189,7 @@ internal static class PsdReader
         catch (PsdException) { return null; }
     }
 
-    private static void DecodeChannels(ref PsdCursor cursor, PsdLayer layer, long remainingPixels)
+    private static void DecodeChannels(ref PsdCursor cursor, PsdLayer layer, long remainingPixels, bool largeDocument)
     {
         int width = layer.Width, height = layer.Height, maskWidth = layer.MaskWidth, maskHeight = layer.MaskHeight;
         var budget = Math.Max(0, remainingPixels);
@@ -192,7 +205,7 @@ internal static class PsdReader
                 var payload = cursor.Bytes(length - 2);
                 var isMask = id == -2;
                 int w = isMask ? maskWidth : width, h = isMask ? maskHeight : height;
-                if (w > 0 && h > 0) planes[id] = PsdChannels.Decode(compression, w, h, payload);
+                if (w > 0 && h > 0) planes[id] = PsdChannels.Decode(compression, w, h, payload, largeDocument);
             }
             cursor.Seek(start + (long)Math.Max(0, length));
         }
@@ -205,7 +218,7 @@ internal static class PsdReader
     private static byte[]? Plane(Dictionary<short, byte[]> planes, short id) => planes.TryGetValue(id, out var plane) ? plane : null;
 
     /// <summary>The merged image at the end of the file: one compression method for all channels, planes in R, G, B, A order.</summary>
-    private static SKBitmap ReadComposite(ref PsdCursor cursor, ReadOnlySpan<byte> data, int width, int height)
+    private static SKBitmap ReadComposite(ref PsdCursor cursor, ReadOnlySpan<byte> data, int width, int height, bool largeDocument)
     {
         var channels = (int)new PsdCursor(data) { Offset = 12 }.U16();
         if (channels < 3) throw new PsdException("Only 8-bit RGB Photoshop files can be imported.");
@@ -221,7 +234,7 @@ internal static class PsdReader
             {
                 // Every row's byte count for every channel comes first, then the packed rows channel by channel.
                 var counts = new int[channels * height];
-                for (var i = 0; i < counts.Length; i++) counts[i] = cursor.U16();
+                for (var i = 0; i < counts.Length; i++) counts[i] = PsdChannels.RowCount(ref cursor, largeDocument);
                 var rest = data[cursor.Offset..];
                 var consumed = 0;
                 for (var c = 0; c < planes.Length; c++)

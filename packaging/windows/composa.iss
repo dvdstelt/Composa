@@ -89,6 +89,7 @@ Root: HKA; Subkey: "Software\Classes\Composa.Image\shell\open\command"; ValueTyp
 #emit OpenWith(".heif")
 #emit OpenWith(".avif")
 #emit OpenWith(".psd")
+#emit OpenWith(".psb")
 
 ; How Windows names the program in "Open with" and the default apps settings.
 Root: HKA; Subkey: "Software\Classes\Applications\{#AppExe}"; ValueType: string; ValueName: "FriendlyAppName"; ValueData: "{#AppName}"; Flags: uninsdeletekey
