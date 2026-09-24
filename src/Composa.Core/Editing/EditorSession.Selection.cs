@@ -13,6 +13,9 @@ public sealed partial class EditorSession
     {
         if (selection == null && document.Selection == null) return;
         Apply(name, () => document.Selection = selection);
+        // Working with the selection moves attention from the Layers panel to the canvas: Delete should now clear the
+        // selected pixels, not take away the effect that was highlighted before.
+        if (SelectedEffect != null) { SelectedEffect = null; LayersChanged?.Invoke(); }
         SelectionChanged?.Invoke();
     }
 
