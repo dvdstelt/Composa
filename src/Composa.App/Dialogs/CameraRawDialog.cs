@@ -18,7 +18,7 @@ namespace Composa.App.Dialogs;
 /// </summary>
 public static class CameraRawDialog
 {
-    private const double LabelWidth = 96, SliderWidth = 190;
+    private const double LabelWidth = 96, FieldWidth = 300;
 
     /// <param name="original">The layer's pixels before the filter, for the eyedropper and Auto.</param>
     /// <param name="graded">Reads the layer as currently previewed, for the histogram.</param>
@@ -91,29 +91,30 @@ public static class CameraRawDialog
             groups.Children.Add(expander);
             return expander;
         }
-        (Control Row, Action<double> Set) Slider(string label, double value, double min, double max, Func<CameraRawSettings, double, CameraRawSettings> set, double step = 1, string format = "0", string? tip = null)
+        Controls.SliderField Slider(string label, double value, double min, double max, Func<CameraRawSettings, double, CameraRawSettings> set, double step = 1, string format = "0", string? tip = null)
         {
-            var row = Ui.SliderRow(label, value, min, max, v => Update(set(current, v)), step, format, SliderWidth, LabelWidth);
-            if (tip != null) ToolTip.SetTip(row.Row, tip);
-            return row;
+            var field = Ui.SliderField(label, value, min, max, v => Update(set(current, v)), step, format, FieldWidth);
+            // The field's own tip explains its gestures; what the slider adjusts goes above that.
+            if (tip != null) ToolTip.SetTip(field, Ui.Column(6, Ui.Label(tip), (Control)ToolTip.GetTip(field)!));
+            return field;
         }
         Control Column(params Control[] rows) => Ui.Column(6, rows);
         Control Heading(string text) { var label = Ui.Label(text, Palette.Secondary); label.Margin = new Thickness(0, 4, 0, 0); return label; }
 
         // Light.
         Group(CameraRawGroup.Light, "Light", Column(
-            Slider("Exposure", initial.Exposure, -5, 5, (s, v) => s with { Exposure = v }, 0.05, "0.00", "Brightens or darkens the whole picture, in stops of light").Row,
-            Slider("Contrast", initial.Contrast, -100, 100, (s, v) => s with { Contrast = v }, tip: "Makes light and dark tones more or less different, mostly around the middle").Row,
-            Slider("Highlights", initial.Highlights, -100, 100, (s, v) => s with { Highlights = v }).Row,
-            Slider("Shadows", initial.Shadows, -100, 100, (s, v) => s with { Shadows = v }).Row,
-            Slider("Whites", initial.Whites, -100, 100, (s, v) => s with { Whites = v }, tip: "Sets the brightest point").Row,
-            Slider("Blacks", initial.Blacks, -100, 100, (s, v) => s with { Blacks = v }, tip: "Sets the darkest point").Row), open: true);
+            Slider("Exposure", initial.Exposure, -5, 5, (s, v) => s with { Exposure = v }, 0.05, "0.00", "Brightens or darkens the whole picture, in stops of light"),
+            Slider("Contrast", initial.Contrast, -100, 100, (s, v) => s with { Contrast = v }, tip: "Makes light and dark tones more or less different, mostly around the middle"),
+            Slider("Highlights", initial.Highlights, -100, 100, (s, v) => s with { Highlights = v }),
+            Slider("Shadows", initial.Shadows, -100, 100, (s, v) => s with { Shadows = v }),
+            Slider("Whites", initial.Whites, -100, 100, (s, v) => s with { Whites = v }, tip: "Sets the brightest point"),
+            Slider("Blacks", initial.Blacks, -100, 100, (s, v) => s with { Blacks = v }, tip: "Sets the darkest point")), open: true);
 
         // Color, with Auto white balance from the layer's average.
         var temperature = Slider("Temperature", initial.Temperature, -100, 100, (s, v) => s with { Temperature = v, WhiteBalance = CameraRawWhiteBalance.Custom }, tip: "Shifts the picture from blue to yellow");
         var tint = Slider("Tint", initial.Tint, -100, 100, (s, v) => s with { Tint = v, WhiteBalance = CameraRawWhiteBalance.Custom }, tip: "Shifts the picture from green to magenta");
-        setTemperature = temperature.Set;
-        setTint = tint.Set;
+        setTemperature = v => temperature.Value = v;
+        setTint = v => tint.Value = v;
         var balanceLabel = Ui.Label("White Balance");
         balanceLabel.Width = LabelWidth;
         balance = Ui.Combo(new[] { "Custom", "Auto" }, initial.WhiteBalance == CameraRawWhiteBalance.Auto ? "Auto" : "Custom", c => c, choice =>
@@ -122,14 +123,14 @@ public static class CameraRawDialog
             // Auto balances the average color of the original layer; the sliders show what it chose.
             var solved = CameraRawPixels.AutoBalance(original);
             Update(current with { WhiteBalance = CameraRawWhiteBalance.Auto, Temperature = Math.Clamp(solved?.Temperature ?? 0, -100, 100), Tint = Math.Clamp(solved?.Tint ?? 0, -100, 100) });
-            temperature.Set(current.Temperature);
-            tint.Set(current.Tint);
+            temperature.Value = current.Temperature;
+            tint.Value = current.Tint;
         }, 120);
         ToolTip.SetTip(balance, "Auto balances the average color; Custom follows Temperature and Tint. Click the thumbnail to set them from one pixel.");
         Group(CameraRawGroup.Color, "Color", Column(
-            Ui.Row(8, balanceLabel, balance), temperature.Row, tint.Row,
-            Slider("Vibrance", initial.Vibrance, -100, 100, (s, v) => s with { Vibrance = v }, tip: "Strengthens quiet colors more than strong ones, and protects skin tones").Row,
-            Slider("Saturation", initial.Saturation, -100, 100, (s, v) => s with { Saturation = v }).Row), open: true);
+            Ui.Row(8, balanceLabel, balance), temperature, tint,
+            Slider("Vibrance", initial.Vibrance, -100, 100, (s, v) => s with { Vibrance = v }, tip: "Strengthens quiet colors more than strong ones, and protects skin tones"),
+            Slider("Saturation", initial.Saturation, -100, 100, (s, v) => s with { Saturation = v })), open: true);
 
         // Effects.
         var glowStyles = Enum.GetValues<CameraRawGlowStyle>();
@@ -141,26 +142,26 @@ public static class CameraRawDialog
         };
         Control StyleRow(string label, Control combo) { var text = Ui.Label(label); text.Width = LabelWidth; return Ui.Row(8, text, combo); }
         Group(CameraRawGroup.Effects, "Effects", Column(
-            Slider("Texture", initial.Texture, -100, 100, (s, v) => s with { Texture = v }, tip: "Adds or softens small detail").Row,
-            Slider("Clarity", initial.Clarity, -100, 100, (s, v) => s with { Clarity = v }, tip: "Adds or softens contrast along broader shapes").Row,
-            Slider("Dehaze", initial.Dehaze, -100, 100, (s, v) => s with { Dehaze = v }, tip: "Clears haze when raised, adds it when lowered").Row,
+            Slider("Texture", initial.Texture, -100, 100, (s, v) => s with { Texture = v }, tip: "Adds or softens small detail"),
+            Slider("Clarity", initial.Clarity, -100, 100, (s, v) => s with { Clarity = v }, tip: "Adds or softens contrast along broader shapes"),
+            Slider("Dehaze", initial.Dehaze, -100, 100, (s, v) => s with { Dehaze = v }, tip: "Clears haze when raised, adds it when lowered"),
             Heading("Glow"),
-            Slider("Glow", initial.Glow, 0, 100, (s, v) => s with { Glow = v }, tip: "Spreads a glow from the bright areas").Row,
+            Slider("Glow", initial.Glow, 0, 100, (s, v) => s with { Glow = v }, tip: "Spreads a glow from the bright areas"),
             StyleRow("Style", Ui.Combo(glowStyles, initial.GlowStyle, v => StyleName(v), v => Update(current with { GlowStyle = v }), 140)),
-            Slider("Range", initial.GlowRange, -100, 100, (s, v) => s with { GlowRange = v }, tip: "How bright an area must be to glow; idle until Glow is raised").Row,
-            Slider("Spread", initial.GlowSpread, -100, 100, (s, v) => s with { GlowSpread = v }, tip: "How far the glow reaches; idle until Glow is raised").Row,
-            Slider("Warmth", initial.GlowWarmth, -100, 100, (s, v) => s with { GlowWarmth = v }, tip: "Cool to warm; Halation stays red").Row,
+            Slider("Range", initial.GlowRange, -100, 100, (s, v) => s with { GlowRange = v }, tip: "How bright an area must be to glow; idle until Glow is raised"),
+            Slider("Spread", initial.GlowSpread, -100, 100, (s, v) => s with { GlowSpread = v }, tip: "How far the glow reaches; idle until Glow is raised"),
+            Slider("Warmth", initial.GlowWarmth, -100, 100, (s, v) => s with { GlowWarmth = v }, tip: "Cool to warm; Halation stays red"),
             Heading("Vignette"),
-            Slider("Amount", initial.VignetteAmount, -100, 100, (s, v) => s with { VignetteAmount = v }, tip: "Darkens or lightens the edges; the center does not change").Row,
+            Slider("Amount", initial.VignetteAmount, -100, 100, (s, v) => s with { VignetteAmount = v }, tip: "Darkens or lightens the edges; the center does not change"),
             StyleRow("Style", Ui.Combo(vignetteStyles, initial.VignetteStyle, v => StyleName(v), v => Update(current with { VignetteStyle = v }), 140)),
-            Slider("Midpoint", initial.VignetteMidpoint, 0, 100, (s, v) => s with { VignetteMidpoint = v }).Row,
-            Slider("Roundness", initial.VignetteRoundness, -100, 100, (s, v) => s with { VignetteRoundness = v }).Row,
-            Slider("Feather", initial.VignetteFeather, 0, 100, (s, v) => s with { VignetteFeather = v }).Row,
-            Slider("Highlights", initial.VignetteHighlights, 0, 100, (s, v) => s with { VignetteHighlights = v }, tip: "Protects bright edges while the vignette darkens (Highlight Priority)").Row,
+            Slider("Midpoint", initial.VignetteMidpoint, 0, 100, (s, v) => s with { VignetteMidpoint = v }),
+            Slider("Roundness", initial.VignetteRoundness, -100, 100, (s, v) => s with { VignetteRoundness = v }),
+            Slider("Feather", initial.VignetteFeather, 0, 100, (s, v) => s with { VignetteFeather = v }),
+            Slider("Highlights", initial.VignetteHighlights, 0, 100, (s, v) => s with { VignetteHighlights = v }, tip: "Protects bright edges while the vignette darkens (Highlight Priority)"),
             Heading("Grain"),
-            Slider("Amount", initial.GrainAmount, 0, 100, (s, v) => s with { GrainAmount = v }).Row,
-            Slider("Size", initial.GrainSize, 0, 100, (s, v) => s with { GrainSize = v }).Row,
-            Slider("Roughness", initial.GrainRoughness, 0, 100, (s, v) => s with { GrainRoughness = v }).Row));
+            Slider("Amount", initial.GrainAmount, 0, 100, (s, v) => s with { GrainAmount = v }),
+            Slider("Size", initial.GrainSize, 0, 100, (s, v) => s with { GrainSize = v }),
+            Slider("Roughness", initial.GrainRoughness, 0, 100, (s, v) => s with { GrainRoughness = v })));
 
         // Curve: the parametric sliders and a point curve per channel.
         var curveEditor = new CurveEditor { Width = 240, Height = 240 };
@@ -183,11 +184,11 @@ public static class CameraRawDialog
         resetCurve.MinWidth = 0;
         Group(CameraRawGroup.Curve, "Curve", Column(
             Heading("Parametric"),
-            Slider("Highlights", initial.Curve.Highlights, -100, 100, (s, v) => s with { Curve = s.Curve with { Highlights = v } }).Row,
-            Slider("Lights", initial.Curve.Lights, -100, 100, (s, v) => s with { Curve = s.Curve with { Lights = v } }).Row,
-            Slider("Darks", initial.Curve.Darks, -100, 100, (s, v) => s with { Curve = s.Curve with { Darks = v } }).Row,
-            Slider("Shadows", initial.Curve.Shadows, -100, 100, (s, v) => s with { Curve = s.Curve with { Shadows = v } }).Row,
-            Slider("Refine Saturation", initial.Curve.RefineSaturation, -100, 100, (s, v) => s with { Curve = s.Curve with { RefineSaturation = v } }, tip: "How much the curve also changes saturation").Row,
+            Slider("Highlights", initial.Curve.Highlights, -100, 100, (s, v) => s with { Curve = s.Curve with { Highlights = v } }),
+            Slider("Lights", initial.Curve.Lights, -100, 100, (s, v) => s with { Curve = s.Curve with { Lights = v } }),
+            Slider("Darks", initial.Curve.Darks, -100, 100, (s, v) => s with { Curve = s.Curve with { Darks = v } }),
+            Slider("Shadows", initial.Curve.Shadows, -100, 100, (s, v) => s with { Curve = s.Curve with { Shadows = v } }),
+            Slider("Refine Saturation", initial.Curve.RefineSaturation, -100, 100, (s, v) => s with { Curve = s.Curve with { RefineSaturation = v } }, tip: "How much the curve also changes saturation"),
             Heading("Point"),
             Ui.Row(8, Ui.Label("Channel", Palette.Secondary), channelPicker, resetCurve),
             curveEditor));
@@ -202,7 +203,7 @@ public static class CameraRawDialog
             for (var family = 0; family < 8; family++)
             {
                 var (t, f) = (mixerTab, family);
-                mixerRows.Children.Add(Slider(CameraRawMixer.Names[family], current.Mixer.Get(t, f), -100, 100, (s, v) => s with { Mixer = s.Mixer.With(t, f, v) }).Row);
+                mixerRows.Children.Add(Slider(CameraRawMixer.Names[family], current.Mixer.Get(t, f), -100, 100, (s, v) => s with { Mixer = s.Mixer.With(t, f, v) }));
             }
         }
         BuildMixer();
@@ -217,50 +218,50 @@ public static class CameraRawDialog
             var index = i;
             var wheel = initial.Grading.Wheels[i];
             wheelRows.Add(Heading(CameraRawGrading.Names[i]));
-            wheelRows.Add(Slider("Hue", wheel.Hue, 0, 360, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Hue = v }) }, tip: "Around the color wheel").Row);
-            wheelRows.Add(Slider("Saturation", wheel.Saturation, 0, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Saturation = v }) }, tip: "How strongly the tint takes; 0 leaves this wheel off").Row);
-            wheelRows.Add(Slider("Luminance", wheel.Luminance, -100, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Luminance = v }) }).Row);
+            wheelRows.Add(Slider("Hue", wheel.Hue, 0, 360, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Hue = v }) }, tip: "Around the color wheel"));
+            wheelRows.Add(Slider("Saturation", wheel.Saturation, 0, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Saturation = v }) }, tip: "How strongly the tint takes; 0 leaves this wheel off"));
+            wheelRows.Add(Slider("Luminance", wheel.Luminance, -100, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Luminance = v }) }));
         }
         wheelRows.Add(Heading("Overlap"));
-        wheelRows.Add(Slider("Blending", initial.Grading.Blending, 0, 100, (s, v) => s with { Grading = s.Grading with { Blending = v } }, tip: "How much the three tonal wheels overlap").Row);
-        wheelRows.Add(Slider("Balance", initial.Grading.Balance, -100, 100, (s, v) => s with { Grading = s.Grading with { Balance = v } }, tip: "Negative favors the shadows, positive the highlights").Row);
+        wheelRows.Add(Slider("Blending", initial.Grading.Blending, 0, 100, (s, v) => s with { Grading = s.Grading with { Blending = v } }, tip: "How much the three tonal wheels overlap"));
+        wheelRows.Add(Slider("Balance", initial.Grading.Balance, -100, 100, (s, v) => s with { Grading = s.Grading with { Balance = v } }, tip: "Negative favors the shadows, positive the highlights"));
         Group(CameraRawGroup.Grading, "Color Grading", Column(wheelRows.ToArray()));
 
         // Detail.
         var d = initial.Detail;
         Group(CameraRawGroup.Detail, "Detail", Column(
             Heading("Sharpening"),
-            Slider("Amount", d.SharpenAmount, 0, 150, (s, v) => s with { Detail = s.Detail with { SharpenAmount = v } }).Row,
-            Slider("Radius", d.SharpenRadius, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenRadius = v } }).Row,
-            Slider("Detail", d.SharpenDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenDetail = v } }).Row,
-            Slider("Masking", d.SharpenMasking, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenMasking = v } }, tip: "Keeps sharpening to the edges").Row,
+            Slider("Amount", d.SharpenAmount, 0, 150, (s, v) => s with { Detail = s.Detail with { SharpenAmount = v } }),
+            Slider("Radius", d.SharpenRadius, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenRadius = v } }),
+            Slider("Detail", d.SharpenDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenDetail = v } }),
+            Slider("Masking", d.SharpenMasking, 0, 100, (s, v) => s with { Detail = s.Detail with { SharpenMasking = v } }, tip: "Keeps sharpening to the edges"),
             Heading("Noise Reduction"),
-            Slider("Luminance", d.NoiseLuminance, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminance = v } }).Row,
-            Slider("Detail", d.NoiseLuminanceDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminanceDetail = v } }).Row,
-            Slider("Contrast", d.NoiseLuminanceContrast, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminanceContrast = v } }).Row,
-            Slider("Color", d.NoiseColor, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColor = v } }).Row,
-            Slider("Detail", d.NoiseColorDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColorDetail = v } }).Row,
-            Slider("Smoothness", d.NoiseColorSmoothness, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColorSmoothness = v } }).Row));
+            Slider("Luminance", d.NoiseLuminance, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminance = v } }),
+            Slider("Detail", d.NoiseLuminanceDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminanceDetail = v } }),
+            Slider("Contrast", d.NoiseLuminanceContrast, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseLuminanceContrast = v } }),
+            Slider("Color", d.NoiseColor, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColor = v } }),
+            Slider("Detail", d.NoiseColorDetail, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColorDetail = v } }),
+            Slider("Smoothness", d.NoiseColorSmoothness, 0, 100, (s, v) => s with { Detail = s.Detail with { NoiseColorSmoothness = v } })));
 
         // Optics.
         var o = initial.Optics;
         Group(CameraRawGroup.Optics, "Optics", Column(
             Ui.Check("Remove Chromatic Aberration", o.RemoveChromaticAberration, v => Update(current with { Optics = current.Optics with { RemoveChromaticAberration = v } })),
             Ui.Check("Enable Lens Profile Corrections", o.EnableLensProfile, v => Update(current with { Optics = current.Optics with { EnableLensProfile = v } })),
-            Slider("Distortion", o.ProfileDistortion, 0, 100, (s, v) => s with { Optics = s.Optics with { ProfileDistortion = v } }, tip: "Profile strength; a rendered layer carries no lens data, so this scales a generic correction").Row,
-            Slider("Vignetting", o.ProfileVignetting, 0, 100, (s, v) => s with { Optics = s.Optics with { ProfileVignetting = v } }).Row,
+            Slider("Distortion", o.ProfileDistortion, 0, 100, (s, v) => s with { Optics = s.Optics with { ProfileDistortion = v } }, tip: "Profile strength; a rendered layer carries no lens data, so this scales a generic correction"),
+            Slider("Vignetting", o.ProfileVignetting, 0, 100, (s, v) => s with { Optics = s.Optics with { ProfileVignetting = v } }),
             Heading("Manual"),
-            Slider("Distortion", o.Distortion, -100, 100, (s, v) => s with { Optics = s.Optics with { Distortion = v } }, tip: "Positive straightens lines that bow outward, negative lines that bow inward").Row,
+            Slider("Distortion", o.Distortion, -100, 100, (s, v) => s with { Optics = s.Optics with { Distortion = v } }, tip: "Positive straightens lines that bow outward, negative lines that bow inward"),
             Heading("Defringe"),
-            Slider("Purple Amount", o.PurpleAmount, 0, 100, (s, v) => s with { Optics = s.Optics with { PurpleAmount = v } }).Row,
-            Slider("Purple Hue Low", o.PurpleHueLow, 0, 360, (s, v) => s with { Optics = s.Optics with { PurpleHueLow = v } }).Row,
-            Slider("Purple Hue High", o.PurpleHueHigh, 0, 360, (s, v) => s with { Optics = s.Optics with { PurpleHueHigh = v } }).Row,
-            Slider("Green Amount", o.GreenAmount, 0, 100, (s, v) => s with { Optics = s.Optics with { GreenAmount = v } }).Row,
-            Slider("Green Hue Low", o.GreenHueLow, 0, 360, (s, v) => s with { Optics = s.Optics with { GreenHueLow = v } }).Row,
-            Slider("Green Hue High", o.GreenHueHigh, 0, 360, (s, v) => s with { Optics = s.Optics with { GreenHueHigh = v } }).Row,
+            Slider("Purple Amount", o.PurpleAmount, 0, 100, (s, v) => s with { Optics = s.Optics with { PurpleAmount = v } }),
+            Slider("Purple Hue Low", o.PurpleHueLow, 0, 360, (s, v) => s with { Optics = s.Optics with { PurpleHueLow = v } }),
+            Slider("Purple Hue High", o.PurpleHueHigh, 0, 360, (s, v) => s with { Optics = s.Optics with { PurpleHueHigh = v } }),
+            Slider("Green Amount", o.GreenAmount, 0, 100, (s, v) => s with { Optics = s.Optics with { GreenAmount = v } }),
+            Slider("Green Hue Low", o.GreenHueLow, 0, 360, (s, v) => s with { Optics = s.Optics with { GreenHueLow = v } }),
+            Slider("Green Hue High", o.GreenHueHigh, 0, 360, (s, v) => s with { Optics = s.Optics with { GreenHueHigh = v } }),
             Heading("Vignette"),
-            Slider("Amount", o.VignetteAmount, -100, 100, (s, v) => s with { Optics = s.Optics with { VignetteAmount = v } }, tip: "Brightens the corners to counter lens falloff").Row,
-            Slider("Midpoint", o.VignetteMidpoint, 0, 100, (s, v) => s with { Optics = s.Optics with { VignetteMidpoint = v } }).Row));
+            Slider("Amount", o.VignetteAmount, -100, 100, (s, v) => s with { Optics = s.Optics with { VignetteAmount = v } }, tip: "Brightens the corners to counter lens falloff"),
+            Slider("Midpoint", o.VignetteMidpoint, 0, 100, (s, v) => s with { Optics = s.Optics with { VignetteMidpoint = v } })));
 
         // Calibration.
         var c = initial.Calibration;
@@ -269,16 +270,16 @@ public static class CameraRawDialog
         Group(CameraRawGroup.Calibration, "Calibration", Column(
             StyleRow("Process", Ui.Combo(processes, c.Process, p => $"Version {p}", p => { Update(current with { Calibration = current.Calibration with { Process = p } }); processSummary.Text = CameraRawCalibration.ProcessSummary(p); }, 130)),
             processSummary,
-            Slider("Shadow Tint", c.ShadowTint, -100, 100, (s, v) => s with { Calibration = s.Calibration with { ShadowTint = v } }, tip: "Green to magenta in the shadows").Row,
+            Slider("Shadow Tint", c.ShadowTint, -100, 100, (s, v) => s with { Calibration = s.Calibration with { ShadowTint = v } }, tip: "Green to magenta in the shadows"),
             Heading("Red Primary"),
-            Slider("Hue", c.RedHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { RedHue = v } }).Row,
-            Slider("Saturation", c.RedSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { RedSaturation = v } }).Row,
+            Slider("Hue", c.RedHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { RedHue = v } }),
+            Slider("Saturation", c.RedSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { RedSaturation = v } }),
             Heading("Green Primary"),
-            Slider("Hue", c.GreenHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { GreenHue = v } }).Row,
-            Slider("Saturation", c.GreenSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { GreenSaturation = v } }).Row,
+            Slider("Hue", c.GreenHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { GreenHue = v } }),
+            Slider("Saturation", c.GreenSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { GreenSaturation = v } }),
             Heading("Blue Primary"),
-            Slider("Hue", c.BlueHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { BlueHue = v } }).Row,
-            Slider("Saturation", c.BlueSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { BlueSaturation = v } }).Row));
+            Slider("Hue", c.BlueHue, -100, 100, (s, v) => s with { Calibration = s.Calibration with { BlueHue = v } }),
+            Slider("Saturation", c.BlueSaturation, -100, 100, (s, v) => s with { Calibration = s.Calibration with { BlueSaturation = v } })));
 
         var scroll = new ScrollViewer { Content = groups, MaxHeight = 520, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, Padding = new Thickness(0, 0, 8, 0) };
         var head = Ui.Column(6, histogram, Ui.Row(0, preview), readout);

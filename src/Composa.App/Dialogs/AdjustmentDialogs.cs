@@ -70,10 +70,13 @@ public static class AdjustmentDialogs
         var other => other
     };
 
+    /// <summary>One width for every field in these dialogs, so their right edges line up whatever the labels are.</summary>
+    private const double FieldWidth = 330;
+
     private static Control Sliders(params (string Label, double Value, double Min, double Max, double Step, string Format, Action<double> Changed)[] rows)
     {
         var panel = new StackPanel { Spacing = 8 };
-        foreach (var r in rows) panel.Children.Add(Ui.SliderRow(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, 240, 80).Row);
+        foreach (var r in rows) panel.Children.Add(Ui.SliderField(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, FieldWidth));
         return panel;
     }
 
@@ -81,7 +84,7 @@ public static class AdjustmentDialogs
 
     private static Control NoiseEditor(AddNoiseAdjustment noise, Action<Adjustment> update)
     {
-        var amount = Ui.SliderRow("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", 240, 80).Row;
+        var amount = Ui.SliderField("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", FieldWidth);
         var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => d, d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
         var mono = Ui.Check("Monochromatic", noise.Monochromatic, v => update(noise = noise with { Monochromatic = v }));
         return Ui.Column(10, amount, Ui.Row(10, Ui.Label("Distribution", Palette.Secondary), distribution), mono);
@@ -97,11 +100,11 @@ public static class AdjustmentDialogs
             rows.Children.Clear();
             var range = levels.Ranges[channel];
             void Set(LevelsRange next) { range = next; update(levels = levels.WithRange(channel, next)); }
-            rows.Children.Add(Ui.SliderRow("Input black", range.InputBlack, 0, 253, v => Set(range with { InputBlack = Math.Min(v, range.InputWhite - 2) }), 1, "0", 220, 100).Row);
-            rows.Children.Add(Ui.SliderRow("Midtones", range.Gamma, 0.1, 5, v => Set(range with { Gamma = v }), 0.01, "0.00", 220, 100).Row);
-            rows.Children.Add(Ui.SliderRow("Input white", range.InputWhite, 2, 255, v => Set(range with { InputWhite = Math.Max(v, range.InputBlack + 2) }), 1, "0", 220, 100).Row);
-            rows.Children.Add(Ui.SliderRow("Output black", range.OutputBlack, 0, 255, v => Set(range with { OutputBlack = v }), 1, "0", 220, 100).Row);
-            rows.Children.Add(Ui.SliderRow("Output white", range.OutputWhite, 0, 255, v => Set(range with { OutputWhite = v }), 1, "0", 220, 100).Row);
+            rows.Children.Add(Ui.SliderField("Input black", range.InputBlack, 0, 253, v => Set(range with { InputBlack = Math.Min(v, range.InputWhite - 2) }), 1, "0", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Midtones", range.Gamma, 0.1, 5, v => Set(range with { Gamma = v }), 0.01, "0.00", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Input white", range.InputWhite, 2, 255, v => Set(range with { InputWhite = Math.Max(v, range.InputBlack + 2) }), 1, "0", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Output black", range.OutputBlack, 0, 255, v => Set(range with { OutputBlack = v }), 1, "0", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Output white", range.OutputWhite, 0, 255, v => Set(range with { OutputWhite = v }), 1, "0", FieldWidth));
         }
         var picker = Ui.Combo(Channels, "RGB", c => c, c => { channel = Array.IndexOf(Channels, c); graph.Channel = channel == 0 ? 3 : channel - 1; Build(); });
         var auto = Ui.TextButton("Auto", () =>
@@ -135,9 +138,9 @@ public static class AdjustmentDialogs
             var shift = hue.Shifts[(int)range];
             void Set(HslShift next) { shift = next; update(hue = hue.WithShift(range, next)); }
             var colorizing = hue.Colorize && range == HueRange.Master;
-            rows.Children.Add(Ui.SliderRow("Hue", shift.Hue, colorizing ? 0 : -180, colorizing ? 360 : 180, v => Set(shift with { Hue = v }), 1, "0", 240, 80).Row);
-            rows.Children.Add(Ui.SliderRow("Saturation", shift.Saturation, -100, 100, v => Set(shift with { Saturation = v }), 1, "0", 240, 80).Row);
-            rows.Children.Add(Ui.SliderRow("Lightness", shift.Lightness, -100, 100, v => Set(shift with { Lightness = v }), 1, "0", 240, 80).Row);
+            rows.Children.Add(Ui.SliderField("Hue", shift.Hue, colorizing ? 0 : -180, colorizing ? 360 : 180, v => Set(shift with { Hue = v }), 1, "0", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Saturation", shift.Saturation, -100, 100, v => Set(shift with { Saturation = v }), 1, "0", FieldWidth));
+            rows.Children.Add(Ui.SliderField("Lightness", shift.Lightness, -100, 100, v => Set(shift with { Lightness = v }), 1, "0", FieldWidth));
         }
         var picker = Ui.Combo(Enum.GetValues<HueRange>(), HueRange.Master, r => r.ToString(), r => { range = r; Build(); });
         var colorize = Ui.Check("Colorize", hue.Colorize, v =>
@@ -160,18 +163,18 @@ public static class AdjustmentDialogs
         for (var i = 0; i < ColorFamilies.Length; i++)
         {
             var index = i;
-            weights.Children.Add(Ui.SliderRow(ColorFamilies[i], bw.Weights[i], BlackAndWhiteAdjustment.MinWeight, BlackAndWhiteAdjustment.MaxWeight,
-                v => update(bw = bw.WithWeight(index, v)), 1, "0", 240, 80).Row);
+            weights.Children.Add(Ui.SliderField(ColorFamilies[i], bw.Weights[i], BlackAndWhiteAdjustment.MinWeight, BlackAndWhiteAdjustment.MaxWeight,
+                v => update(bw = bw.WithWeight(index, v)), 1, "0", FieldWidth));
         }
         var tintRows = new StackPanel { Spacing = 8, IsVisible = bw.Tint, Margin = new Thickness(0, 4, 0, 0) };
-        tintRows.Children.Add(Ui.SliderRow("Hue", bw.TintHue, 0, 360, v => update(bw = bw with { TintHue = v }), 1, "0", 240, 80).Row);
-        tintRows.Children.Add(Ui.SliderRow("Saturation", bw.TintSaturation, 0, 100, v => update(bw = bw with { TintSaturation = v }), 1, "0", 240, 80).Row);
+        tintRows.Children.Add(Ui.SliderField("Hue", bw.TintHue, 0, 360, v => update(bw = bw with { TintHue = v }), 1, "0", FieldWidth));
+        tintRows.Children.Add(Ui.SliderField("Saturation", bw.TintSaturation, 0, 100, v => update(bw = bw with { TintSaturation = v }), 1, "0", FieldWidth));
         var tint = Ui.Check("Tint", bw.Tint, v => { tintRows.IsVisible = v; update(bw = bw with { Tint = v }); });
         ToolTip.SetTip(tint, "Color the result while keeping its tones, for a sepia or a cyanotype");
         var reset = Ui.TextButton("Reset", () =>
         {
             update(bw = new BlackAndWhiteAdjustment { Tint = bw.Tint, TintHue = bw.TintHue, TintSaturation = bw.TintSaturation });
-            for (var i = 0; i < ColorFamilies.Length; i++) ((Slider)((StackPanel)weights.Children[i]).Children[1]).Value = bw.Weights[i];
+            for (var i = 0; i < ColorFamilies.Length; i++) ((Controls.SliderField)weights.Children[i]).Value = bw.Weights[i];
         });
         return Ui.Column(10, weights, Ui.Row(12, tint, reset), tintRows);
     }
@@ -189,8 +192,8 @@ public static class AdjustmentDialogs
             for (var channel = 0; channel < 3; channel++)
             {
                 var (r, c) = (range, channel);
-                panel.Children.Add(Ui.SliderRow(BalancePairs[channel], balance.Shift(range, channel), ColorBalanceAdjustment.MinShift, ColorBalanceAdjustment.MaxShift,
-                    v => update(balance = balance.WithShift(r, c, v)), 1, "0", 220, 110).Row);
+                panel.Children.Add(Ui.SliderField(BalancePairs[channel], balance.Shift(range, channel), ColorBalanceAdjustment.MinShift, ColorBalanceAdjustment.MaxShift,
+                    v => update(balance = balance.WithShift(r, c, v)), 1, "0", FieldWidth));
             }
         }
         var preserve = Ui.Check("Preserve Luminosity", balance.PreserveLuminosity, v => update(balance = balance with { PreserveLuminosity = v }));
@@ -247,7 +250,7 @@ public static class AdjustmentDialogs
         void Update(FilterSettings value) { current = value; timer.Stop(); timer.Start(); }
         var panel = new StackPanel { Spacing = 8 };
         void Slider(string label, double value, double min, double max, Func<double, FilterSettings> apply, double step = 1, string format = "0") =>
-            panel.Children.Add(Ui.SliderRow(label, value, min, max, v => Update(apply(v)), step, format, 240, 90).Row);
+            panel.Children.Add(Ui.SliderField(label, value, min, max, v => Update(apply(v)), step, format, FieldWidth));
         switch (initial.Kind)
         {
             case FilterKind.GaussianBlur:

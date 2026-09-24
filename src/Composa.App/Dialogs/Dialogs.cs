@@ -226,7 +226,7 @@ public static class CanvasDialogs
         }
 
         timer.Tick += (_, _) => Refresh();
-        var (row, _) = Ui.SliderRow("Quality", initial, 1, 100, v => { quality = (int)v; timer.Stop(); timer.Start(); }, sliderWidth: 320);
+        var row = Ui.SliderField("Quality", initial, 1, 100, v => { quality = (int)v; timer.Stop(); timer.Start(); }, width: 380);
         var frame = new Border { Child = preview, Background = new SolidColorBrush(Color.Parse("#1A1A1A")), Padding = new Thickness(1) };
         var dialog = new DialogWindow("Export JPEG", Ui.Column(12, frame, row, info), "Export…");
         dialog.Opened += (_, _) => Refresh();

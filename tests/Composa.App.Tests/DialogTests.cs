@@ -4,6 +4,7 @@ using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
+using Composa.App.Controls;
 using Composa.App.Dialogs;
 using Composa.Editing;
 using Composa.Filters;
@@ -76,7 +77,7 @@ public class DialogTests
         for (var i = 0; i < 50 && dialog.GetVisualDescendants().OfType<Image>().First().Source == null; i++) { Thread.Sleep(20); Dispatcher.UIThread.RunJobs(); }
         var image = dialog.GetVisualDescendants().OfType<Image>().First();
         Assert.NotNull(image.Source);
-        var exposure = dialog.GetVisualDescendants().OfType<Slider>().First();
+        var exposure = dialog.GetVisualDescendants().OfType<SliderField>().First();
         exposure.Value = 1.5;
         Dispatcher.UIThread.RunJobs();
         Capture(window, "29-raw-develop");

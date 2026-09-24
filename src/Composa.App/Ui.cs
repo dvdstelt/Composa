@@ -72,24 +72,6 @@ public static class Ui
         return box;
     }
 
-    /// <summary>A labelled slider with a numeric readout. Returns the row and a setter that updates it silently.</summary>
-    public static (Control Row, Action<double> Set) SliderRow(string label, double value, double min, double max, Action<double> changed,
-        double step = 1, string format = "0", double sliderWidth = 140, double labelWidth = double.NaN)
-    {
-        var silent = false;
-        var slider = new Slider { Minimum = min, Maximum = max, Value = value, Width = sliderWidth, SmallChange = step, LargeChange = step * 10, VerticalAlignment = VerticalAlignment.Center };
-        var readout = new TextBlock { Text = value.ToString(format), Width = 38, TextAlignment = TextAlignment.Right, Foreground = Palette.Secondary };
-        slider.ValueChanged += (_, e) =>
-        {
-            var v = Math.Round(e.NewValue / step) * step;
-            readout.Text = v.ToString(format);
-            if (!silent) changed(v);
-        };
-        var title = Label(label);
-        if (!double.IsNaN(labelWidth)) title.Width = labelWidth;
-        return (Row(8, title, slider, readout), v => { silent = true; slider.Value = v; silent = false; });
-    }
-
     /// <summary>A Krita-style field whose fill is the slider: drag to change, Alt-drag for fine steps, double-click to type. See <see cref="Controls.SliderField"/>.</summary>
     public static Controls.SliderField SliderField(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0", double width = 120)
     {
