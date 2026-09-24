@@ -125,6 +125,22 @@ public class LayerEffectsTests
     }
 
     [Fact]
+    public void Changing_the_selection_drops_the_highlighted_effect()
+    {
+        var (session, layer) = RedBoxOnWhite();
+        session.AddEffect(layer, LayerEffectKind.Stroke);
+        Assert.NotNull(session.SelectedEffect);
+        var layersChanged = 0;
+        session.LayersChanged += () => layersChanged++;
+        session.SelectRect(new SKRect(0, 0, 10, 10));
+        Assert.Null(session.SelectedEffect);
+        Assert.Equal(1, layersChanged);
+        // Delete now has no effect to take: it is left to clear the selected pixels.
+        Assert.False(session.RemoveSelectedEffect());
+        Assert.NotNull(layer.Effects!.Stroke);
+    }
+
+    [Fact]
     public void Disabled_effects_keep_their_settings_and_deleting_the_selected_one_removes_it()
     {
         var (session, layer) = RedBoxOnWhite();
