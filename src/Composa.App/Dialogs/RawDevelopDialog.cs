@@ -51,19 +51,19 @@ public static class RawDevelopDialog
         timer.Tick += (_, _) => { timer.Stop(); Render(); };
         void Update(RawDevelopSettings next) { settings = next; timer.Stop(); timer.Start(); }
 
-        var exposure = Ui.SliderRow("Exposure (EV)", settings.Exposure, -3, 3, v => Update(settings with { Exposure = v }), 0.05, "+0.00;-0.00;0.00", 300, 90);
-        var temperature = Ui.SliderRow("Temperature", settings.Temperature, -100, 100, v => Update(settings with { Temperature = v }), 1, "0", 300, 90);
-        var tint = Ui.SliderRow("Tint", settings.Tint, -100, 100, v => Update(settings with { Tint = v }), 1, "0", 300, 90);
+        var exposure = Ui.SliderField("Exposure (EV)", settings.Exposure, -3, 3, v => Update(settings with { Exposure = v }), 0.05, "+0.00;-0.00;0.00", 400);
+        var temperature = Ui.SliderField("Temperature", settings.Temperature, -100, 100, v => Update(settings with { Temperature = v }), 1, "0", 400);
+        var tint = Ui.SliderField("Tint", settings.Tint, -100, 100, v => Update(settings with { Tint = v }), 1, "0", 400);
         var reset = Ui.TextButton("Reset", () =>
         {
             Update(new RawDevelopSettings());
-            exposure.Set(0); temperature.Set(0); tint.Set(0);
+            exposure.Value = 0; temperature.Value = 0; tint.Value = 0;
         });
         var note = Ui.Label("Cooler to warmer, and green to magenta, away from the camera's own white balance.", Palette.Secondary);
         note.TextWrapping = TextWrapping.Wrap;
         note.MaxWidth = PreviewWidth;
 
-        var body = Ui.Column(12, frame, info, exposure.Row, temperature.Row, tint.Row, Ui.Row(12, reset, note));
+        var body = Ui.Column(12, frame, info, exposure, temperature, tint, Ui.Row(12, reset, note));
         var dialog = new DialogWindow($"Develop {fileName}", body, "Import");
         dialog.Opened += (_, _) => Render();
         var accepted = await dialog.Ask(owner);

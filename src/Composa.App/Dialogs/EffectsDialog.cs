@@ -20,8 +20,17 @@ public static class EffectsDialog
         if (!effects.Contains(kind)) return false;
         void Set(LayerEffects next) { effects = next; session.SetEffects(layer, next); }
         var rows = new StackPanel { Spacing = 10 };
+        const double fieldWidth = 330;
         Control Slider(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0") =>
-            Ui.SliderRow(label, value, min, max, changed, step, format, 220, 70).Row;
+            Ui.SliderField(label, value, min, max, changed, step, format, fieldWidth);
+        // Photoshop's dial for the light's direction, with the field beside it for an exact number; each follows the other.
+        Control Angle(double value, Action<double> changed)
+        {
+            var dial = new Controls.AngleDial(value);
+            var field = Ui.SliderField("Angle", dial.Value, -180, 180, v => { dial.Value = v; changed(v); }, 1, "0", fieldWidth - Controls.AngleDial.DefaultSize - 10);
+            dial.Changed += v => { field.Value = v; changed(v); };
+            return Ui.Row(10, dial, field);
+        }
         Control Swatch()
         {
             var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
@@ -54,7 +63,7 @@ public static class EffectsDialog
                 void SetShadow(Func<ShadowEffect, ShadowEffect> change) => Set(inner ? effects with { InnerShadow = change(effects.InnerShadow!) } : effects with { Shadow = change(effects.Shadow!) });
                 rows.Children.Add(Swatch());
                 rows.Children.Add(Slider("Opacity", shadow.Opacity * 100, 0, 100, v => SetShadow(s => s with { Opacity = v / 100 })));
-                rows.Children.Add(Slider("Angle", shadow.Angle, -180, 180, v => SetShadow(s => s with { Angle = v })));
+                rows.Children.Add(Angle(shadow.Angle, v => SetShadow(s => s with { Angle = v })));
                 rows.Children.Add(Slider("Distance", shadow.Distance, 0, inner ? 100 : 250, v => SetShadow(s => s with { Distance = v })));
                 rows.Children.Add(Slider("Blur", shadow.Blur, 0, 250, v => SetShadow(s => s with { Blur = v })));
                 break;

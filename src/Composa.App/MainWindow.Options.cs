@@ -16,7 +16,7 @@ public sealed partial class MainWindow
         refreshOptions = null;
         if (session == null) { optionsHost.Child = null; return; }
         var s = session;
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 14, VerticalAlignment = VerticalAlignment.Center, Classes = { "options" } };
         void Add(params Control[] controls) => row.Children.AddRange(controls);
         Control Title(string text) => Ui.Label(text, weight: Avalonia.Media.FontWeight.SemiBold);
 
@@ -32,30 +32,30 @@ public sealed partial class MainWindow
                     Add(Ui.Combo(new[] { "Paint", "Erase" }, s.EraserMode ? "Erase" : "Paint", v => v, v => { s.EraserMode = v == "Erase"; SelectTool(Tool.Brush); }, 90));
                 if (s.Tool == Tool.Smear)
                     Add(Ui.Combo(Enum.GetValues<SmearMode>(), s.SmearMode, v => v.ToString(), v => { s.SmearMode = v; UpdateStatus(); }, 100));
-                var size = Ui.SliderRow("Size", s.Brush.Size, 1, 500, v => s.Brush = s.Brush with { Size = v }, 1, "0", 130);
-                var hardness = Ui.SliderRow("Hardness", s.Brush.Hardness * 100, 0, 100, v => s.Brush = s.Brush with { Hardness = v / 100 }, 1, "0", 90);
-                Add(size.Row, hardness.Row);
+                var size = Ui.SliderField("Size", s.Brush.Size, 1, 500, v => s.Brush = s.Brush with { Size = v });
+                var hardness = Ui.SliderField("Hardness", s.Brush.Hardness * 100, 0, 100, v => s.Brush = s.Brush with { Hardness = v / 100 });
+                Add(size, hardness);
                 Action<double>? setOpacity = null;
                 if (s.Tool != Tool.SpotHealing)
                 {
-                    var opacity = Ui.SliderRow(s.Tool == Tool.Smear ? "Strength" : "Opacity", s.Brush.Opacity * 100, 1, 100, v => s.Brush = s.Brush with { Opacity = v / 100 }, 1, "0", 90);
-                    setOpacity = opacity.Set;
-                    Add(opacity.Row);
+                    var opacity = Ui.SliderField(s.Tool == Tool.Smear ? "Strength" : "Opacity", s.Brush.Opacity * 100, 1, 100, v => s.Brush = s.Brush with { Opacity = v / 100 });
+                    setOpacity = v => opacity.Value = v;
+                    Add(opacity);
                 }
                 Action<double>? setSmoothing = null;
                 if (s.Tool == Tool.Brush)
                 {
                     // Healing, cloning and smearing keep their own feel; only Paint and Erase trail the pointer.
-                    var smoothing = Ui.SliderRow("Smoothing", s.Brush.Smoothing, 0, 100, v => s.Brush = s.Brush with { Smoothing = v }, 1, "0", 90);
-                    setSmoothing = smoothing.Set;
-                    Add(smoothing.Row);
+                    var smoothing = Ui.SliderField("Smoothing", s.Brush.Smoothing, 0, 100, v => s.Brush = s.Brush with { Smoothing = v });
+                    setSmoothing = v => smoothing.Value = v;
+                    Add(smoothing);
                 }
                 if (s.Tool == Tool.CloneStamp)
                     Add(Ui.Check("Aligned", s.CloneAligned, v => s.CloneAligned = v), Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
                 refreshOptions = () =>
                 {
-                    size.Set(Math.Min(500, s.Brush.Size));
-                    hardness.Set(s.Brush.Hardness * 100);
+                    size.Value = Math.Min(500, s.Brush.Size);
+                    hardness.Value = s.Brush.Hardness * 100;
                     setOpacity?.Invoke(s.Brush.Opacity * 100);
                     setSmoothing?.Invoke(s.Brush.Smoothing);
                 };
@@ -70,7 +70,7 @@ public sealed partial class MainWindow
                     ToolTip.SetTip(mode, "Wand selects similar colors; Object traces the object under the click. Tab switches.");
                     Add(mode);
                     if (s.WandMode == WandMode.Wand)
-                        Add(Ui.SliderRow("Tolerance", s.WandTolerance, 0, 255, v => s.WandTolerance = (int)v, 1, "0", 120).Row, Ui.Check("Contiguous", s.WandContiguous, v => s.WandContiguous = v));
+                        Add(Ui.SliderField("Tolerance", s.WandTolerance, 0, 255, v => s.WandTolerance = (int)v, width: 130), Ui.Check("Contiguous", s.WandContiguous, v => s.WandContiguous = v));
                     else
                     {
                         var edge = Ui.Number(s.ObjectEdgeOffset, -10, 10, v => s.ObjectEdgeOffset = (int)v, 1, "0", 52);
@@ -79,7 +79,7 @@ public sealed partial class MainWindow
                     }
                     Add(Ui.Check("Sample all layers", s.SampleAllLayers, v => s.SampleAllLayers = v));
                 }
-                else Add(Ui.SliderRow("Feather", s.Feather, 0, 100, v => s.Feather = v, 1, "0", 100).Row);
+                else Add(Ui.SliderField("Feather", s.Feather, 0, 100, v => s.Feather = v));
                 Add(Ui.Separator());
                 // Modify buttons with their amounts, as in the macOS tool bar; both need a selection.
                 Control Modify(string title, Func<int> get, Action<int> set, int max, Action apply)
@@ -100,14 +100,14 @@ public sealed partial class MainWindow
                 Add(Title("Gradient"),
                     Ui.Combo(new[] { "Linear", "Radial" }, s.GradientRadial ? "Radial" : "Linear", v => v, v => s.GradientRadial = v == "Radial", 90),
                     Ui.Check("Foreground to transparent", s.GradientToTransparent, v => { s.GradientToTransparent = v; UpdateStatus(); }));
-                var gradientOpacity = Ui.SliderRow("Opacity", s.GradientOpacity * 100, 1, 100, v => s.GradientOpacity = v / 100, 1, "0", 100);
-                Add(gradientOpacity.Row);
-                refreshOptions = () => gradientOpacity.Set(s.GradientOpacity * 100);
+                var gradientOpacity = Ui.SliderField("Opacity", s.GradientOpacity * 100, 1, 100, v => s.GradientOpacity = v / 100);
+                Add(gradientOpacity);
+                refreshOptions = () => gradientOpacity.Value = s.GradientOpacity * 100;
                 break;
             case Tool.Shape:
                 Add(Title("Shape"), Ui.Combo(Enum.GetValues<ShapeKind>(), s.ShapeKind, ShapeStyle.DisplayName, v => { s.ShapeKind = v; SelectTool(Tool.Shape); }, 160));
-                if (s.ShapeKind == ShapeKind.Line) Add(Ui.SliderRow("Width", s.ShapeLineWidth, 1, 100, v => s.ShapeLineWidth = v, 1, "0", 120).Row);
-                else if (s.ShapeKind == ShapeKind.RoundedRectangle) Add(Ui.SliderRow("Corner radius", s.ShapeCornerRadius, 0, 400, v => s.ShapeCornerRadius = v, 1, "0", 120).Row);
+                if (s.ShapeKind == ShapeKind.Line) Add(Ui.SliderField("Width", s.ShapeLineWidth, 1, 100, v => s.ShapeLineWidth = v));
+                else if (s.ShapeKind == ShapeKind.RoundedRectangle) Add(Ui.SliderField("Corner radius", s.ShapeCornerRadius, 0, 400, v => s.ShapeCornerRadius = v, width: 150));
                 Add(Ui.Label(s.ShapeKind == ShapeKind.Line ? "Draws in the foreground color · Shift snaps to 45°" : "Fills with the foreground color", Palette.Secondary));
                 break;
             case Tool.Text:
