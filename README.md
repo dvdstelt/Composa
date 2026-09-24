@@ -79,7 +79,7 @@ Composa is developed on Linux, on X11 and Wayland (through XWayland), and that i
 
 ## Differences from the macOS app
 
-- Projects are saved as `.cmps` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
+- Projects are saved as `.cmps` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects saved by the macOS app (`.comp` packages) cannot be opened.
 - Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which exists only on Apple's platforms, so busy backgrounds defeat these here.
 - HEIC, AVIF, TIFF, SVG and camera RAW open through ImageMagick, because Skia does not decode them itself. The Windows build includes it; on Linux they open when ImageMagick (`magick` or `convert`) is installed. SVG files are drawn by ImageMagick's librsvg rather than by macOS's own renderer, so an SVG that leans on features librsvg lacks may look different.
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
@@ -210,7 +210,7 @@ dotnet run --project src/Composa.App -- photo.jpg project.cmps
 dotnet test
 ```
 
-- `tests/Composa.Core.Tests` drives the editor through `EditorSession`: compositing, selections, every brush mode, healing, filters, canvas operations, project files, the macOS importer, regressions found in review, and a fuzz test that runs thousands of random edits, undos and redos while checking the document stays consistent.
+- `tests/Composa.Core.Tests` drives the editor through `EditorSession`: compositing, selections, every brush mode, healing, filters, canvas operations, project files, regressions found in review, and a fuzz test that runs thousands of random edits, undos and redos while checking the document stays consistent.
 - `tests/Composa.App.Tests` runs the real window with Avalonia's headless platform and Skia rendering. Every tool, the layers panel, typing on the canvas, guides and the dialogs are driven with pointer, key and text events, and screenshots of the window and each dialog are written to `artifacts/screenshots/`, which is the way to review UI changes without a display.
 
 ## Shortcuts

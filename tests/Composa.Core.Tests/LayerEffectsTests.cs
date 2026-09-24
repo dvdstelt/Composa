@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Composa.Editing;
 using Composa.IO;
 using Composa.Model;
@@ -192,50 +191,6 @@ public class LayerEffectsTests
         using var expected = DocumentRenderer.Flatten(session.Document);
         using var actual = DocumentRenderer.Flatten(loaded);
         Assert.Equal(expected.Bytes, actual.Bytes);
-    }
-
-    [Fact]
-    public void Mac_projects_bring_their_effects_along()
-    {
-        var folder = Path.Combine(Path.GetTempPath(), "composa-effects-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path.Combine(folder, "images"));
-        try
-        {
-            var id = Guid.NewGuid();
-            File.WriteAllBytes(Path.Combine(folder, "images", id + ".png"), ImageFiles.Encode(Solid(10, 10, SKColors.Red), ExportFormat.Png));
-            var manifest = new
-            {
-                format = "com.compositor.project", version = 8, colorSpace = "sRGB", documentID = Guid.NewGuid(), width = 50, height = 50,
-                layers = new object[]
-                {
-                    new
-                    {
-                        id, name = "Box", isVisible = true, transform = new { origin = new[] { 10.0, 10.0 }, size = new[] { 10.0, 10.0 }, rotation = 0.0 },
-                        imageFile = id + ".png", opacity = 1.0, blendMode = "Normal",
-                        effects = new
-                        {
-                            stroke = new { size = 3.0, red = 0.0, green = 1.0, blue = 0.0, opacity = 1.0, inside = false },
-                            shadow = new { enabled = false, angle = 120.0, distance = 8.0, blur = 4.0, red = 0.0, green = 0.0, blue = 0.0, opacity = 0.5 },
-                            innerShadow = new { angle = 90.0, distance = 3.0, blur = 2.0, red = 1.0, green = 0.0, blue = 0.0, opacity = 0.6 },
-                            outerGlow = new { size = 14.0, red = 1.0, green = 1.0, blue = 0.0, opacity = 0.9 },
-                            innerGlow = new { size = 6.0, red = 0.0, green = 1.0, blue = 1.0, opacity = 0.4 }
-                        }
-                    }
-                }
-            };
-            File.WriteAllText(Path.Combine(folder, "manifest.json"), JsonSerializer.Serialize(manifest));
-            var document = MacProject.Load(folder);
-            var effects = Assert.Single(document.Layers).Effects!;
-            Assert.Equal(3, effects.Stroke!.Size);
-            Assert.Equal(0xFF00FF00u, effects.Stroke.Color);
-            Assert.False(effects.Shadow!.Enabled);
-            Assert.Equal(120, effects.Shadow.Angle);
-            Assert.Equal(0.6, effects.InnerShadow!.Opacity, 3);
-            Assert.Null(effects.ColorOverlay);
-            Assert.Equal((14d, 0xFFFFFF00u, 0.9), (effects.OuterGlow!.Size, effects.OuterGlow.Color, effects.OuterGlow.Opacity));
-            Assert.Equal((6d, 0xFF00FFFFu, 0.4), (effects.InnerGlow!.Size, effects.InnerGlow.Color, effects.InnerGlow.Opacity));
-        }
-        finally { Directory.Delete(folder, recursive: true); }
     }
 
     [Fact]

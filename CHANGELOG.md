@@ -11,6 +11,10 @@ Catches up with Compositor 1.2.11.
 - Drag a number's label to change its value, as in Photoshop: the transform bar's X, Y, W, H and angle, the text size, tracking and leading, the object selection's edge offset, and the width, height and resolution in the New Canvas, Canvas Size and Image Size dialogs. Dragging moves in whole numbers, Alt makes it ten times finer, and typing still takes decimals.
 - A layer mask can be painted anywhere on the canvas, past the layer's own pixels, with the brush, a gradient or a fill. The mask grows with its layer; new area starts as the mask's background, so a hide-all mask stays black and a reveal-all mask stays white.
 
+### Removed
+
+- The importer for projects saved by the macOS app (`.comp` folders), and the File menu item that opened them. Composa's own `.cmps` project files are unaffected.
+
 ## [1.1.0] - 2026-09-25
 
 Catches up with Compositor 1.2.7 to 1.2.10 and reworks every slider.
