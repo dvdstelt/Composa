@@ -558,3 +558,39 @@ public class RotateCanvasTests
         Assert.Equal(0, session.Document.Layers[1].Transform.Rotation);
     }
 }
+
+public class SelectionOutlineTests
+{
+    /// <summary>A Magic Wand selection on detailed artwork: here a checkerboard of 2-pixel squares, one edge per pixel step.</summary>
+    private static SKBitmap Checkerboard(int size)
+    {
+        var mask = Pixels.NewMask(size, size);
+        var span = mask.GetPixelSpan();
+        for (var y = 0; y < size; y++)
+            for (var x = 0; x < size; x++)
+                if (((x / 2) + (y / 2)) % 2 == 0) span[y * mask.RowBytes + x] = 255;
+        Pixels.Invalidate(mask);
+        return mask;
+    }
+
+    [Fact]
+    public void A_reduced_outline_has_far_fewer_edges_covers_the_same_area_and_keeps_thin_parts()
+    {
+        using var mask = Checkerboard(512);
+        using var full = SelectionMask.Outline(mask);
+        Assert.True(full.PointCount > 20_000, $"{full.PointCount} points");
+        using var reduced = SelectionMask.ReducedOutline(mask, 8);
+        Assert.True(reduced.PointCount < full.PointCount / 100, $"{reduced.PointCount} points");
+        Assert.Equal(new SKRect(0, 0, 512, 512), reduced.Bounds);         // Any coverage in a block selects it, so the whole board is outlined.
+
+        // A one-pixel line is still there at a quarter of the resolution, eight document pixels wide.
+        using var line = Pixels.NewMask(400, 300);
+        var span = line.GetPixelSpan();
+        for (var x = 100; x < 300; x++) span[150 * line.RowBytes + x] = 255;
+        Pixels.Invalidate(line);
+        using var thin = SelectionMask.ReducedOutline(line, 4);
+        Assert.Equal(new SKRect(100, 148, 300, 152), thin.Bounds);
+        using var same = SelectionMask.ReducedOutline(line, 1);
+        Assert.Equal(new SKRect(100, 150, 300, 151), same.Bounds);      // A block of one is the exact outline.
+    }
+}

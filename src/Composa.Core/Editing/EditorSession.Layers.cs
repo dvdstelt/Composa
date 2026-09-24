@@ -338,7 +338,7 @@ public sealed partial class EditorSession
             area = Geometry.Intersect(area, new SKRectI(-Document.MaxSide, -Document.MaxSide, 2 * Document.MaxSide, 2 * Document.MaxSide));
             // Layers that sprawl far beyond the canvas would need a bitmap the size of a wall; the merge then keeps
             // only what lies within the canvas.
-            if ((long)area.Width * area.Height > IO.ImageFiles.MaxPixels) area = document.Bounds;
+            if ((long)area.Width * area.Height > DocumentLimits.MaxSurfacePixels) area = document.Bounds;
 
             // The merged layer keeps the bottom layer's blend mode and opacity, so those are left out of the render.
             var single = roots.Count == 1;

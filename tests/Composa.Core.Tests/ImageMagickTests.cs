@@ -48,6 +48,54 @@ public class ImageMagickTests
         finally { Directory.Delete(folder, recursive: true); }
     }
 
+    /// <summary>An SVG is drawn at the size it declares, or larger by the scale asked for, over a transparent background.</summary>
+    [Fact]
+    public void The_tool_rasterizes_an_svg_at_its_declared_size_and_scaled()
+    {
+        if (ImageMagickTool.Find() is not { } tool) return;
+        var path = Path.Combine(Path.GetTempPath(), "composa-" + Guid.NewGuid().ToString("N") + ".svg");
+        File.WriteAllText(path, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"50\"><circle cx=\"50\" cy=\"25\" r=\"20\" fill=\"#ff0000\"/></svg>");
+        try
+        {
+            using var declared = SKBitmap.Decode(tool.Rasterize(path, 1));
+            Assert.Equal((100, 50), (declared.Width, declared.Height));
+            Assert.Equal(0, declared.GetPixel(2, 2).Alpha);
+            TestImages.AssertColor(SKColors.Red, declared.GetPixel(50, 25));
+            using var doubled = SKBitmap.Decode(tool.Rasterize(path, 2.5));
+            Assert.Equal((250, 125), (doubled.Width, doubled.Height));
+            TestImages.AssertColor(SKColors.Red, doubled.GetPixel(125, 62));
+        }
+        finally { File.Delete(path); }
+    }
+
+    [Fact]
+    public void An_svg_is_fitted_to_the_canvas_as_it_is_drawn_or_kept_at_its_declared_size()
+    {
+        Assert.True(SvgImporter.IsSvg("icon.SVG"));
+        Assert.False(SvgImporter.IsSvg("icon.png"));
+        Assert.Contains(".svg", ImageFiles.ImportExtensions);
+        var path = Path.Combine(Path.GetTempPath(), "composa-" + Guid.NewGuid().ToString("N") + ".svg");
+        File.WriteAllText(path, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"50\"><circle cx=\"50\" cy=\"25\" r=\"20\" fill=\"#ff0000\"/></svg>");
+        try
+        {
+            if (!ImageMagick.IsAvailable)
+            {
+                Assert.Contains("ImageMagick", Assert.Throws<InvalidDataException>(() => SvgImporter.Render(path)).Message);
+                return;
+            }
+            using var declared = SvgImporter.Render(path);
+            Assert.Equal((100, 50), (declared.Width, declared.Height));
+            using var fitted = SvgImporter.Render(path, new SKSizeI(400, 400));
+            Assert.Equal((400, 200), (fitted.Width, fitted.Height));       // Sharp at the fitted size, not enlarged from 100 x 50.
+            TestImages.AssertColor(SKColors.Red, fitted.GetPixel(200, 100));
+            Assert.Equal(0, fitted.GetPixel(4, 4).Alpha);
+            using var shrunk = SvgImporter.Render(path, new SKSizeI(20, 40));
+            Assert.Equal((20, 10), (shrunk.Width, shrunk.Height));
+            Assert.Contains("room", Assert.Throws<InvalidDataException>(() => SvgImporter.Render(path, null, remainingPixels: 100)).Message);
+        }
+        finally { File.Delete(path); }
+    }
+
     /// <summary>A file ImageMagick cannot read says so in the exception the callers already handle, rather than in an empty result.</summary>
     [Fact]
     public void A_file_the_tool_cannot_read_is_invalid_data()

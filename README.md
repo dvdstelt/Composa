@@ -67,9 +67,9 @@ Composa is developed on Linux, on X11 and Wayland (through XWayland), and that i
 - Zoom In and Zoom Out step through fixed stops, so ten steps in and ten out land back where they started
 - Canvas Size, Image Size, and quarter-turn rotation of the canvas or of single layers
 - Smooth downsampling when zoomed out, crisp pixels and a pixel grid when zoomed in
-- Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF and TIFF through ImageMagick when it is installed); drop files onto the window; paste images from other apps
+- Open PNG, JPEG, WebP, BMP and GIF (and HEIC, AVIF, TIFF and SVG through ImageMagick when it is installed); drop files onto the window; paste images from other apps. An SVG placed into a document is drawn to fit the canvas, so a small icon comes in sharp
 - Open camera RAW files (Canon, Nikon, Sony, Fujifilm, DNG and more) through ImageMagick when it is installed: a develop step with exposure, temperature and tint and a live preview comes first, working on a 16-bit decode, so you choose what to keep before the image becomes an 8-bit layer
-- Open Photoshop files: layers, folders, masks, clipping, opacity, blend modes, solid fill shapes and adjustments come in editable, and a report lists everything that has to be converted before anything is applied; dropped onto an open document, a Photoshop file arrives inside a folder
+- Open Photoshop files, `.psd` and Large Document `.psb`: layers, folders, masks, clipping, opacity, blend modes, solid fill shapes, adjustments and simple horizontal text come in editable, and a report lists everything that has to be converted before anything is applied; dropped onto an open document, a Photoshop file arrives inside a folder
 - Export PNG, JPEG (with a live preview of the compression and the file size) and WebP; Copy Merged
 - Undo history limited by memory, not by a fixed step count
 - Tool settings stick between launches: Auto Select, the transform controls, the pixel grid, rulers, guides, the grid, Snap and the Snap To options keep what you last set them to
@@ -79,13 +79,13 @@ Composa is developed on Linux, on X11 and Wayland (through XWayland), and that i
 
 - Projects are saved as `.cmps` files: a zip archive with a JSON manifest and one PNG per layer and mask. Projects from the macOS app (`.comp` packages, which are plain folders on Linux) can be opened with File > Open macOS Project Folder or by dropping the folder on the window; they are not written back in that format. Per-range hue bands, separately placed masks and Liquify strokes have no equivalent here and are simplified on import.
 - Remove Background, Select > Subject and the Magic tool's Object mode work from the plain backdrop connected to the image's edges: the subject is everything else, and an object is the connected piece of it under the click. The macOS app uses Apple's Vision subject detection, which exists only on Apple's platforms, so busy backgrounds defeat these here.
-- HEIC, AVIF, TIFF and camera RAW open through ImageMagick, because Skia does not decode them itself. The Windows build includes it; on Linux they open when ImageMagick (`magick` or `convert`) is installed.
+- HEIC, AVIF, TIFF, SVG and camera RAW open through ImageMagick, because Skia does not decode them itself. The Windows build includes it; on Linux they open when ImageMagick (`magick` or `convert`) is installed. SVG files are drawn by ImageMagick's librsvg rather than by macOS's own renderer, so an SVG that leans on features librsvg lacks may look different.
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
 - Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries whole layers across when nothing is selected, and pixels when something is; layers pasted into another project arrive centered on its canvas.
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
 - Point text grows from the edge its alignment reads from (right-aligned text grows leftward); the macOS app keeps the top-left corner.
 - Layer effects are drawn on the CPU from a cached image; while a brush stroke is in progress they follow the pixels the stroke started from and catch up when it ends.
-- Photoshop files are opened, never written. Text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure, Black & White, Color Balance and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` files open (no PSB, CMYK or 16-bit).
+- Photoshop files are opened, never written. Horizontal text with one style stays editable; vertical, sheared or unevenly scaled text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure, Black & White, Color Balance and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` and `.psb` files open (no CMYK or 16-bit).
 - Camera RAW files open only through ImageMagick's LibRaw delegate. The develop step applies exposure and white balance to the 16-bit decoded frame rather than to the sensor data, as Apple's RAW pipeline does on macOS, so its temperature and tint are relative to the camera's reading and there is no tone Boost control.
 - The Camera Raw Filter has no Geometry group (Upright and guided lines), no vectorscope, no Option-drag clipping views, no point colors and no sharpening-mask overlay; its white-balance eyedropper works on the thumbnail in the panel rather than on the canvas, because the panel is a dialog. The filter renders on the full layer while you drag, so a very large layer answers more slowly than the macOS preview does.
 - Layer masks always move with their layer, so the layer menu has no Link Mask item.
@@ -162,7 +162,7 @@ Builds installed from the `.deb` or `.rpm` never check on their own, because apt
 
 ### ImageMagick
 
-HEIC, AVIF, TIFF and camera RAW files open through ImageMagick.
+HEIC, AVIF, TIFF, SVG and camera RAW files open through ImageMagick.
 
 On Windows it is included: the download carries [Magick.NET](https://github.com/dlemstra/Magick.NET), so nothing has to be installed separately. Its licences, including those of the LGPL libraries it contains for RAW and HEIC, are in `THIRD-PARTY-NOTICES.txt` and `ImageMagick-NOTICE.txt` next to `composa.exe`.
 
@@ -171,7 +171,7 @@ On Linux the packages recommend rather than require it, because every distributi
 ## Requirements
 
 - Windows 10 or 11, x64 or arm64. Nothing else: .NET and ImageMagick are bundled.
-- Linux, x86-64 or arm64, with Fontconfig and the usual X11 libraries, present on any desktop distribution. .NET is bundled; ImageMagick is optional, to open HEIC, AVIF, TIFF and camera RAW.
+- Linux, x86-64 or arm64, with Fontconfig and the usual X11 libraries, present on any desktop distribution. .NET is bundled; ImageMagick is optional, to open HEIC, AVIF, TIFF, SVG and camera RAW.
 - macOS is not built yet.
 - To build from source: the .NET 10 SDK, plus `rpmbuild` if you want the `.rpm` and [Inno Setup 6](https://jrsoftware.org/isinfo.php) if you want the Windows installer.
 

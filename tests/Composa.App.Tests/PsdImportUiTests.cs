@@ -80,6 +80,43 @@ public class PsdImportUiTests
         finally { File.Delete(path); }
     }
 
+    /// <summary>Opened, an SVG becomes a document at the size it declares; placed, it is drawn to fit the canvas.</summary>
+    [AvaloniaFact]
+    public async Task An_svg_opens_at_its_declared_size_and_is_placed_fitted_to_the_canvas()
+    {
+        if (!Composa.IO.ImageMagick.IsAvailable) return; // SVG goes through ImageMagick, like HEIC and TIFF.
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var path = Path.Combine(Path.GetTempPath(), "composa-" + Guid.NewGuid().ToString("N") + ".svg");
+        File.WriteAllText(path, "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"100\" height=\"50\"><circle cx=\"50\" cy=\"25\" r=\"20\" fill=\"#ff0000\"/></svg>");
+        try
+        {
+            var opening = window.OpenPaths([path]);
+            await Pump(() => opening.IsCompleted);
+            var session = window.Session!;
+            Assert.Equal((100, 50), (session.Document.Width, session.Document.Height));
+            Assert.Equal(Path.GetFileNameWithoutExtension(path), Assert.Single(session.Document.Layers).Name);
+
+            var placing = window.PlacePaths([path], null);
+            await Pump(() => placing.IsCompleted);
+            var placed = session.ActiveLayer!;
+            Assert.Equal(2, session.Document.Layers.Count);
+            Assert.Equal((100d, 50d), (placed.Transform.Width, placed.Transform.Height));
+            Assert.Equal((100, 50), (placed.Pixels!.Width, placed.Pixels.Height));
+            Assert.Equal("Add Image", session.History.UndoName);
+
+            // On a larger canvas the placed copy is drawn at the fitted size, not enlarged from 100 x 50 pixels.
+            var large = Composa.Editing.EditorSession.NewCanvas(800, 600, SKColors.White);
+            window.AddSession(large);
+            placing = window.PlacePaths([path], new SKPoint(400, 300));
+            await Pump(() => placing.IsCompleted);
+            var fitted = large.ActiveLayer!;
+            Assert.Equal((800, 400), (fitted.Pixels!.Width, fitted.Pixels.Height));
+            Assert.Equal((0d, 100d, 800d, 400d), (fitted.Transform.X, fitted.Transform.Y, fitted.Transform.Width, fitted.Transform.Height));
+        }
+        finally { File.Delete(path); }
+    }
+
     private static void Capture(Window window, string name)
     {
         Dispatcher.UIThread.RunJobs();

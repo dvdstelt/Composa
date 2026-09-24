@@ -1,4 +1,7 @@
 using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
+using Avalonia.VisualTree;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
@@ -129,6 +132,85 @@ public class TextEditingTests
         Assert.False(session.IsEditingText);
         Assert.Single(session.Document.Layers);
         Assert.False(session.CanUndo);
+    }
+
+    private static async Task Pump(Func<bool> until)
+    {
+        for (var i = 0; i < 400 && !until(); i++) { await Task.Delay(10); Dispatcher.UIThread.RunJobs(); }
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private void PressSwatch(string tip)
+    {
+        var swatch = window.GetVisualDescendants().OfType<Border>().First(b => ToolTip.GetTip(b) as string == tip);
+        var center = swatch.TranslatePoint(new Point(swatch.Bounds.Width / 2, swatch.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(center, MouseButton.Left);
+        window.MouseUp(center, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>The picker's working color shows on the text as it changes, from the Type bar's swatch and from the foreground swatch alike; Cancel puts the text's own color back.</summary>
+    [AvaloniaFact]
+    public async Task Text_being_typed_previews_the_color_picker_and_cancel_restores_it()
+    {
+        Click(80, 120);
+        window.KeyTextInput("Color");
+        Dispatcher.UIThread.RunJobs();
+        var layer = session.TextEditLayer!;
+        Assert.Equal(0xFFFFC857u, layer.Text!.Color);
+
+        PressSwatch("Text color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        var dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x20, 0xC0, 0xFF);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0xFF20C0FFu, layer.Text!.Color);                    // Previewed live on the canvas.
+        Assert.Equal(new SKColor(0xFF, 0xC8, 0x57), session.Foreground);   // The swatch waits for OK.
+        dialog.Close(false);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Equal(0xFFFFC857u, layer.Text!.Color);                    // Cancel: back to its own color.
+        Assert.True(session.IsEditingText);
+
+        PressSwatch("Foreground color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x10, 0x80, 0x30);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(0xFF108030u, layer.Text!.Color);
+        dialog.Close(true);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Equal(0xFF108030u, layer.Text!.Color);
+        Assert.Equal(new SKColor(0x10, 0x80, 0x30), session.Foreground);   // OK: the text color is the foreground color.
+        Assert.Equal("Color", layer.Text.Text);
+    }
+
+    /// <summary>With the Move tool, a double-click on live text opens it for typing where the pointer is; the toolbar follows to the Type tool.</summary>
+    [AvaloniaFact]
+    public void Double_clicking_live_text_with_the_move_tool_opens_it_for_typing()
+    {
+        var layer = session.AddText(new SKPoint(100, 100), session.TextDefaults with { Text = "Hello" });
+        window.SelectTool(Tool.Move);
+        Dispatcher.UIThread.RunJobs();
+        // A little in from the right edge of the letters, so the caret lands at the end of the word.
+        var x = (float)(layer.Transform.X + layer.Transform.Width - Text.TextLayout.Padding - 2);
+        var y = (float)(layer.Transform.Y + layer.Transform.Height / 2);
+        Click(x, y);
+        Assert.False(session.IsEditingText);            // One click moves, as before.
+        Click(x, y);                                     // The second click of a double-click.
+        Assert.True(session.IsEditingText);
+        Assert.Equal(layer.Id, session.TextEditLayer!.Id);
+        Assert.Equal(Tool.Text, session.Tool);
+        Assert.Equal(5, session.TextEdit!.Caret);
+        var typeButton = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => (ToolTip.GetTip(b) as string)?.StartsWith("Type", StringComparison.Ordinal) == true);
+        var moveButton = window.GetVisualDescendants().OfType<ToggleButton>().Single(b => (ToolTip.GetTip(b) as string)?.StartsWith("Move", StringComparison.Ordinal) == true);
+        Assert.True(typeButton.IsChecked);
+        Assert.False(moveButton.IsChecked);
+        window.KeyTextInput("!");
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Hello!", session.TextEditLayer.Text!.Text);
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Edit Text", session.History.UndoName);
     }
 
     [AvaloniaFact]

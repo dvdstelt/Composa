@@ -1,3 +1,4 @@
+using Composa.Model;
 using SkiaSharp;
 
 namespace Composa.IO.Psd;
@@ -6,7 +7,7 @@ namespace Composa.IO.Psd;
 public sealed class PsdException(string message) : IOException(message)
 {
     public static PsdException Truncated() => new("The Photoshop file could not be read. It may be damaged or incomplete.");
-    public static PsdException TooLarge() => new("The Photoshop file is larger than the supported 30,000 pixels a side and 100 megapixels.");
+    public static PsdException TooLarge() => new($"The Photoshop file is larger than Composa can hold: {DocumentLimits.MaxSide:N0} pixels a side and {DocumentLimits.MaxSurfaceMegapixels} megapixels for any one layer, {DocumentLimits.DocumentBudgetMegapixels} megapixels of layers in all.");
 }
 
 /// <summary>One thing that had to change on the way in, reported per layer before anything is applied.</summary>
@@ -21,16 +22,23 @@ internal sealed class PsdFile
     public int Width;
     public int Height;
     public double Resolution = 72;
+    /// <summary>A Large Document (<c>.psb</c>, header version 2).</summary>
+    public bool LargeDocument;
     public List<PsdLayer> Layers = [];
     /// <summary>The merged image, decoded only when the file has no layers of its own.</summary>
     public SKBitmap? Composite;
 }
 
+/// <summary>The part of a channel's plane that is decoded: an offset into the plane as the file stores it, and a size.</summary>
+internal readonly record struct PsdCrop(int X, int Y, int Width, int Height);
+
 /// <summary>A layer record with its channels decoded, still in Photoshop's terms.</summary>
 internal sealed class PsdLayer
 {
     public string Name = "";
+    /// <summary>The pixel rectangle as it is imported. Cropping to the canvas shrinks it; <see cref="SourceTop"/> and the others keep what the file says.</summary>
     public int Top, Left, Bottom, Right;
+    public int SourceTop, SourceLeft, SourceBottom, SourceRight;
     public byte Opacity = 255;
     public byte Fill = 255;
     public bool Clipping;
@@ -40,6 +48,11 @@ internal sealed class PsdLayer
     public Dictionary<string, byte[]> Extra = [];
     public bool HasMask;
     public int MaskTop, MaskLeft, MaskBottom, MaskRight;
+    public int SourceMaskTop, SourceMaskLeft, SourceMaskBottom, SourceMaskRight;
+    /// <summary>The part of the file's planes that is read, once the layer has been cropped to the canvas; null reads them whole.</summary>
+    public PsdCrop? ImageCrop, MaskCrop;
+    /// <summary>The layer or its mask reached past the canvas and was cut to it so the file would fit in memory.</summary>
+    public bool Cropped;
     public byte MaskDefault = 255;
     public bool MaskDisabled;
     public bool MaskLinked = true;
@@ -56,6 +69,10 @@ internal sealed class PsdLayer
     public int Height => Math.Max(0, Bottom - Top);
     public int MaskWidth => Math.Max(0, MaskRight - MaskLeft);
     public int MaskHeight => Math.Max(0, MaskBottom - MaskTop);
+    public int SourceWidth => Math.Max(0, SourceRight - SourceLeft);
+    public int SourceHeight => Math.Max(0, SourceBottom - SourceTop);
+    public int SourceMaskWidth => Math.Max(0, SourceMaskRight - SourceMaskLeft);
+    public int SourceMaskHeight => Math.Max(0, SourceMaskBottom - SourceMaskTop);
     public bool IsGroup => Section is 1 or 2;
     public bool IsDivider => Section == 3;
 }

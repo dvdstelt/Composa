@@ -165,7 +165,15 @@ public sealed partial class MainWindow
         ToolTip.SetTip(swatch, "Text color");
         swatch.PointerPressed += async (_, _) =>
         {
-            if (await Dialogs.Prompts.Color(this, "Text Color", new SKColor(s.CurrentTextStyle.Color)) is not { } picked) return;
+            // Text being typed previews the picker's working color on the canvas, and goes back to its own color on Cancel.
+            var original = s.CurrentTextStyle.Color;
+            var editing = s.TextEdit;
+            void Preview(SKColor color) { if (editing != null && s.TextEdit == editing) Change(st => st with { Color = (uint)color | 0xFF000000 }); }
+            if (await Dialogs.Prompts.Color(this, "Text Color", new SKColor(original), editing != null ? Preview : null) is not { } picked)
+            {
+                if (editing != null && s.TextEdit == editing) Change(st => st with { Color = original });
+                return;
+            }
             Change(st => st with { Color = (uint)picked | 0xFF000000 });
             // The text color is the foreground color: picking one in the Type bar moves the swatch too.
             s.Foreground = picked;

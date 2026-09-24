@@ -184,6 +184,8 @@ public sealed partial class CanvasView
         else switch (session.Tool)
         {
             case Tool.Move:
+                // A double-click on live text opens it for typing, without switching to the Type tool first.
+                if (e.ClickCount >= 2 && BeginLiveTextEdit(shift)) break;
                 if (session.CanMovePixels && InsideSelection(pressDocument) && session.BeginMovePixels(duplicate: alt)) drag = Drag.MovePixels;
                 else BeginMove(control, e.ClickCount);
                 break;

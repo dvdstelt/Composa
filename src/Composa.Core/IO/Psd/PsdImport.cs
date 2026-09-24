@@ -32,14 +32,19 @@ public sealed class PsdImport
     public static bool IsPsd(string path) => PsdReader.Matches(path);
     public static bool IsPsd(ReadOnlySpan<byte> data) => PsdReader.Matches(data);
 
-    public static PsdImport Load(string path, long pixelBudget = PsdReader.MaxPixels)
+    /// <summary>Reads a file that is to become a document of its own, so the whole document budget is its to use.</summary>
+    public static PsdImport Load(string path) => Load(path, DocumentLimits.DocumentPixelBudget);
+    public static PsdImport Load(byte[] data) => Load(data, DocumentLimits.DocumentPixelBudget);
+
+    /// <param name="pixelBudget">How much raster the file may add: the document budget, less what the target document already holds.</param>
+    public static PsdImport Load(string path, long pixelBudget)
     {
         var info = new FileInfo(path);
         if (info.Length > int.MaxValue) throw PsdException.TooLarge();
         return Load(File.ReadAllBytes(path), pixelBudget);
     }
 
-    public static PsdImport Load(byte[] data, long pixelBudget = PsdReader.MaxPixels)
+    public static PsdImport Load(byte[] data, long pixelBudget)
     {
         var file = PsdReader.Read(data, pixelBudget);
         try { return Build(file, pixelBudget); }
@@ -84,6 +89,9 @@ public sealed class PsdImport
         // Dissolve, Darker Color and Lighter Color have no equivalent here and fall through to Normal with a conversion listed.
     };
 
+    /// <summary>Listed for every layer the reader had to cut to the canvas to make the file fit.</summary>
+    public const string CroppedNote = "Cropped to the canvas so the file fits in memory. Pixels outside the canvas weren't imported.";
+
     private static readonly string[] TextKeys = ["TySh", "tySh", "txt2"];
     private static readonly string[] VectorKeys = ["vmsk", "vsms", "vogk"];
     private static readonly string[] SmartObjectKeys = ["SoLd", "SoLE"];
@@ -122,6 +130,7 @@ public sealed class PsdImport
                 continue;
             }
             var name = record.Name.Length == 0 ? "Layer" : record.Name;
+            if (record.Cropped) conversions.Add(new PsdConversion(name, CroppedNote));
             var target = openGroups.Count > 0 ? pending[openGroups.Peek()] : roots;
             Layer? layer;
             if (record.IsGroup)
@@ -184,7 +193,17 @@ public sealed class PsdImport
             layer.Name = name;
             return layer;
         }
-        if (kind == PsdLayerKind.Text) Note("Editable Photoshop text becomes pixels and can't be retyped.");
+        if (kind == PsdLayerKind.Text)
+        {
+            // Horizontal type keeps its wording, font, size, color, alignment, tracking and leading, so it can be retyped.
+            if (PsdText.Parse(extra) is { } source && PsdText.Place(source, name, ref remaining) is { } text)
+            {
+                record.Image?.Dispose();
+                foreach (var note in source.Notes) Note(note);
+                return text;
+            }
+            Note(PsdText.RasterizedNote);
+        }
         if (kind == PsdLayerKind.SmartObject) Note("The smart object was rasterized. Linked contents can't be edited.");
         if (kind == PsdLayerKind.Other) Note("Gradient and pattern fills aren't supported; the layer was imported empty.");
 

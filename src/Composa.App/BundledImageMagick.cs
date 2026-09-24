@@ -30,16 +30,26 @@ public sealed class BundledImageMagick : IO.IImageMagick
         }
     }
 
-    public byte[] Convert(string path, IO.ImageMagickOutput output)
+    public byte[] Convert(string path, IO.ImageMagickOutput output) => Read(path, new Magick.MagickReadSettings { FrameIndex = 0, FrameCount = 1 }, image =>
+    {
+        image.AutoOrient();
+        if (output == IO.ImageMagickOutput.Pam16) image.Depth = 16;
+        return image.ToByteArray(output == IO.ImageMagickOutput.Png ? Magick.MagickFormat.Png : Magick.MagickFormat.Pam);
+    });
+
+    /// <summary>The resolution decides how large an SVG is drawn, 96 dots per inch being the size it declares.</summary>
+    public byte[] Rasterize(string path, double scale) => Read(path,
+        new Magick.MagickReadSettings { FrameIndex = 0, FrameCount = 1, Density = new Magick.Density(96 * scale), BackgroundColor = Magick.MagickColors.Transparent },
+        image => image.ToByteArray(Magick.MagickFormat.Png));
+
+    private static byte[] Read(string path, Magick.MagickReadSettings settings, Func<Magick.MagickImage, byte[]> produce)
     {
         try
         {
             // Only the first frame, exactly as the command line's "file[0]" does: a multi-page TIFF
             // would otherwise decode every page to keep one.
-            using var image = new Magick.MagickImage(path, new Magick.MagickReadSettings { FrameIndex = 0, FrameCount = 1 });
-            image.AutoOrient();
-            if (output == IO.ImageMagickOutput.Pam16) image.Depth = 16;
-            return image.ToByteArray(output == IO.ImageMagickOutput.Png ? Magick.MagickFormat.Png : Magick.MagickFormat.Pam);
+            using var image = new Magick.MagickImage(path, settings);
+            return produce(image);
         }
         catch (Magick.MagickException error)
         {

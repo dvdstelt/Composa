@@ -153,6 +153,97 @@ public class PsdTests
         Assert.Equal((50, 50), (import.Layers[3].Pixels!.Width, import.Layers[3].Pixels.Height));
     }
 
+    private static PsdImport LoadText(PsdWriter.TypeTool type, int width = 300, int height = 200)
+    {
+        var writer = new PsdWriter { Width = width, Height = height };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Headline", Image = Solid(30, 10, SKColors.Black), Left = 40, Top = 30 }.With("TySh", type.Build()));
+        return PsdImport.Load(writer.Build());
+    }
+
+    [Fact]
+    public void Simple_photoshop_text_stays_editable_with_its_style_and_place()
+    {
+        var installed = EditorSession.FontFamilies.FirstOrDefault(f => f.Contains("Sans", StringComparison.OrdinalIgnoreCase)) ?? EditorSession.FontFamilies[0];
+        var import = LoadText(new PsdWriter.TypeTool
+        {
+            Text = "Hello\rworld", Font = installed.Replace(" ", "") + "-BoldItalic", FontSize = 24, Color = new SKColor(20, 40, 200),
+            Justification = 1, Tracking = 100, Leading = 30, Tx = 40, Ty = 50
+        });
+        var layer = Assert.Single(import.Layers);
+        var text = layer.Text;
+        Assert.NotNull(text);
+        Assert.Equal("Hello\nworld", text!.Text);                           // Photoshop's return becomes a line break.
+        Assert.Equal(installed, text.FontFamily);
+        Assert.True(text.Bold && text.Italic);
+        Assert.Equal(24, text.Size);
+        Assert.Equal(0xFF1428C8u, text.Color);
+        Assert.Equal(TextAlignment.Right, text.Alignment);
+        Assert.Equal(2.4, text.Tracking, 3);                               // 100/1000 em at 24 px.
+        Assert.Equal(30, text.Leading);
+        Assert.DoesNotContain(import.Conversions, c => c.Message.Contains("retyped") || c.Message.Contains("installed"));
+        // Right-aligned point text hangs from its first baseline at (tx, ty): the first line ends there.
+        var layout = new Composa.Text.TextLayout(text);
+        var first = layout.Lines[0];
+        Assert.Equal(40, layer.Transform.X + first.X + first.VisibleWidth, 0.5);
+        Assert.Equal(50, layer.Transform.Y + first.Baseline, 0.5);
+        Assert.Equal((0d, false), (layer.Transform.Rotation, layer.Transform.FlipVertical));
+        // The glyphs are drawn in the text's color: some pixel along the first line's middle is a solid blue.
+        var band = Enumerable.Range((int)first.X, (int)first.VisibleWidth).Select(x => layer.Pixels!.GetPixel(x, (int)(first.Baseline - 6)));
+        Assert.Contains(band, p => p.Alpha > 200 && p.Blue > 150 && p.Red < 60);
+    }
+
+    [Fact]
+    public void Text_the_model_cannot_hold_stays_pixels_and_the_rest_is_reported()
+    {
+        foreach (var type in new[] { new PsdWriter.TypeTool { Vertical = true }, new PsdWriter.TypeTool { Xy = 0.4 }, new PsdWriter.TypeTool { Xx = 2, Yy = 1 } })
+        {
+            var import = LoadText(type);
+            var layer = Assert.Single(import.Layers);
+            Assert.Null(layer.Text);
+            AssertColor(SKColors.Black, layer.Pixels!.GetPixel(0, 0));
+            Assert.Contains(import.Conversions, c => c.Message.Contains("retyped"));
+        }
+        var noted = LoadText(new PsdWriter.TypeTool { Warp = true, FauxBold = true, Justification = 3, SecondSize = 40, Font = "NoSuchFace-Regular" });
+        Assert.NotNull(Assert.Single(noted.Layers).Text);
+        var messages = noted.Conversions.Select(c => c.Message).ToList();
+        Assert.Contains(PsdText.WarpNote, messages);
+        Assert.Contains(PsdText.FauxNote, messages);
+        Assert.Contains(PsdText.JustifyNote, messages);
+        Assert.Contains(PsdText.FirstStyleNote, messages);
+        Assert.Contains(messages, m => m.Contains("NoSuchFace") && m.Contains("installed"));
+        Assert.Equal(TextAlignment.Left, noted.Layers[0].Text!.Alignment);
+        // Without engine data the words still come across, at 12 points.
+        var bare = LoadText(new PsdWriter.TypeTool { Text = "Plain", NoEngine = true });
+        Assert.Equal(("Plain", 12d), (bare.Layers[0].Text!.Text, bare.Layers[0].Text!.Size));
+    }
+
+    [Fact]
+    public void Scaled_rotated_and_boxed_photoshop_text_keeps_its_placement()
+    {
+        // A 30° turn at twice the size: cos 30 = 0.866, sin 30 = 0.5, scale 2.
+        double cos = Math.Cos(Math.PI / 6) * 2, sin = Math.Sin(Math.PI / 6) * 2;
+        var turned = LoadText(new PsdWriter.TypeTool { FontSize = 24, Xx = cos, Xy = -sin, Yx = sin, Yy = cos, Tx = 100, Ty = 80 });
+        var layer = Assert.Single(turned.Layers);
+        Assert.Equal(48, layer.Text!.Size);                                 // Engine points times the matrix scale.
+        Assert.Equal(30, layer.Transform.Rotation, 1);
+        // The baseline start lands on (tx, ty) after the turn.
+        var layout = new Composa.Text.TextLayout(layer.Text);
+        var anchor = layer.Matrix.MapPoint(layout.Lines[0].X, layout.Lines[0].Baseline);
+        Assert.Equal(100, anchor.X, 0.6);
+        Assert.Equal(80, anchor.Y, 0.6);
+
+        var flipped = LoadText(new PsdWriter.TypeTool { Yy = -1 });
+        Assert.True(Assert.Single(flipped.Layers).Transform.FlipVertical);
+
+        var boxed = LoadText(new PsdWriter.TypeTool { Text = "A paragraph that wraps inside its frame", Bounds = new SKRect(0, 0, 120, 60), GlyphBounds = new SKRect(0, 0, 100, 20), Tx = 30, Ty = 40 });
+        var paragraph = Assert.Single(boxed.Layers);
+        Assert.True(paragraph.Text!.IsBox);
+        Assert.Equal(120 + 2 * Composa.Text.TextLayout.Padding, paragraph.Text.BoxWidth!.Value, 0.5);
+        Assert.Equal(60 + 2 * Composa.Text.TextLayout.Padding, paragraph.Text.BoxHeight!.Value, 0.5);
+        Assert.Equal((30 - Composa.Text.TextLayout.Padding, 40 - Composa.Text.TextLayout.Padding), (paragraph.Transform.X, paragraph.Transform.Y));
+        Assert.True(new Composa.Text.TextLayout(paragraph.Text).Lines.Count > 1, "the frame wraps the sentence");
+    }
+
     [Fact]
     public void Solid_fill_rectangles_and_ellipses_stay_live_shapes()
     {
@@ -269,10 +360,88 @@ public class PsdTests
     }
 
     [Fact]
+    public void The_budget_counts_layers_not_the_canvas_and_each_layer_must_fit_one_surface()
+    {
+        // A 10 x 10 canvas holding one 4 x 4 layer needs 16 pixels of raster, not 100: the canvas is a size, not an allocation.
+        var writer = new PsdWriter { Width = 10, Height = 10 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Small", Image = Solid(4, 4, SKColors.Red), Left = 3, Top = 3 });
+        var import = PsdImport.Load(writer.Build(), pixelBudget: 16);
+        Assert.Equal("Small", Assert.Single(import.Layers).Name);
+        Assert.Contains("larger", Assert.Throws<PsdException>(() => PsdImport.Load(writer.Build(), pixelBudget: 15)).Message);
+
+        // Two layers share the budget, so together they can need more than either does alone.
+        writer.Layers.Add(new PsdWriterLayer { Name = "Second", Image = Solid(4, 4, SKColors.Blue) });
+        Assert.Equal(2, PsdImport.Load(writer.Build(), pixelBudget: 32).Layers.Count);
+        Assert.Throws<PsdException>(() => PsdImport.Load(writer.Build(), pixelBudget: 31));
+
+        Assert.True(DocumentLimits.DocumentPixelBudget >= DocumentLimits.MaxSurfacePixels);
+        Assert.True(DocumentLimits.DocumentPixelBudget <= 800_000_000);
+        Assert.True((long)DocumentLimits.MaxSide * DocumentLimits.MaxSide > DocumentLimits.DocumentPixelBudget); // A square at the side limit is still too large.
+    }
+
+    /// <summary>A 4 x 4 canvas with one 6 x 3 layer and mask hanging two columns off its left edge.</summary>
+    private static PsdWriter Overhang(int compression, int version = 1)
+    {
+        var writer = new PsdWriter { Width = 4, Height = 4, Compression = compression, Version = (ushort)version };
+        var mask = Pixels.NewMask(6, 3);
+        for (var y = 0; y < 3; y++) for (var x = 0; x < 6; x++) mask.SetPixel(x, y, new SKColor(0, 0, 0, (byte)(x * 40 + y * 3)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Overhang", Image = Gradient(6, 3), Left = -2, Top = 1, Mask = mask, MaskLeft = -2, MaskTop = 1 });
+        return writer;
+    }
+
+    [Fact]
+    public void A_file_that_fits_keeps_every_pixel_of_a_layer_hanging_off_the_canvas()
+    {
+        var import = PsdImport.Load(Overhang(1).Build(), pixelBudget: 100);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal((-2d, 1d, 6d, 3d), (layer.Transform.X, layer.Transform.Y, layer.Transform.Width, layer.Transform.Height));
+        using var source = Gradient(6, 3);
+        Assert.Equal(source.Bytes, layer.Pixels!.Bytes);
+        Assert.Empty(import.Conversions);
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(1, 1)]
+    [InlineData(1, 2)]
+    [InlineData(2, 1)]
+    [InlineData(3, 1)]
+    public void A_file_over_budget_crops_its_layers_and_masks_to_the_canvas_and_says_so(int compression, int version)
+    {
+        // 6 x 3 pixels plus a 6 x 3 mask is 36; cropped to the canvas, 4 x 3 twice is 24. The budget sits between.
+        var import = PsdImport.Load(Overhang(compression, version).Build(), pixelBudget: 24);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal((0d, 1d, 4d, 3d), (layer.Transform.X, layer.Transform.Y, layer.Transform.Width, layer.Transform.Height));
+        using var source = Gradient(6, 3);
+        for (var y = 0; y < 3; y++)
+            for (var x = 0; x < 4; x++)
+            {
+                AssertColor(source.GetPixel(x + 2, y), layer.Pixels!.GetPixel(x, y));
+                Assert.Equal((x + 2) * 40 + y * 3, layer.Mask!.GetPixel(x, y).Alpha);
+            }
+        var note = Assert.Single(import.Conversions);
+        Assert.Equal(("Overhang", PsdImport.CroppedNote), (note.LayerName, note.Message));
+        // Cropped, the file still needs 24 pixels: one less and it is refused.
+        Assert.Throws<PsdException>(() => PsdImport.Load(Overhang(compression, version).Build(), pixelBudget: 23));
+    }
+
+    [Fact]
+    public void A_layer_entirely_off_the_canvas_is_kept_empty_when_cropping()
+    {
+        var writer = new PsdWriter { Width = 4, Height = 4 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Outside", Image = Solid(2, 2, SKColors.Red), Left = 5, Top = 0 });
+        var import = PsdImport.Load(writer.Build(), pixelBudget: 1);
+        var layer = Assert.Single(import.Layers);
+        Assert.Equal("Outside", layer.Name);
+        Assert.Equal(0, layer.Pixels!.GetPixel(0, 0).Alpha); // Nothing of it is inside the canvas.
+        Assert.Contains(import.Conversions, c => c.LayerName == "Outside" && c.Message == PsdImport.CroppedNote);
+    }
+
+    [Fact]
     public void Unsupported_and_damaged_files_are_refused_with_a_reason()
     {
         byte[] Plain() { var w = new PsdWriter { Width = 10, Height = 10 }; w.Layers.Add(new PsdWriterLayer { Image = Solid(10, 10, SKColors.Red) }); return w.Build(); }
-        Assert.Contains("psb", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Version = 2 }.Build())).Message);
+        Assert.Contains("format version", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Version = 3 }.Build())).Message);
         Assert.Contains("8-bit RGB", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Mode = 4 }.Build())).Message);
         Assert.Contains("8-bit RGB", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Depth = 16 }.Build())).Message);
         Assert.Contains("larger", Assert.Throws<PsdException>(() => PsdImport.Load(new PsdWriter { Width = 40_000, Height = 10 }.Build())).Message);
@@ -283,13 +452,42 @@ public class PsdTests
         Assert.True(PsdImport.IsPsd(Plain()));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Large_document_files_read_through_their_widened_lengths(int compression)
+    {
+        // A PSB is a PSD with 8-byte section, layer-info and channel lengths, 4-byte PackBits row counts, and 8-byte
+        // lengths for a fixed set of additional-info keys; everything else is unchanged.
+        using var gradient = Gradient(37, 23);
+        using var hole = Pixels.NewMask(10, 10);
+        var writer = new PsdWriter { Version = 2, Width = 60, Height = 40, Compression = compression, Resolution = 144 };
+        writer.Layers.Add(new PsdWriterLayer { Name = "Background", Image = Solid(60, 40, SKColors.Red) });
+        writer.Layers.Add(new PsdWriterLayer { Name = "</Layer group>", EmptyWidth = 0 }.With("lsct", PsdWriter.Section(3)));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Picture", Image = gradient, Left = 2, Top = 3, Mask = hole, MaskLeft = 12, MaskTop = 13 }
+            .With("Lr16", new byte[6]).With("luni", PsdWriter.Unicode("Large picture")));
+        writer.Layers.Add(new PsdWriterLayer { Name = "Folder", Blend = "pass" }.With("lsct", PsdWriter.Section(1)));
+        var import = Load(writer);
+        Assert.Equal((60, 40, 144d), (import.Width, import.Height, import.Resolution));
+        Assert.Equal(["Background", "Folder"], import.Layers.Select(l => l.Name));
+        var picture = Assert.Single(import.Layers[1].Children);
+        Assert.Equal("Large picture", picture.Name);                        // The key after the 8-byte-length block still reads.
+        Assert.Equal(gradient.Bytes, picture.Pixels!.Bytes);
+        Assert.Equal((2d, 3d), (picture.Transform.X, picture.Transform.Y));
+        Assert.Equal(0, picture.Mask!.GetPixel(15, 15).Alpha);
+        Assert.Equal(255, picture.Mask.GetPixel(0, 0).Alpha);
+        Assert.Empty(import.Conversions);
+        Assert.Contains(".psb", Composa.IO.ImageFiles.ImportExtensions);
+    }
+
     [Fact]
     public void A_flattened_file_becomes_one_layer_from_the_merged_image()
     {
         using var gradient = Gradient(30, 20);
-        foreach (var compression in new[] { 0, 1 })
+        foreach (var (compression, version) in new[] { (0, 1), (1, 1), (0, 2), (1, 2) })
         {
-            var writer = new PsdWriter { Width = 30, Height = 20, Composite = gradient, Compression = compression };
+            var writer = new PsdWriter { Width = 30, Height = 20, Composite = gradient, Compression = compression, Version = (ushort)version };
             var import = Load(writer);
             var layer = Assert.Single(import.Layers);
             Assert.Equal("Background", layer.Name);

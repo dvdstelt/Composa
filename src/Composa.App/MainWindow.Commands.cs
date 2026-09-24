@@ -465,7 +465,7 @@ public sealed partial class MainWindow
                 if (PsdImport.IsPsd(path))
                 {
                     // Photoshop files open as unsaved documents; what had to be converted is shown before anything is applied.
-                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    if (await ImportPhotoshop(path, DocumentLimits.DocumentPixelBudget) is not { } import) continue;
                     AddSession(EditorSession.OpenPhotoshop(import, Path.GetFileNameWithoutExtension(path)));
                 }
                 else if (MacProject.IsProject(path))
@@ -481,7 +481,9 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path) : ImageFiles.Load(path);
+                    var pixels = RawImporter.IsRaw(path) ? await DevelopRaw(path)
+                        : SvgImporter.IsSvg(path) ? await Busy(() => Task.Run(() => SvgImporter.Render(path))) // At the size the file declares.
+                        : ImageFiles.Load(path);
                     if (pixels == null) continue;
                     var document = new Document(pixels.Width, pixels.Height);
                     var layer = Layer.Raster(Path.GetFileNameWithoutExtension(path), pixels);
@@ -520,7 +522,8 @@ public sealed partial class MainWindow
                 {
                     // Into an existing document, a Photoshop file's layers arrive inside a folder named after it.
                     var target = session;
-                    if (await ImportPhotoshop(path) is not { } import) continue;
+                    // The file's layers join what the document already holds, so they get what is left of its budget.
+                    if (await ImportPhotoshop(path, DocumentLimits.DocumentPixelBudget - session.Document.RasterPixels()) is not { } import) continue;
                     if (target != session) { import.Discard(); continue; }
                     session.PlacePhotoshop(import, name, at);
                 }
@@ -530,6 +533,16 @@ public sealed partial class MainWindow
                     if (await DevelopRaw(path) is not { } developed) continue;
                     if (target != session) { developed.Dispose(); continue; }
                     session.AddImageLayer(name, developed, at);
+                }
+                else if (SvgImporter.IsSvg(path))
+                {
+                    // Fitted to the canvas as it is drawn, so a small icon comes in sharp rather than enlarged from a few pixels.
+                    var target = session;
+                    var canvas = new SKSizeI(target.Document.Width, target.Document.Height);
+                    var budget = DocumentLimits.DocumentPixelBudget - target.Document.RasterPixels();
+                    var fitted = await Busy(() => Task.Run(() => SvgImporter.Render(path, canvas, budget)));
+                    if (target != session) { fitted.Dispose(); continue; }
+                    session.AddImageLayer(name, fitted, at);
                 }
                 else session.AddImageLayer(name, ImageFiles.Load(path), at);
             }
@@ -550,9 +563,9 @@ public sealed partial class MainWindow
     }
 
     /// <summary>Reads a Photoshop file and, when anything has to be converted, asks before going on. Null means the user declined.</summary>
-    private async Task<PsdImport?> ImportPhotoshop(string path)
+    private async Task<PsdImport?> ImportPhotoshop(string path, long pixelBudget)
     {
-        var import = await Task.Run(() => PsdImport.Load(path));
+        var import = await Task.Run(() => PsdImport.Load(path, pixelBudget));
         if (import.Conversions.Count == 0 || await PsdConversionDialog.Confirm(this, Path.GetFileName(path), import.Conversions)) return import;
         import.Discard();
         return null;

@@ -173,6 +173,7 @@ public class TextSessionTests
         Assert.Equal("Hi", layer.Text!.Text);
         Assert.Equal("Hi", layer.Name);
         Assert.Equal(50 - TextLayout.Padding, layer.Transform.X);
+        Assert.Equal(60, layer.Transform.Y + TextLayout.Padding + editor.Layout.Ascent, 0.5); // The click is on the first baseline.
         var narrow = layer.Pixels!.Width;
         editor.Insert(" there");
         Assert.True(layer.Pixels!.Width > narrow); // Point text grows as it is typed.

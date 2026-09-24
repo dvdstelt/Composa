@@ -11,7 +11,11 @@ internal sealed class PsdWriter
 {
     public int Width = 100, Height = 80;
     public double Resolution = 72;
+    /// <summary>1 writes a PSD, 2 a PSB (Large Document) with its widened length fields.</summary>
     public ushort Version = 1, Depth = 8, Mode = 3, Channels = 3;
+    public bool LargeDocument => Version == 2;
+    /// <summary>The additional-info keys a PSB stores with 8-byte lengths even under an 8BIM signature.</summary>
+    public static readonly string[] LargeKeys = ["LMsk", "Lr16", "Lr32", "Layr", "Mt16", "Mt32", "Mtrn", "Alph", "FMsk", "lnk2", "FEid", "FXid", "PxSD"];
     /// <summary>The compression every channel uses unless a layer says otherwise: 0 raw, 1 PackBits, 2 zip, 3 zip with prediction.</summary>
     public int Compression = 1;
     /// <summary>Bottom to top, as the file lists them.</summary>
@@ -48,10 +52,10 @@ internal sealed class PsdWriter
             var channelData = new List<byte[]>();
             foreach (var layer in Layers)
             {
-                var channels = layer.ChannelData(layer.Compression ?? Compression);
+                var channels = layer.ChannelData(layer.Compression ?? Compression, LargeDocument);
                 layerInfo.I32(layer.Top); layerInfo.I32(layer.Left); layerInfo.I32(layer.Top + layer.Height); layerInfo.I32(layer.Left + layer.Width);
                 layerInfo.U16((ushort)channels.Count);
-                foreach (var (id, data) in channels) { layerInfo.I16(id); layerInfo.U32((uint)data.Length); channelData.Add(data); }
+                foreach (var (id, data) in channels) { layerInfo.I16(id); layerInfo.Length((uint)data.Length, LargeDocument); channelData.Add(data); }
                 layerInfo.Ascii("8BIM");
                 layerInfo.Ascii(layer.Blend.PadRight(4)[..4]);
                 layerInfo.U8(layer.Opacity);
@@ -78,7 +82,7 @@ internal sealed class PsdWriter
                 {
                     extra.Ascii("8BIM");
                     extra.Ascii(key);
-                    extra.U32((uint)data.Length);
+                    extra.Length((uint)data.Length, LargeDocument && LargeKeys.Contains(key));
                     extra.Bytes(data);
                     if (data.Length % 2 == 1) extra.U8(0);
                 }
@@ -87,8 +91,8 @@ internal sealed class PsdWriter
             foreach (var data in channelData) layerInfo.Bytes(data);
         }
         var section = new Buffer();
-        if (Layers.Count > 0) { section.Block(layerInfo); section.U32(0); }
-        file.Block(section);
+        if (Layers.Count > 0) { section.Block(layerInfo, LargeDocument); section.U32(0); }
+        file.Block(section, LargeDocument);
 
         // The merged image: one compression for all planes, R, G, B (and A with four channels).
         var planes = new List<byte[]>();
@@ -97,7 +101,7 @@ internal sealed class PsdWriter
         if (Compression == 1)
         {
             var rows = planes.Select(p => PackRows(p, Width, Height)).ToList();
-            foreach (var packed in rows) foreach (var row in packed) file.U16((ushort)row.Length);
+            foreach (var packed in rows) foreach (var row in packed) file.Length((uint)row.Length, LargeDocument, shortForm: true);
             foreach (var packed in rows) foreach (var row in packed) file.Bytes(row);
         }
         else foreach (var plane in planes) file.Bytes(plane);
@@ -298,6 +302,128 @@ internal sealed class PsdWriter
     }
     public static byte[] Exposure(float exposure, float offset, float gamma) { var b = new Buffer(); b.U16(1); b.F32(exposure); b.F32(offset); b.F32(gamma); return b.ToArray(); }
 
+    // ---- Type tool object setting ------------------------------------------------------------------------------------
+
+    /// <summary>What a type layer's fixture says; the defaults are 24-point black left-aligned Helvetica at (40, 50).</summary>
+    public sealed class TypeTool
+    {
+        public string Text = "Hello";
+        public string Font = "Helvetica";
+        public double FontSize = 24;
+        public SKColor Color = SKColors.Black;
+        /// <summary>0 left, 1 right, 2 center; anything else is a justification this editor lacks.</summary>
+        public int Justification;
+        public double Tracking;
+        public double? Leading;
+        public bool FauxBold, FauxItalic, Vertical, Warp;
+        /// <summary>A second style run that differs from the first, when set.</summary>
+        public double? SecondSize;
+        /// <summary>The 2×3 transform: xx, xy, yx, yy and the translation.</summary>
+        public double Xx = 1, Xy, Yx, Yy = 1, Tx = 40, Ty = 50;
+        /// <summary>Paragraph text: the frame and the glyphs' box, in text-space units.</summary>
+        public SKRect? Bounds, GlyphBounds;
+        /// <summary>Leave out the engine data, so only the text itself is known.</summary>
+        public bool NoEngine;
+
+        public byte[] Build()
+        {
+            var block = new Buffer();
+            block.U16(1);
+            foreach (var value in new[] { Xx, Xy, Yx, Yy, Tx, Ty }) block.F64(value);
+            block.U16(50);
+            var text = new Descriptor().Add("Txt ", Descriptor.Text(Text)).Add("Ornt", Descriptor.Enum("Ornt", Vertical ? "Vrtc" : "Hrzn"));
+            if (Bounds is { } bounds) text.Add("bounds", Descriptor.Objc(Rect(bounds)));
+            if (GlyphBounds is { } glyphs) text.Add("boundingBox", Descriptor.Objc(Rect(glyphs)));
+            if (!NoEngine) text.Add("EngineData", Descriptor.Raw(Encoding.Latin1.GetBytes(Engine())));
+            block.U32(16);
+            block.Bytes(text.ToArray());
+            block.U16(1);
+            block.U32(16);
+            block.Bytes(new Descriptor().Add("warpStyle", Descriptor.Enum("warpStyle", Warp ? "warpArc" : "warpNone")).ToArray());
+            return block.ToArray();
+        }
+
+        private static Descriptor Rect(SKRect box) => new Descriptor().Add("Left", Descriptor.UntF("#Pnt", box.Left)).Add("Top ", Descriptor.UntF("#Pnt", box.Top))
+            .Add("Rght", Descriptor.UntF("#Pnt", box.Right)).Add("Btom", Descriptor.UntF("#Pnt", box.Bottom));
+
+        private string Run(double size) => $$"""
+            <<
+            /StyleSheet
+            <<
+            /StyleSheetData
+            <<
+            /Font 0
+            /FontSize {{N(size)}}
+            /FauxBold {{(FauxBold ? "true" : "false")}}
+            /FauxItalic {{(FauxItalic ? "true" : "false")}}
+            /AutoLeading {{(Leading == null ? "true" : "false")}}
+            /Leading {{N(Leading ?? size * 1.2)}}
+            /Tracking {{N(Tracking)}}
+            /FillColor
+            <<
+            /Type 1
+            /Values [ 1.0 {{N(Color.Red / 255.0)}} {{N(Color.Green / 255.0)}} {{N(Color.Blue / 255.0)}} ]
+            >>
+            >>
+            >>
+            >>
+            """;
+
+        private static string N(double value) => value.ToString("0.0###", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>The engine dictionary: the text as UTF-16 with a byte order mark inside parentheses, one paragraph run and one or two style runs.</summary>
+        private string Engine()
+        {
+            var utf16 = Encoding.BigEndianUnicode.GetBytes(Text);
+            var escaped = new StringBuilder("(\\376\\377");
+            foreach (int b in utf16) escaped.Append(b is '(' or ')' or '\\' ? "\\" + (char)b : b is < 0x20 or > 0x7E ? $"\\{Convert.ToString(b, 8).PadLeft(3, '0')}" : ((char)b).ToString());
+            escaped.Append(')');
+            var runs = SecondSize is { } second ? Run(FontSize) + "\n" + Run(second) : Run(FontSize);
+            return $$"""
+                <<
+                /EngineDict
+                <<
+                /Editor
+                <<
+                /Text {{escaped}}
+                >>
+                /ParagraphRun
+                <<
+                /RunArray
+                [
+                <<
+                /ParagraphSheet
+                <<
+                /Properties
+                <<
+                /Justification {{Justification}}
+                >>
+                >>
+                >>
+                ]
+                >>
+                /StyleRun
+                <<
+                /RunArray
+                [
+                {{runs}}
+                ]
+                >>
+                >>
+                /ResourceDict
+                <<
+                /FontSet
+                [
+                <<
+                /Name ({{Font}})
+                >>
+                ]
+                >>
+                >>
+                """;
+        }
+    }
+
     // ---- Descriptor structure ----------------------------------------------------------------------------------------
 
     public sealed class Descriptor
@@ -322,6 +448,9 @@ internal sealed class PsdWriter
         public static byte[] Long(int value) { var b = new Buffer(); b.Ascii("long"); b.I32(value); return b.ToArray(); }
         public static byte[] Objc(Descriptor descriptor) { var b = new Buffer(); b.Ascii("Objc"); b.Bytes(descriptor.ToArray()); return b.ToArray(); }
         public static byte[] List(params byte[][] items) { var b = new Buffer(); b.Ascii("VlLs"); b.U32((uint)items.Length); foreach (var item in items) b.Bytes(item); return b.ToArray(); }
+        public static byte[] Text(string text) { var b = new Buffer(); b.Ascii("TEXT"); b.U32((uint)text.Length + 1); b.Bytes(Encoding.BigEndianUnicode.GetBytes(text)); b.U16(0); return b.ToArray(); }
+        public static byte[] Enum(string type, string value) { var b = new Buffer(); b.Ascii("enum"); b.Key(type); b.Key(value); return b.ToArray(); }
+        public static byte[] Raw(byte[] payload) { var b = new Buffer(); b.Ascii("tdta"); b.U32((uint)payload.Length); b.Bytes(payload); return b.ToArray(); }
     }
 
     public sealed class Buffer
@@ -339,8 +468,15 @@ internal sealed class PsdWriter
         public void Zeros(int count) { for (var i = 0; i < count; i++) stream.WriteByte(0); }
         /// <summary>A four-character key as a zero length, any other as its length.</summary>
         public void Key(string key) { if (key.Length == 4) U32(0); else U32((uint)key.Length); Ascii(key); }
-        /// <summary>A length-prefixed block.</summary>
-        public void Block(Buffer inner) { var bytes = inner.ToArray(); U32((uint)bytes.Length); Bytes(bytes); }
+        /// <summary>A length-prefixed block; the length takes 8 bytes in a PSB.</summary>
+        public void Block(Buffer inner, bool large = false) { var bytes = inner.ToArray(); Length((uint)bytes.Length, large); Bytes(bytes); }
+        /// <summary>A PSD length field that a PSB widens: 4 bytes to 8, or (<paramref name="shortForm"/>, a PackBits row count) 2 bytes to 4.</summary>
+        public void Length(uint value, bool large, bool shortForm = false)
+        {
+            if (shortForm) { if (large) U32(value); else U16((ushort)value); }
+            else if (large) { U32(0); U32(value); }
+            else U32(value);
+        }
         public byte[] ToArray() => stream.ToArray();
     }
 }
@@ -370,23 +506,23 @@ internal sealed class PsdWriterLayer
 
     public PsdWriterLayer With(string key, byte[] data) { Extra.Add((key, data)); return this; }
 
-    public List<(short Id, byte[] Data)> ChannelData(int compression)
+    public List<(short Id, byte[] Data)> ChannelData(int compression, bool largeDocument = false)
     {
         var channels = new List<(short, byte[])>();
         if (Image != null)
         {
-            if (IncludeAlpha) channels.Add((-1, Encode(PsdWriter.Plane(Image, -1), Image.Width, Image.Height, compression)));
-            for (short c = 0; c < 3; c++) channels.Add((c, Encode(PsdWriter.Plane(Image, c), Image.Width, Image.Height, compression)));
+            if (IncludeAlpha) channels.Add((-1, Encode(PsdWriter.Plane(Image, -1), Image.Width, Image.Height, compression, largeDocument)));
+            for (short c = 0; c < 3; c++) channels.Add((c, Encode(PsdWriter.Plane(Image, c), Image.Width, Image.Height, compression, largeDocument)));
         }
         else
         {
-            for (short c = 0; c < 3; c++) channels.Add((c, Encode([], 0, 0, compression)));
+            for (short c = 0; c < 3; c++) channels.Add((c, Encode([], 0, 0, compression, largeDocument)));
         }
-        if (Mask != null) channels.Add((-2, Encode(PsdWriter.Plane(Mask, -2), Mask.Width, Mask.Height, compression)));
+        if (Mask != null) channels.Add((-2, Encode(PsdWriter.Plane(Mask, -2), Mask.Width, Mask.Height, compression, largeDocument)));
         return channels;
     }
 
-    private static byte[] Encode(byte[] plane, int width, int height, int compression)
+    private static byte[] Encode(byte[] plane, int width, int height, int compression, bool largeDocument)
     {
         var buffer = new PsdWriter.Buffer();
         if (width == 0 || height == 0) { buffer.U16(0); return buffer.ToArray(); }
@@ -396,7 +532,7 @@ internal sealed class PsdWriterLayer
             case 0: buffer.Bytes(plane); break;
             case 1:
                 var rows = PsdWriter.PackRows(plane, width, height);
-                foreach (var row in rows) buffer.U16((ushort)row.Length);
+                foreach (var row in rows) buffer.Length((uint)row.Length, largeDocument, shortForm: true);
                 foreach (var row in rows) buffer.Bytes(row);
                 break;
             default: buffer.Bytes(PsdWriter.Zip(plane, width, height, compression == 3)); break;
