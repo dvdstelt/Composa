@@ -229,6 +229,8 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> CloseSession(EditorSession item)
     {
+        // Text still being typed is an open edit: commit it so it counts as a change and is in what gets saved.
+        if (item.IsEditingText) item.FinishText();
         if (item.IsModified)
         {
             if (item != session) SetSession(item);
@@ -273,6 +275,7 @@ public sealed partial class MainWindow : Window
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         RememberWindow();
+        if (session?.IsEditingText == true) session.FinishText();
         if (closingConfirmed || sessions.All(s => !s.IsModified)) return;
         e.Cancel = true;
         foreach (var item in sessions.Where(s => s.IsModified).ToList())

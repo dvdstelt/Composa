@@ -162,6 +162,9 @@ public class TextEditingTests
         await Pump(() => window.OwnedWindows.Count == 0);
         Assert.Equal(0xFFFFC857u, layer.Text!.Color);                    // Cancel: back to its own color.
         Assert.True(session.IsEditingText);
+        window.KeyTextInput("!");                                        // The keys go back to the text once the picker is gone.
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal("Color!", layer.Text!.Text);
 
         PressSwatch("Foreground color");
         await Pump(() => window.OwnedWindows.Count > 0);
@@ -173,7 +176,32 @@ public class TextEditingTests
         await Pump(() => window.OwnedWindows.Count == 0);
         Assert.Equal(0xFF108030u, layer.Text!.Color);
         Assert.Equal(new SKColor(0x10, 0x80, 0x30), session.Foreground);   // OK: the text color is the foreground color.
-        Assert.Equal("Color", layer.Text.Text);
+        Assert.Equal("Color!", layer.Text.Text);
+        window.KeyTextInput("?");
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control); // Typing and Ctrl+Enter reach the text after OK too.
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(session.IsEditingText);
+        Assert.Equal("Color!?", session.Document.Find(layer.Id)!.Text!.Text);
+    }
+
+    /// <summary>Closing while typing commits the text, so it counts as a change and the usual save prompt appears instead of nothing.</summary>
+    [AvaloniaFact]
+    public async Task Closing_the_window_while_typing_commits_the_text_and_asks_to_save()
+    {
+        Click(80, 120);
+        window.KeyTextInput("Keep");
+        Dispatcher.UIThread.RunJobs();
+        var layer = session.TextEditLayer!;
+        window.Close();
+        await Pump(() => window.OwnedWindows.Count > 0);
+        Assert.False(session.IsEditingText);
+        Assert.True(session.IsModified);
+        Assert.Equal("Keep", session.Document.Find(layer.Id)!.Text!.Text);
+        var prompt = Assert.Single(window.OwnedWindows);
+        Assert.Equal("Unsaved Changes", prompt.Title);
+        prompt.Close();                                                  // Cancel: the window stays open.
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.True(window.IsVisible);
     }
 
     /// <summary>A text layer that is only selected previews the picker too, and the pick undoes as one step without opening the text for typing.</summary>

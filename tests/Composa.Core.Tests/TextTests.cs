@@ -1,4 +1,5 @@
 using Composa.Editing;
+using Composa.Filters;
 using Composa.IO;
 using Composa.Model;
 using Composa.Text;
@@ -156,6 +157,30 @@ public class TextEditorTests
 public class TextSessionTests
 {
     private static readonly string Family = EditorSession.FontFamilies.FirstOrDefault(f => f.Contains("Sans", StringComparison.OrdinalIgnoreCase)) ?? EditorSession.FontFamilies.First();
+
+    /// <summary>
+    /// A text layer is live, so adjustments and filters are unavailable on it whether it is being typed or committed: they can never
+    /// act on text being typed, and a text layer takes them only once it is rasterized.
+    /// </summary>
+    [Fact]
+    public void Adjustments_are_unavailable_on_live_text_whether_typed_or_committed()
+    {
+        var session = EditorSession.NewCanvas(400, 200, SKColors.White);
+        session.TextDefaults = new TextStyle { FontFamily = Family, Size = 40 };
+        session.Foreground = SKColors.Black;
+        var editor = session.BeginText(new SKPoint(50, 60));
+        editor.Insert("Hi");
+        Assert.False(session.CanEditPixels);
+        session.Adjust(new InvertAdjustment());                          // Nothing happens, and the text stays open.
+        Assert.True(session.IsEditingText);
+        Assert.Equal("Hi", session.TextEditLayer!.Text!.Text);
+        session.FinishText();
+        Assert.False(session.CanEditPixels);
+        session.RasterizeShape(session.ActiveLayer!);
+        Assert.True(session.CanEditPixels);
+        session.Adjust(new InvertAdjustment());
+        Assert.Equal("Invert", session.History.UndoName);
+    }
 
     [Fact]
     public void New_point_text_is_typed_live_committed_once_and_discarded_when_empty()

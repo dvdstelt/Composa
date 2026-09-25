@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Composa.App.Controls;
@@ -101,6 +102,33 @@ public class DialogTests
         Assert.All(pairs, f => { Assert.Equal(SliderTracks.CyanRed, f.Track); Assert.Equal(0, f.Reset); });
         dialog.Close();
         Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>A negative or zero resolution is clamped as it is typed, so the dialog never carries an unusable one into the sizes.</summary>
+    [AvaloniaFact]
+    public void Image_size_clamps_a_negative_resolution_instead_of_getting_stuck()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var task = CanvasDialogs.ImageSize(window, 1920, 1080, 72);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = window.OwnedWindows.Last();
+        var boxes = dialog.GetVisualDescendants().OfType<NumericUpDown>().ToList();
+        var (width, height, resolution) = (boxes[0], boxes[1], boxes[2]);
+        // Typed as a user would: the box clamps what is committed when the focus moves on, so nothing below 1 gets through.
+        var entry = resolution.GetVisualDescendants().OfType<TextBox>().Single();
+        entry.Focus();
+        entry.Text = "-5";
+        width.GetVisualDescendants().OfType<TextBox>().Single().Focus();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, resolution.Value);
+        resolution.Value = 300;
+        width.Value = 960;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(540, height.Value);                                  // Proportions still follow after the bad entry.
+        dialog.Close(true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal((960, 540, 300d), task.Result);
     }
 
     [AvaloniaFact]
