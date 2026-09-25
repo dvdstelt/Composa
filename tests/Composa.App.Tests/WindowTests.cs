@@ -13,17 +13,6 @@ namespace Composa.App.Tests;
 
 public class WindowTests
 {
-    internal static readonly string Shots = Path.Combine(AppContext.BaseDirectory, "../../../../../artifacts/screenshots");
-
-    private static void Capture(Window window, string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        var frame = window.CaptureRenderedFrame();
-        Directory.CreateDirectory(Shots);
-        frame?.Save(Path.Combine(Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-    }
-
     private static MainWindow Open()
     {
         var window = new MainWindow { Width = 1280, Height = 800 };
@@ -52,7 +41,7 @@ public class WindowTests
     public void Welcome_screen_renders()
     {
         var window = Open();
-        Capture(window, "01-welcome");
+        Screenshots.Save(window, "01-welcome");
         Assert.Null(window.Session);
     }
 
@@ -61,7 +50,7 @@ public class WindowTests
     {
         var window = Open();
         var session = Sample(window);
-        Capture(window, "02-move-tool");
+        Screenshots.Save(window, "02-move-tool");
 
         session.SelectEllipse(new SKRect(250, 150, 650, 450));
         session.AddAdjustmentLayer(new HueSaturationAdjustment().WithShift(HueRange.Master, new HslShift(120, 20, 0)));
@@ -73,11 +62,11 @@ public class WindowTests
         session.BeginStroke(new SKPoint(120, 480), out _);
         for (var i = 0; i <= 40; i++) session.ContinueStroke(new SKPoint(120 + i * 16, 480 + MathF.Sin(i / 4f) * 60));
         session.EndStroke();
-        Capture(window, "03-brush-and-adjustment");
+        Screenshots.Save(window, "03-brush-and-adjustment");
 
         window.SelectTool(Tool.Marquee);
         session.SelectRect(new SKRect(80, 60, 420, 300));
-        Capture(window, "04-selection");
+        Screenshots.Save(window, "04-selection");
 
         session.Deselect();
         session.SelectLayer(session.Document.Layers[1].Id);
@@ -85,7 +74,7 @@ public class WindowTests
         var edit = session.BeginTransform()!;
         edit.RotateTo(new SKPoint(900, 300), new SKPoint(880, 420), snap: false);
         session.CommitTransform();
-        Capture(window, "05-rotated");
+        Screenshots.Save(window, "05-rotated");
         Assert.True(session.CanUndo);
     }
 
@@ -102,7 +91,7 @@ public class WindowTests
         window.MouseDown(center, MouseButton.Left);
         window.MouseMove(center + new Vector(60, 10));
         window.MouseUp(center + new Vector(60, 10), MouseButton.Left);
-        Capture(window, "06-pointer-stroke");
+        Screenshots.Save(window, "06-pointer-stroke");
         Assert.True(session.CanUndo);
         Assert.Equal("Brush", session.History.UndoName);
         var painted = session.Composite().GetPixel(200, 150);
@@ -200,10 +189,7 @@ public class LayersPanelTests
         window.MouseMove(to);
         window.MouseUp(to, MouseButton.Left);
         Assert.True(view.HasCrop);
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "07-layers-and-crop.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(window, "07-layers-and-crop");
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Assert.Equal(540, session.Document.Width);
         Assert.Equal(420, session.Document.Height);
@@ -212,14 +198,6 @@ public class LayersPanelTests
 
 public class ZoomTests
 {
-    private static void Save(Window window, string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-    }
-
     [AvaloniaFact]
     public void Large_documents_render_zoomed_out_and_zoomed_in()
     {
@@ -239,7 +217,7 @@ public class ZoomTests
         session.AddImageLayer("Rings", photo, fit: false);
         session.AddAdjustmentLayer(new CurvesAdjustment().WithChannel(0, [new(0, 0), new(110, 150), new(255, 255)]));
         session.SelectEllipse(new SKRect(1500, 900, 3300, 2300));
-        Save(window, "08-large-zoomed-out");
+        Screenshots.Save(window, "08-large-zoomed-out");
         Assert.True(window.Canvas.Zoom < 0.5);
 
         // Painting while zoomed out updates just the dirty part of the on-screen render.
@@ -251,10 +229,10 @@ public class ZoomTests
         session.BeginStroke(new SKPoint(600, 600), out _);
         for (var i = 0; i <= 30; i++) { session.ContinueStroke(new SKPoint(600 + i * 120, 600 + MathF.Sin(i / 3f) * 300)); Dispatcher.UIThread.RunJobs(); }
         session.EndStroke();
-        Save(window, "09-large-painted");
+        Screenshots.Save(window, "09-large-painted");
 
         window.Canvas.ZoomTo(12, new Point(window.Canvas.Bounds.Width / 2, window.Canvas.Bounds.Height / 2));
-        Save(window, "09b-zoomed-in-grid");
+        Screenshots.Save(window, "09b-zoomed-in-grid");
         Assert.Equal(12, window.Canvas.Zoom);
     }
 
@@ -272,10 +250,10 @@ public class ZoomTests
         Rendering.Pixels.Invalidate(mask);
         session.Select(mask, Selections.SelectionMode.Replace);
         using (var outline = Selections.SelectionMask.Outline(session.Selection!)) Assert.True(outline.PointCount > 20_000);
-        Save(window, "08b-complex-selection-zoomed-out");
+        Screenshots.Save(window, "08b-complex-selection-zoomed-out");
         Assert.True(window.Canvas.Zoom < 0.5);
         window.Canvas.ZoomTo(2, new Point(window.Canvas.Bounds.Width / 2, window.Canvas.Bounds.Height / 2));
-        Save(window, "08c-complex-selection-zoomed-in");
+        Screenshots.Save(window, "08c-complex-selection-zoomed-in");
         Assert.Equal(2, window.Canvas.Zoom);
     }
 }

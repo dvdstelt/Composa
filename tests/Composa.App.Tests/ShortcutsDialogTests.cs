@@ -36,9 +36,7 @@ public class ShortcutsDialogTests
         dialog.KeyPressQwerty(PhysicalKey.K, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("K", recorder.Content);
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "26-keyboard-shortcuts.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(dialog, "26-keyboard-shortcuts");
         dialog.Close(true);
         Dispatcher.UIThread.RunJobs();
 

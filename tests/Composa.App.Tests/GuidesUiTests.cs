@@ -63,9 +63,7 @@ public class GuidesUiTests
         Dispatcher.UIThread.RunJobs();
         Drag(At(100, 300), At(100 + 117, 300)); // Right edge would land at 247; the guide at 250 pulls it over.
         Assert.Equal(190, layer.Transform.X);
-        Directory.CreateDirectory(WindowTests.Shots);
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "25-rulers-guides-grid.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(window, "25-rulers-guides-grid");
 
         // Dropping a guide back onto a ruler deletes it.
         Drag(At(150, 160), OnCanvas(400, 5));

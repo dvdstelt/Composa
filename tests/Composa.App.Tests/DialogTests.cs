@@ -17,10 +17,8 @@ public class DialogTests
     private static void Capture(Window owner, string name)
     {
         Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         var dialog = owner.OwnedWindows.Last();
-        Directory.CreateDirectory(WindowTests.Shots);
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(dialog, name);
         dialog.Close();
         Dispatcher.UIThread.RunJobs();
     }
@@ -108,8 +106,7 @@ public class JpegDialogTests
         Dispatcher.UIThread.RunJobs();
         var dialog = Assert.Single(window.OwnedWindows);
         for (var i = 0; i < 40; i++) { await Task.Delay(25); Dispatcher.UIThread.RunJobs(); }
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "21-jpeg-export.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(dialog, "21-jpeg-export");
         dialog.Close(true);
         Assert.Equal(60, await task);
     }
@@ -143,9 +140,7 @@ public class CameraRawDialogTests
         var eye = ((Grid)groups[0].Header!).Children.OfType<Button>().Single();
         Assert.True(eye.IsVisible);
         Assert.False(((Grid)groups[2].Header!).Children.OfType<Button>().Single().IsVisible);
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "30-camera-raw.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(dialog, "30-camera-raw");
         eye.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         dialog.Close(true);
         Dispatcher.UIThread.RunJobs();

@@ -110,12 +110,7 @@ public class AngleDialTests
     [AvaloniaFact]
     public void The_shadow_dialog_renders_with_the_dial()
     {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        using var frame = dialog.CaptureRenderedFrame();
-        Directory.CreateDirectory(WindowTests.Shots);
-        frame?.Save(Path.Combine(WindowTests.Shots, "46-drop-shadow-dialog.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-        Assert.NotNull(frame);
+        Assert.True(Screenshots.Save(dialog, "46-drop-shadow-dialog"));
         Assert.Equal(4, dialog.GetVisualDescendants().OfType<SliderField>().Count());
     }
 }

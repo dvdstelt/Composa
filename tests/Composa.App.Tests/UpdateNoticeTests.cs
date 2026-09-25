@@ -30,12 +30,7 @@ public class UpdateNoticeTests
         notice.Show(new ReleaseVersion(9, 9, 9, ""));
         Assert.True(notice.IsVisible);
 
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        var frame = window.CaptureRenderedFrame();
-        Directory.CreateDirectory(WindowTests.Shots);
-        frame?.Save(Path.Combine(WindowTests.Shots, "20-update-notice.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-        Assert.NotNull(frame);
+        Assert.True(Screenshots.Save(window, "20-update-notice"));
     }
 
     [AvaloniaFact]

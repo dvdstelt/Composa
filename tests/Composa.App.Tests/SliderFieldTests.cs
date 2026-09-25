@@ -200,29 +200,20 @@ public class SliderFieldTests
         window.SelectTool(Tool.Brush);
         Dispatcher.UIThread.RunJobs();
         Field("Hardness").Value = 63;
-        Capture("42-slider-fields-brush");
+        Screenshots.Save(window, "42-slider-fields-brush");
         window.SelectTool(Tool.Marquee);
         Dispatcher.UIThread.RunJobs();
         session.Feather = 22;
         window.SelectTool(Tool.Marquee);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(22, Field("Feather").Value);
-        Capture("43-slider-fields-marquee");
+        Screenshots.Save(window, "43-slider-fields-marquee");
         session.AddText(new SKPoint(100, 100), session.TextDefaults with { Text = "Hello" });
         window.SelectTool(Tool.Text);
         Dispatcher.UIThread.RunJobs();
-        Capture("44-options-bar-type");
+        Screenshots.Save(window, "44-options-bar-type");
         window.SelectTool(Tool.Move);
         Dispatcher.UIThread.RunJobs();
-        Capture("45-options-bar-move");
-    }
-
-    private void Capture(string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        using var frame = window.CaptureRenderedFrame();
-        Directory.CreateDirectory(WindowTests.Shots);
-        frame?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(window, "45-options-bar-move");
     }
 }

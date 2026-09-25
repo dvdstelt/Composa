@@ -14,14 +14,6 @@ namespace Composa.App.Tests;
 
 public class EffectsUiTests
 {
-    private static void Capture(Window window, string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-    }
-
     [AvaloniaFact]
     public void Effect_rows_select_edit_and_delete()
     {
@@ -44,7 +36,7 @@ public class EffectsUiTests
             OuterGlow = layer.Effects.OuterGlow! with { Size = 30, Color = 0xFFFFD040 }
         });
         Dispatcher.UIThread.RunJobs();
-        Capture(window, "22-layer-effects");
+        Screenshots.Save(window, "22-layer-effects");
 
         var panel = window.GetVisualDescendants().OfType<LayersPanel>().Single();
         var rows = panel.GetVisualDescendants().OfType<Border>().Where(b => b.Tag is ValueTuple<Layer, LayerEffectKind>).ToList();
@@ -63,9 +55,7 @@ public class EffectsUiTests
         Dispatcher.UIThread.RunJobs();
         var dialog = Assert.Single(window.OwnedWindows);
         Assert.Equal("Stroke", dialog.Title);
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "23-stroke-dialog.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(dialog, "23-stroke-dialog");
         dialog.Close(false);
         Dispatcher.UIThread.RunJobs();
         Assert.Equal(8, session.Document.Find(layer.Id)!.Effects!.Stroke!.Size);

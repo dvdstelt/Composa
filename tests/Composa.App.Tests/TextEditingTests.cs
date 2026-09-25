@@ -39,14 +39,6 @@ public class TextEditingTests
         Dispatcher.UIThread.RunJobs();
     }
 
-    private void Capture(string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
-    }
-
     [AvaloniaFact]
     public void Printable_keys_stay_unhandled_while_typing_so_the_platform_delivers_the_characters()
     {
@@ -87,7 +79,7 @@ public class TextEditingTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("Composa\nfor Linux", layer.Text!.Text);
         Assert.Equal(0xFFFFC857u, layer.Text.Color);
-        Capture("19-text-typing");
+        Screenshots.Save(window, "19-text-typing");
         // Letters are text, not tool shortcuts.
         Assert.Equal(Tool.Text, session.Tool);
         window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.Shift | RawInputModifiers.Control);
@@ -99,7 +91,7 @@ public class TextEditingTests
         Assert.False(session.IsEditingText);
         Assert.Equal("Text", session.History.UndoName);
         Assert.Equal("Composa for Linux", session.Document.Find(layer.Id)!.Name);
-        Capture("20-text-layer");
+        Screenshots.Save(window, "20-text-layer");
         Assert.Equal(1, session.History.Count);
     }
 
@@ -126,7 +118,7 @@ public class TextEditingTests
         Dispatcher.UIThread.RunJobs();
         Assert.Equal((360d, 200d), (layer.Text!.BoxWidth, layer.Text.BoxHeight));
         Assert.Equal((100d, 100d), (layer.Transform.X, layer.Transform.Y));
-        Capture("20b-paragraph-box");
+        Screenshots.Save(window, "20b-paragraph-box");
         window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
         Assert.False(session.IsEditingText);
