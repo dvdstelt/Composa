@@ -43,7 +43,7 @@ public static class AdjustmentDialogs
             GaussianBlurAdjustment blur => Sliders(
                 ("Radius", blur.Radius, GaussianBlurAdjustment.MinRadius, GaussianBlurAdjustment.MaxRadius, 0.1, "0.0", v => Update(blur = blur with { Radius = v }), new GaussianBlurAdjustment().Radius)),
             MotionBlurAdjustment motion => Ui.Column(8,
-                Ui.AngleField("Angle", motion.Angle, -90, 90, v => Update(motion = motion with { Angle = v }), FieldWidth, Controls.AngleDialStyle.Line, new MotionBlurAdjustment().Angle),
+                Ui.AngleField("Angle", motion.Angle, -180, 180, v => Update(motion = motion with { Angle = v }), FieldWidth, Controls.AngleDialStyle.Line, new MotionBlurAdjustment().Angle),
                 Ui.SliderField("Distance", motion.Distance, MotionBlurAdjustment.MinDistance, 500, v => Update(motion = motion with { Distance = v }), 1, "0", FieldWidth, reset: new MotionBlurAdjustment().Distance)),
             AddNoiseAdjustment noise => NoiseEditor(noise, Update),
             GradientMapAdjustment map => GradientMapEditor(owner, map, foreground, background, Update),
@@ -281,8 +281,9 @@ public static class AdjustmentDialogs
                 Slider("Radius", initial.Radius, 0.1, 250, v => current with { Radius = v }, 0.1, "0.0");
                 break;
             case FilterKind.MotionBlur:
-                // The blur runs along a line, so its dial is a line rather than a light.
-                panel.Children.Add(Ui.AngleField("Angle", initial.Angle, -90, 90, v => Update(current with { Angle = v }), FieldWidth, Controls.AngleDialStyle.Line, initial.Angle));
+                // The blur runs along a line, so its dial is a line rather than a light. It turns the full circle as Photoshop's field
+                // allows, although 200 blurs the same as 20, because a dial that turns half way feels stuck.
+                panel.Children.Add(Ui.AngleField("Angle", initial.Angle, -180, 180, v => Update(current with { Angle = v }), FieldWidth, Controls.AngleDialStyle.Line, initial.Angle));
                 Slider("Distance", initial.Radius, 1, 500, v => current with { Radius = v });
                 break;
             case FilterKind.Sharpen:

@@ -10,7 +10,7 @@ public enum AngleDialStyle
 {
     /// <summary>A hand pointing at a light, with the shadow's stub opposite: the angle of a shadow or glow.</summary>
     Light,
-    /// <summary>A line through the centre: a direction that reads the same both ways, as a motion blur's, wrapping every 180 degrees.</summary>
+    /// <summary>A line through the centre with a dot at the end the number counts towards: a direction, as a motion blur's.</summary>
     Line
 }
 
@@ -19,7 +19,7 @@ public enum AngleDialStyle
 /// bright dot at its tip, and a dim stub on the far side of the centre showing where the shadow falls. Press or drag anywhere on it to
 /// turn the hand to the pointer; Shift snaps to 15 degree steps; the wheel and the arrow keys turn it by one degree. Setting
 /// <see cref="Value"/> from code redraws without raising <see cref="Changed"/>. The <see cref="AngleDialStyle.Line"/> style draws a
-/// line through the centre instead, for a direction where 100 degrees is the same line as -80.
+/// line through the centre instead of a hand, for a direction rather than a light; it turns the full circle like the hand does.
 /// </summary>
 public sealed class AngleDial : Control
 {
@@ -50,15 +50,12 @@ public sealed class AngleDial : Control
         Width = Height = DefaultSize;
         Focusable = true;
         Cursor = new Cursor(StandardCursorType.Hand);
-        var what = style == AngleDialStyle.Line ? "The line is the direction; the dot marks the positive end" : "The hand points at the light; the shadow falls the other way";
+        var what = style == AngleDialStyle.Line ? "The line is the direction; the dot marks the end the number counts towards" : "The hand points at the light; the shadow falls the other way";
         ToolTip.SetTip(this, what + "\nDrag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°");
         ToolTip.SetShowDelay(this, 450);
     }
 
     public AngleDialStyle Style => style;
-
-    /// <summary>Degrees before the dial comes back to the same picture: a line reads the same both ways.</summary>
-    private double Period => style == AngleDialStyle.Line ? 180 : 360;
 
     public double Value
     {
@@ -72,16 +69,12 @@ public sealed class AngleDial : Control
         }
     }
 
-    /// <summary>
-    /// Brings any angle into the dial's range, so 190 on a -180 to 180 dial is -170 and straight left reads 180, never -180; a line
-    /// dial from -90 to 90 reads 100 as -80 and straight down as 90.
-    /// </summary>
+    /// <summary>Brings any angle into the dial's range, so 190 on a -180 to 180 dial is -170 and straight left reads 180, never -180.</summary>
     public double Normalise(double degrees)
     {
         if (!double.IsFinite(degrees)) return max;
-        var period = Period;
-        if (max - min < period) return Math.Clamp(degrees, min, max);
-        var wrapped = max - ((max - degrees) % period + period) % period;
+        if (max - min < 360) return Math.Clamp(degrees, min, max);
+        var wrapped = max - ((max - degrees) % 360 + 360) % 360;
         return Math.Round(wrapped, 6);
     }
 

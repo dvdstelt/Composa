@@ -116,7 +116,7 @@ public class AngleDialTests
     }
 }
 
-/// <summary>Motion Blur's dial is a line: the direction reads the same both ways, so it wraps every 180 degrees.</summary>
+/// <summary>Motion Blur's dial is a line through the centre that turns the full circle, with the field and its Reset following it.</summary>
 public class LineDialTests
 {
     private readonly MainWindow window;
@@ -152,31 +152,32 @@ public class LineDialTests
     }
 
     [AvaloniaFact]
-    public async Task The_line_dial_wraps_every_180_degrees_and_the_field_and_the_reset_follow_it()
+    public async Task The_line_dial_turns_the_full_circle_and_the_field_and_the_reset_follow_it()
     {
         Assert.Equal(AngleDialStyle.Line, dial.Style);
         Assert.Equal(30, dial.Value);
         Assert.Equal(30, field.Value);
 
-        // Pressing on the far side of the line is the same line: 135 reads -45.
+        // The dot follows the pointer all the way round: the far side of the 30 degree line reads 210 as -150, not as 30.
         dialog.MouseDown(OnDial(135), MouseButton.Left);
         dialog.MouseUp(OnDial(135), MouseButton.Left);
-        Assert.Equal(-45, dial.Value);
-        Assert.Equal(-45, field.Value);
-        Assert.Equal(-45, await Angle());
+        Assert.Equal(135, dial.Value);
+        Assert.Equal(135, field.Value);
+        Assert.Equal(135, await Angle());
+        dialog.MouseDown(OnDial(-150), MouseButton.Left);
+        dialog.MouseUp(OnDial(-150), MouseButton.Left);
+        Assert.Equal(-150, dial.Value);
+        Assert.Equal(-150, await Angle());
 
-        // Straight down is the same line as straight up and reads 90, as straight left reads 180 on a light dial.
-        dialog.MouseDown(OnDial(-90), MouseButton.Left);
-        dialog.MouseUp(OnDial(-90), MouseButton.Left);
-        Assert.Equal(90, dial.Value);
-        Assert.Equal(90, await Angle());
-
-        // The arrows keep turning past the edge instead of stopping there.
+        // The arrows keep turning past the edge instead of stopping there: straight left reads 180, one more is -179.
+        dialog.MouseDown(OnDial(180), MouseButton.Left);
+        dialog.MouseUp(OnDial(180), MouseButton.Left);
+        Assert.Equal(180, dial.Value);
         Assert.True(dial.IsFocused);
         dialog.KeyPressQwerty(PhysicalKey.ArrowUp, RawInputModifiers.None);
-        Assert.Equal(-89, dial.Value);
-        Assert.Equal(-89, field.Value);
-        Assert.Equal(-89, await Angle());
+        Assert.Equal(-179, dial.Value);
+        Assert.Equal(-179, field.Value);
+        Assert.Equal(-179, await Angle());
 
         // Typing into the field turns the dial, and the field's Reset turns it back to the angle the filter opened with.
         field.BeginEdit();
