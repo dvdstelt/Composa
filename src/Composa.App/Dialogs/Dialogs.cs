@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Composa.Editing;
+using Composa.Model;
 using SkiaSharp;
 
 namespace Composa.App.Dialogs;
@@ -123,8 +124,8 @@ public static class CanvasDialogs
     {
         int width = clipboardSize?.W ?? 1920, height = clipboardSize?.H ?? 1080;
         var fill = 0;
-        var widthBox = Ui.Number(width, 1, 30000, v => width = (int)v, width: 120);
-        var heightBox = Ui.Number(height, 1, 30000, v => height = (int)v, width: 120);
+        var widthBox = Ui.Number(width, 1, DocumentLimits.MaxSide, v => width = (int)v, width: 120);
+        var heightBox = Ui.Number(height, 1, DocumentLimits.MaxSide, v => height = (int)v, width: 120);
         var preset = Ui.Combo(Presets, Presets[clipboardSize == null ? 1 : 0], p => p.Name, p =>
         {
             if (p.W == 0) return;
@@ -141,8 +142,8 @@ public static class CanvasDialogs
         int width = currentWidth, height = currentHeight;
         var anchor = Anchor.Center;
         var relative = false;
-        var widthBox = Ui.Number(width, -30000, 30000, v => width = (int)v, width: 120);
-        var heightBox = Ui.Number(height, -30000, 30000, v => height = (int)v, width: 120);
+        var widthBox = Ui.Number(width, -DocumentLimits.MaxSide, DocumentLimits.MaxSide, v => width = (int)v, width: 120);
+        var heightBox = Ui.Number(height, -DocumentLimits.MaxSide, DocumentLimits.MaxSide, v => height = (int)v, width: 120);
         var relativeBox = Ui.Check("Relative", false, v =>
         {
             relative = v;
@@ -167,7 +168,7 @@ public static class CanvasDialogs
             Form(("Width", Ui.Row(6, widthBox, Ui.Label("px", Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label("px", Palette.Secondary))), ("", relativeBox), ("Anchor", anchors)));
         if (!await new DialogWindow("Canvas Size", body).Ask(owner)) return null;
         if (relative) { width += currentWidth; height += currentHeight; }
-        return (Math.Clamp(width, 1, 30000), Math.Clamp(height, 1, 30000), anchor);
+        return (Math.Clamp(width, 1, DocumentLimits.MaxSide), Math.Clamp(height, 1, DocumentLimits.MaxSide), anchor);
     }
 
     public static async Task<(int Width, int Height, double Resolution)?> ImageSize(Window owner, int currentWidth, int currentHeight, double resolution)
@@ -176,13 +177,13 @@ public static class CanvasDialogs
         var constrain = true;
         var syncing = false;
         NumericUpDown widthBox = null!, heightBox = null!;
-        widthBox = Ui.Number(width, 1, 30000, v =>
+        widthBox = Ui.Number(width, 1, DocumentLimits.MaxSide, v =>
         {
             width = (int)v;
             if (!constrain || syncing) return;
             syncing = true; heightBox.Value = Math.Max(1, (int)Math.Round(v * currentHeight / currentWidth)); syncing = false;
         }, width: 120);
-        heightBox = Ui.Number(height, 1, 30000, v =>
+        heightBox = Ui.Number(height, 1, DocumentLimits.MaxSide, v =>
         {
             height = (int)v;
             if (!constrain || syncing) return;

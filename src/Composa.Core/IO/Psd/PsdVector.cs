@@ -91,7 +91,7 @@ internal static class PsdVector
         return new Raster(image, new SKRectI((int)box.Left, (int)box.Top, (int)box.Left + size.Value.Width, (int)box.Top + size.Value.Height));
     }
 
-    /// <summary>Refuses sizes past the 30,000 px side and the remaining pixel budget; null for an empty box.</summary>
+    /// <summary>Refuses sizes past <see cref="DocumentLimits.MaxSide"/> and the remaining pixel budget; null for an empty box.</summary>
     private static SKSizeI? PixelSize(SKRect box, long remainingPixels)
     {
         if (!float.IsFinite(box.Left) || !float.IsFinite(box.Top) || !float.IsFinite(box.Width) || !float.IsFinite(box.Height)) return null;

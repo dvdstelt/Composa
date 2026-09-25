@@ -27,7 +27,7 @@ public enum TextAlignment { Left, Center, Right }
 public sealed record TextStyle
 {
     public const int MaxLength = 100_000;
-    public const double MinBox = 16, MaxBox = 30_000;
+    public const double MinBox = 16, MaxBox = DocumentLimits.MaxSide;
 
     public string Text { get; init; } = "";
     public string FontFamily { get; init; } = "Inter";
