@@ -18,9 +18,10 @@ public static class ProjectFile
     public const string Format = "org.composa.project";
     /// <summary>
     /// The format version new saves write, and the highest one <see cref="Read"/> accepts. 1 was the first release,
-    /// 2 added guides, 3 added the Gaussian Blur, Motion Blur and Add Noise adjustment layers and the Inner Glow effect.
+    /// 2 added guides, 3 added the Gaussian Blur, Motion Blur and Add Noise adjustment layers and the Inner Glow effect,
+    /// 4 added letters in their own colors (<see cref="TextStyle.ColorRuns"/>).
     /// </summary>
-    public const int Version = 3;
+    public const int Version = 4;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -156,7 +157,7 @@ public static class ProjectFile
                 Id = record.Id == Guid.Empty ? Guid.NewGuid() : record.Id, Name = record.Name, Kind = record.Kind, Visible = record.Visible,
                 Opacity = double.IsFinite(record.Opacity) ? Math.Clamp(record.Opacity, 0, 1) : 1, Blend = record.Blend,
                 MaskEnabled = record.MaskEnabled ?? true, Clipped = record.Clipped ?? false, Collapsed = record.Collapsed ?? false,
-                Adjustment = record.Adjustment, Shape = record.Shape, Text = record.Text
+                Adjustment = record.Adjustment, Shape = record.Shape, Text = record.Text?.Clamped()
             };
             if (record.ImageFile != null && record.Kind == LayerKind.Raster)
             {

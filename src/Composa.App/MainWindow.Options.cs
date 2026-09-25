@@ -165,24 +165,25 @@ public sealed partial class MainWindow
             // The picker's working color shows on the canvas as it changes. Text being typed takes it as any bar change;
             // a text layer that is not open for typing shows it inside an edit that is taken back when the dialog
             // closes, and the pick then goes through Change so it undoes as one step like any other bar change.
-            var original = s.CurrentTextStyle.Color;
+            // While typing, the color goes on the selected letters only (or all of them when nothing is selected).
+            var original = s.CurrentTextStyle;
             var editing = s.TextEdit;
             var layer = editing == null && s.ActiveLayer is { Text: not null } active ? active : null;
             if (layer != null) s.Begin("Change Text Style");
             void Preview(SKColor color)
             {
                 var opaque = (uint)color | 0xFF000000;
-                if (editing != null && s.TextEdit == editing) Change(st => st with { Color = opaque });
-                else if (layer != null) s.PreviewTextStyle(layer, st => st with { Color = opaque });
+                if (editing != null && s.TextEdit == editing) s.SetTextColor(opaque);
+                else if (layer != null) s.PreviewTextStyle(layer, st => st.WithColor(opaque, 0, 0));
             }
-            var picked = await Dialogs.Prompts.Color(this, "Text Color", new SKColor(original), editing != null || layer != null ? Preview : null);
+            var picked = await Dialogs.Prompts.Color(this, "Text Color", new SKColor(s.CurrentTextColor), editing != null || layer != null ? Preview : null);
             if (layer != null) s.Cancel();
             if (picked is not { } color)
             {
-                if (editing != null && s.TextEdit == editing) Change(st => st with { Color = original });
+                if (editing != null && s.TextEdit == editing) s.RestoreTextColors(original);
                 return;
             }
-            Change(st => st with { Color = (uint)color | 0xFF000000 });
+            if (!updating) s.SetTextColor((uint)color | 0xFF000000);
             // The text color is the foreground color: picking one in the Type bar moves the swatch too.
             s.Foreground = color;
             UpdateColors();
@@ -219,7 +220,7 @@ public sealed partial class MainWindow
             leading.Value = (decimal)current.Leading;
             bold.IsChecked = current.Bold;
             italic.IsChecked = current.Italic;
-            swatch.Background = new Avalonia.Media.SolidColorBrush(new SKColor(current.Color).ToAvalonia());
+            swatch.Background = new Avalonia.Media.SolidColorBrush(new SKColor(s.CurrentTextColor).ToAvalonia());
             foreach (var (alignment, button) in alignments) button.IsChecked = current.Alignment == alignment;
             updating = false;
         };

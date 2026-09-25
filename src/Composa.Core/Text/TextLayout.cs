@@ -183,28 +183,42 @@ public sealed class TextLayout
     public void Draw(SKCanvas canvas)
     {
         using var font = MakeFont();
-        using var paint = new SKPaint { Color = new SKColor(Style.Color), IsAntialias = true };
+        using var paint = new SKPaint { IsAntialias = true };
         canvas.Save();
         if (Style.IsBox) canvas.ClipRect(new SKRect(0, 0, Width, Height));
+        // Letters are drawn a stretch at a time, one stretch per color; text in one color is one stretch per line.
+        var glyphs = new List<ushort>();
+        var positions = new List<SKPoint>();
+        void Flush(uint color)
+        {
+            if (glyphs.Count == 0) return;
+            using var builder = new SKTextBlobBuilder();
+            var run = builder.AllocatePositionedRun(font, glyphs.Count);
+            run.SetGlyphs(glyphs.ToArray());
+            run.SetPositions(positions.ToArray());
+            using var blob = builder.Build();
+            paint.Color = new SKColor(color);
+            if (blob != null) canvas.DrawText(blob, 0, 0, paint);
+            glyphs.Clear();
+            positions.Clear();
+        }
         foreach (var line in Lines)
         {
             if (line.Length == 0) continue;
             var segment = Text.Substring(line.Start, line.Length);
-            var glyphs = font.GetGlyphs(segment);
-            if (glyphs.Length == 0) continue;
-            var positions = new SKPoint[glyphs.Length];
+            var lineGlyphs = font.GetGlyphs(segment);
+            if (lineGlyphs.Length == 0) continue;
             var glyph = 0;
-            for (var k = 0; k < segment.Length && glyph < glyphs.Length; k++)
+            var color = Style.ColorAt(line.Start);
+            for (var k = 0; k < segment.Length && glyph < lineGlyphs.Length; k++)
             {
-                positions[glyph++] = new SKPoint(line.X + line.Positions[k], line.Baseline);
+                var next = Style.ColorAt(line.Start + k);
+                if (next != color) { Flush(color); color = next; }
+                glyphs.Add(lineGlyphs[glyph++]);
+                positions.Add(new SKPoint(line.X + line.Positions[k], line.Baseline));
                 if (char.IsHighSurrogate(segment[k]) && k + 1 < segment.Length && char.IsLowSurrogate(segment[k + 1])) k++;
             }
-            using var builder = new SKTextBlobBuilder();
-            var run = builder.AllocatePositionedRun(font, glyphs.Length);
-            run.SetGlyphs(glyphs);
-            run.SetPositions(positions);
-            using var blob = builder.Build();
-            if (blob != null) canvas.DrawText(blob, 0, 0, paint);
+            Flush(color);
         }
         canvas.Restore();
     }

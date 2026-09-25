@@ -361,3 +361,143 @@ public class TextSessionTests
         Assert.True(dark > 100);
     }
 }
+
+/// <summary>Letters in their own colors: runs over the text that follow their letters through typing and are drawn as they are.</summary>
+public class TextColorTests
+{
+    private static readonly string Family = EditorSession.FontFamilies.FirstOrDefault(f => f.Contains("Sans", StringComparison.OrdinalIgnoreCase)) ?? EditorSession.FontFamilies.First();
+    private const uint Black = 0xFF000000, Red = 0xFFFF0000, Blue = 0xFF0000FF, Green = 0xFF00FF00;
+
+    [Fact]
+    public void Colors_stay_on_their_letters_while_typing()
+    {
+        var editor = new TextEditor(new TextStyle { Text = "Hello world" });
+        editor.MoveHorizontal(-1, select: true, word: true);                 // "world"
+        editor.SetColor(Red);
+        Assert.Equal([new TextColorRun(6, 5, Red)], editor.Style.ColorRuns);
+        Assert.Equal(Black, editor.Style.Color);                             // The style's own color is untouched.
+        Assert.Equal(Red, editor.ColorAtCaret);                              // The first selected letter's.
+        editor.MoveToDocumentEdge(end: true, select: false);
+        editor.Insert("!");                                                  // Typing takes the color of the letter before it.
+        Assert.Equal([new TextColorRun(6, 6, Red)], editor.Style.ColorRuns);
+        editor.MoveToDocumentEdge(end: false, select: false);
+        editor.Insert("Oh ");                                                // At the very start, the first letter's color.
+        Assert.Equal("Oh Hello world!", editor.Text);
+        Assert.Equal([new TextColorRun(9, 6, Red)], editor.Style.ColorRuns);
+        Assert.Equal(Black, editor.ColorAtCaret);
+        editor.MoveTo(12, select: false);
+        editor.Backspace();                                                  // Removing a colored letter shrinks its run.
+        Assert.Equal("Oh Hello wold!", editor.Text);
+        Assert.Equal([new TextColorRun(9, 5, Red)], editor.Style.ColorRuns);
+        editor.MoveTo(9, select: false);
+        editor.MoveTo(14, select: true);
+        editor.Insert("there");                                              // Typing over colored letters takes the color before them.
+        Assert.Equal("Oh Hello there", editor.Text);
+        Assert.Null(editor.Style.ColorRuns);
+        Assert.True(editor.Undo());
+        Assert.Equal([new TextColorRun(9, 5, Red)], editor.Style.ColorRuns);
+        editor.SelectAll();
+        editor.SetColor(Blue);                                               // Everything selected: the style's own color, no runs.
+        Assert.Equal(Blue, editor.Style.Color);
+        Assert.Null(editor.Style.ColorRuns);
+        Assert.True(editor.Undo());
+        Assert.Equal(Black, editor.Style.Color);
+        Assert.Equal([new TextColorRun(9, 5, Red)], editor.Style.ColorRuns);
+    }
+
+    [Fact]
+    public void Colored_letters_are_drawn_in_their_colors_and_round_trip_through_the_project()
+    {
+        var style = new TextStyle { Text = "AB", FontFamily = Family, Size = 60, Color = Blue, ColorRuns = [new TextColorRun(1, 1, Red)] };
+        using var bitmap = new TextLayout(style).Render();
+        int red = 0, blue = 0, redLeft = int.MaxValue, blueRight = 0;
+        for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var c = bitmap.GetPixel(x, y);
+                if (c.Alpha < 250) continue;
+                if (c.Red > 200 && c.Blue < 60) { red++; redLeft = Math.Min(redLeft, x); }
+                else if (c.Blue > 200 && c.Red < 60) { blue++; blueRight = Math.Max(blueRight, x); }
+            }
+        Assert.True(red > 50 && blue > 50, $"red {red}, blue {blue}");
+        Assert.True(blueRight < redLeft + 2, "The B is drawn to the right of the A.");        // The red letter is the second one.
+
+        var session = EditorSession.NewCanvas(300, 120, SKColors.White);
+        var layer = session.AddText(new SKPoint(10, 10), style);
+        using var stream = new MemoryStream();
+        ProjectFile.Write(session.Document, stream);
+        stream.Position = 0;
+        using (var zip = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Read, leaveOpen: true))
+        using (var reader = new StreamReader(zip.GetEntry("manifest.json")!.Open()))
+            Assert.Contains("\"version\": 4", reader.ReadToEnd());              // Letters in their own colors arrived in version 4.
+        stream.Position = 0;
+        var loaded = ProjectFile.Read(stream).Find(layer.Id)!.Text!;
+        Assert.Equal(layer.Text, loaded);
+        Assert.Equal([new TextColorRun(1, 1, Red)], loaded.ColorRuns);
+    }
+
+    [Fact]
+    public void The_bar_colors_the_selection_while_typing_and_all_of_the_text_otherwise()
+    {
+        var session = EditorSession.NewCanvas(300, 100, SKColors.White);
+        var layer = session.AddText(new SKPoint(10, 10), new TextStyle { Text = "Hi", FontFamily = Family, Size = 40, ColorRuns = [new TextColorRun(1, 1, Red)] });
+        Assert.Equal([new TextColorRun(1, 1, Red)], layer.Text!.ColorRuns);
+        Assert.Equal(Red, layer.Text.ColorAt(1));
+        Assert.Equal(Black, layer.Text.ColorAt(0));
+
+        session.Fill(SKColors.Blue);                                         // Fill paints every letter and drops the runs.
+        Assert.Equal(Blue, layer.Text!.Color);
+        Assert.Null(layer.Text.ColorRuns);
+        session.Undo();
+        layer = session.Document.Find(layer.Id)!;
+        Assert.Equal([new TextColorRun(1, 1, Red)], layer.Text!.ColorRuns);
+
+        session.SetTextColor(Green);                                         // Not open for typing: the whole layer, as one step.
+        layer = session.Document.Find(layer.Id)!;
+        Assert.Equal(Green, layer.Text!.Color);
+        Assert.Null(layer.Text.ColorRuns);
+        Assert.Equal("Change Text Style", session.History.UndoName);
+        session.Undo();
+        layer = session.Document.Find(layer.Id)!;
+
+        var original = layer.Text;                                           // The live layer is restyled in place while typing.
+        var editor = session.EditText(layer)!;
+        editor.MoveTo(2, select: false);
+        editor.MoveTo(1, select: true);                                      // "i"
+        Assert.Equal(Red, session.CurrentTextColor);
+        session.SetTextColor(Green);                                         // Typing: the selected letters only.
+        Assert.Equal([new TextColorRun(1, 1, Green)], session.TextEditLayer!.Text!.ColorRuns);
+        Assert.Equal(Black, session.TextEditLayer.Text.Color);
+        editor.MoveTo(0, select: false);
+        Assert.Equal(Black, session.CurrentTextColor);                       // The swatch follows the caret.
+        session.SetTextColor(Blue);                                          // Nothing selected: every letter.
+        Assert.Equal(Blue, session.TextEditLayer.Text!.Color);
+        Assert.Null(session.TextEditLayer.Text.ColorRuns);
+        session.RestoreTextColors(original);                                 // What a cancelled picker does.
+        Assert.Equal([new TextColorRun(1, 1, Red)], session.TextEditLayer.Text!.ColorRuns);
+        session.FinishText();
+        Assert.Null(session.TextDefaults.ColorRuns);                         // The next text starts in one color.
+
+        session.SelectLayer(session.Document.Layers[0].Id);                  // No text layer: the defaults take the color.
+        session.SetTextColor(Green);
+        Assert.Equal(Green, session.TextDefaults.Color);
+    }
+
+    [Fact]
+    public void Damaged_runs_are_dropped_and_translucent_ones_made_opaque()
+    {
+        TextStyle With(params TextColorRun[] runs) => new TextStyle { Text = "abc", ColorRuns = runs }.Clamped();
+        Assert.Equal([new TextColorRun(1, 1, Red)], With(new TextColorRun(1, 1, 0x00FF0000)).ColorRuns);
+        Assert.Null(With().ColorRuns);
+        Assert.Null(With(new TextColorRun(0, 2, Red), new TextColorRun(1, 1, Blue)).ColorRuns);   // Overlapping.
+        Assert.Null(With(new TextColorRun(2, 5, Red)).ColorRuns);                                  // Past the text.
+        Assert.Null(With(new TextColorRun(1, 0, Red)).ColorRuns);                                  // Empty.
+        Assert.Null(With(new TextColorRun(2, 1, Red), new TextColorRun(0, 1, Blue)).ColorRuns);   // Out of order.
+        Assert.Null(With(new TextColorRun(-1, 2, Red)).ColorRuns);
+        // Equality reads the runs, so a restyled copy with the same runs is the same style.
+        var a = With(new TextColorRun(1, 1, Red));
+        Assert.Equal(a, a with { ColorRuns = [new TextColorRun(1, 1, Red)] });
+        Assert.NotEqual(a, a with { ColorRuns = [new TextColorRun(1, 1, Blue)] });
+        Assert.NotEqual(a, a with { ColorRuns = null });
+    }
+}

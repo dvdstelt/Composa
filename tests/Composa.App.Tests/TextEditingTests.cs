@@ -184,6 +184,59 @@ public class TextEditingTests
         Assert.Equal("Color!?", session.Document.Find(layer.Id)!.Text!.Text);
     }
 
+    /// <summary>With letters selected, the picker colors only those; the swatch shows the color at the caret; Cancel puts every letter's color back.</summary>
+    [AvaloniaFact]
+    public async Task The_color_picker_colors_the_selected_letters_while_typing()
+    {
+        Click(80, 120);
+        window.KeyTextInput("Color");
+        window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.Shift);
+        window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.Shift);
+        Dispatcher.UIThread.RunJobs();
+        var layer = session.TextEditLayer!;
+        Assert.Equal("or", session.TextEdit!.SelectedText);
+        Avalonia.Media.Color Swatch() => ((Avalonia.Media.SolidColorBrush)window.GetVisualDescendants().OfType<Border>().First(b => ToolTip.GetTip(b) as string == "Text color").Background!).Color;
+
+        PressSwatch("Text color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        var dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x20, 0xC0, 0xFF);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal([new TextColorRun(3, 2, 0xFF20C0FF)], layer.Text!.ColorRuns); // Only the selected letters, previewed live.
+        Assert.Equal(0xFFFFC857u, layer.Text.Color);
+        dialog.Close(false);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Null(layer.Text!.ColorRuns);                                  // Cancel: every letter back as it was.
+        Assert.Equal("or", session.TextEdit!.SelectedText);
+
+        PressSwatch("Text color");
+        await Pump(() => window.OwnedWindows.Count > 0);
+        dialog = Assert.Single(window.OwnedWindows);
+        dialog.GetVisualDescendants().OfType<ColorView>().First().Color = Avalonia.Media.Color.FromRgb(0x10, 0x80, 0x30);
+        Dispatcher.UIThread.RunJobs();
+        dialog.Close(true);
+        await Pump(() => window.OwnedWindows.Count == 0);
+        Assert.Equal([new TextColorRun(3, 2, 0xFF108030)], layer.Text!.ColorRuns);
+        Assert.Equal(0xFFFFC857u, layer.Text.Color);
+        Assert.Equal(new SKColor(0x10, 0x80, 0x30), session.Foreground);
+        Assert.Equal(Avalonia.Media.Color.FromRgb(0x10, 0x80, 0x30), Swatch()); // The swatch shows the selected letters' color.
+
+        window.KeyPressQwerty(PhysicalKey.End, RawInputModifiers.None);
+        window.KeyTextInput("s");                                            // Typed after a colored letter, so in its color.
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal([new TextColorRun(3, 3, 0xFF108030)], layer.Text!.ColorRuns);
+        window.KeyPressQwerty(PhysicalKey.Home, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(Avalonia.Media.Color.FromRgb(0xFF, 0xC8, 0x57), Swatch()); // At the start, the text's own color.
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(session.IsEditingText);
+        var committed = session.Document.Find(layer.Id)!.Text!;
+        Assert.Equal("Colors", committed.Text);
+        Assert.Equal([new TextColorRun(3, 3, 0xFF108030)], committed.ColorRuns);
+        Assert.Null(session.TextDefaults.ColorRuns);                         // The next text starts in one color.
+    }
+
     /// <summary>Closing while typing commits the text, so it counts as a change and the usual save prompt appears instead of nothing.</summary>
     [AvaloniaFact]
     public async Task Closing_the_window_while_typing_commits_the_text_and_asks_to_save()
