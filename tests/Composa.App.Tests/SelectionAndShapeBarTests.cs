@@ -83,9 +83,7 @@ public class SelectionAndShapeBarTests
         // Shift snapped the slight slope away: a flat line 8 pixels tall.
         Assert.Equal(8, line.Transform.Height);
         TestColor(SKColors.Blue, session.Composite().GetPixel(200, 100));
-        Directory.CreateDirectory(WindowTests.Shots);
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "24-line-shape.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+        Screenshots.Save(window, "24-line-shape");
     }
 
     private static void TestColor(SKColor expected, SKColor actual) =>

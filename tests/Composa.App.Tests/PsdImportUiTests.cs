@@ -46,9 +46,7 @@ public class PsdImportUiTests
             Assert.Contains("retyped", text);
             Assert.Contains("diss", text);
             Assert.Contains("effects", text);
-            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-            Directory.CreateDirectory(WindowTests.Shots);
-            dialog.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, "40-psd-conversions.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+            Screenshots.Save(dialog, "40-psd-conversions");
 
             // Cancel: nothing opens.
             dialog.Close(false);
@@ -64,7 +62,7 @@ public class PsdImportUiTests
             Assert.Equal(Path.GetFileNameWithoutExtension(path), session.Title);
             Assert.Equal(["Background", "Headline", "Badge"], session.Document.Layers.Select(l => l.Name));
             Assert.Equal((300, 200), (session.Document.Width, session.Document.Height));
-            Capture(window, "41-psd-opened");
+            Screenshots.Save(window, "41-psd-opened");
 
             // Placed into that document, a second copy arrives inside a folder named after the file.
             opening = window.PlacePaths([path], new SKPoint(150, 100));
@@ -115,13 +113,5 @@ public class PsdImportUiTests
             Assert.Equal((0d, 100d, 800d, 400d), (fitted.Transform.X, fitted.Transform.Y, fitted.Transform.Width, fitted.Transform.Height));
         }
         finally { File.Delete(path); }
-    }
-
-    private static void Capture(Window window, string name)
-    {
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-        Directory.CreateDirectory(WindowTests.Shots);
-        window.CaptureRenderedFrame()?.Save(Path.Combine(WindowTests.Shots, name + ".png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
     }
 }
