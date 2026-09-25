@@ -28,22 +28,23 @@ public static class AdjustmentDialogs
             LevelsAdjustment levels => LevelsEditor(levels, histogram, Update),
             CurvesAdjustment curves => CurvesEditor(curves, histogram, Update),
             HueSaturationAdjustment hue => HueEditor(hue, Update),
+            // Reset puts a slider back to the value a new adjustment starts with, not to what the dialog opened with.
             ExposureAdjustment exposure => Sliders(
-                ("Exposure", exposure.Exposure, -5, 5, 0.01, "0.00", v => Update(exposure = exposure with { Exposure = v })),
-                ("Offset", exposure.Offset, -0.5, 0.5, 0.001, "0.000", v => Update(exposure = exposure with { Offset = v })),
-                ("Gamma", exposure.Gamma, 0.1, 5, 0.01, "0.00", v => Update(exposure = exposure with { Gamma = v }))),
+                ("Exposure", exposure.Exposure, -5, 5, 0.01, "0.00", v => Update(exposure = exposure with { Exposure = v }), new ExposureAdjustment().Exposure),
+                ("Offset", exposure.Offset, -0.5, 0.5, 0.001, "0.000", v => Update(exposure = exposure with { Offset = v }), new ExposureAdjustment().Offset),
+                ("Gamma", exposure.Gamma, 0.1, 5, 0.01, "0.00", v => Update(exposure = exposure with { Gamma = v }), new ExposureAdjustment().Gamma)),
             BrightnessContrastAdjustment bc => Sliders(
-                ("Brightness", bc.Brightness, -100, 100, 1, "0", v => Update(bc = bc with { Brightness = v })),
-                ("Contrast", bc.Contrast, -100, 100, 1, "0", v => Update(bc = bc with { Contrast = v }))),
+                ("Brightness", bc.Brightness, -100, 100, 1, "0", v => Update(bc = bc with { Brightness = v }), new BrightnessContrastAdjustment().Brightness),
+                ("Contrast", bc.Contrast, -100, 100, 1, "0", v => Update(bc = bc with { Contrast = v }), new BrightnessContrastAdjustment().Contrast)),
             GrainAdjustment grain => Sliders(
-                ("Amount", grain.Amount, 0, 100, 1, "0", v => Update(grain = grain with { Amount = v })),
-                ("Size", grain.Size, 0.5, 20, 0.1, "0.0", v => Update(grain = grain with { Size = v })),
-                ("Roughness", grain.Roughness, 0, 100, 1, "0", v => Update(grain = grain with { Roughness = v }))),
+                ("Amount", grain.Amount, 0, 100, 1, "0", v => Update(grain = grain with { Amount = v }), new GrainAdjustment().Amount),
+                ("Size", grain.Size, 0.5, 20, 0.1, "0.0", v => Update(grain = grain with { Size = v }), new GrainAdjustment().Size),
+                ("Roughness", grain.Roughness, 0, 100, 1, "0", v => Update(grain = grain with { Roughness = v }), new GrainAdjustment().Roughness)),
             GaussianBlurAdjustment blur => Sliders(
-                ("Radius", blur.Radius, GaussianBlurAdjustment.MinRadius, GaussianBlurAdjustment.MaxRadius, 0.1, "0.0", v => Update(blur = blur with { Radius = v }))),
+                ("Radius", blur.Radius, GaussianBlurAdjustment.MinRadius, GaussianBlurAdjustment.MaxRadius, 0.1, "0.0", v => Update(blur = blur with { Radius = v }), new GaussianBlurAdjustment().Radius)),
             MotionBlurAdjustment motion => Sliders(
-                ("Angle", motion.Angle, -90, 90, 1, "0", v => Update(motion = motion with { Angle = v })),
-                ("Distance", motion.Distance, MotionBlurAdjustment.MinDistance, 500, 1, "0", v => Update(motion = motion with { Distance = v }))),
+                ("Angle", motion.Angle, -90, 90, 1, "0", v => Update(motion = motion with { Angle = v }), new MotionBlurAdjustment().Angle),
+                ("Distance", motion.Distance, MotionBlurAdjustment.MinDistance, 500, 1, "0", v => Update(motion = motion with { Distance = v }), new MotionBlurAdjustment().Distance)),
             AddNoiseAdjustment noise => NoiseEditor(noise, Update),
             GradientMapAdjustment map => GradientMapEditor(owner, map, foreground, background, Update),
             BlackAndWhiteAdjustment bw => BlackAndWhiteEditor(bw, Update),
@@ -73,10 +74,10 @@ public static class AdjustmentDialogs
     /// <summary>One width for every field in these dialogs, so their right edges line up whatever the labels are.</summary>
     private const double FieldWidth = 330;
 
-    private static Control Sliders(params (string Label, double Value, double Min, double Max, double Step, string Format, Action<double> Changed)[] rows)
+    private static Control Sliders(params (string Label, double Value, double Min, double Max, double Step, string Format, Action<double> Changed, double Reset)[] rows)
     {
         var panel = new StackPanel { Spacing = 8 };
-        foreach (var r in rows) panel.Children.Add(Ui.SliderField(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, FieldWidth));
+        foreach (var r in rows) panel.Children.Add(Ui.SliderField(r.Label, r.Value, r.Min, r.Max, r.Changed, r.Step, r.Format, FieldWidth, reset: r.Reset));
         return panel;
     }
 
@@ -84,7 +85,7 @@ public static class AdjustmentDialogs
 
     private static Control NoiseEditor(AddNoiseAdjustment noise, Action<Adjustment> update)
     {
-        var amount = Ui.SliderField("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", FieldWidth);
+        var amount = Ui.SliderField("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", FieldWidth, reset: new AddNoiseAdjustment().Amount);
         var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => d, d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
         var mono = Ui.Check("Monochromatic", noise.Monochromatic, v => update(noise = noise with { Monochromatic = v }));
         return Ui.Column(10, amount, Ui.Row(10, Ui.Label("Distribution", Palette.Secondary), distribution), mono);
@@ -138,9 +139,21 @@ public static class AdjustmentDialogs
             var shift = hue.Shifts[(int)range];
             void Set(HslShift next) { shift = next; update(hue = hue.WithShift(range, next)); }
             var colorizing = hue.Colorize && range == HueRange.Master;
-            rows.Children.Add(Ui.SliderField("Hue", shift.Hue, colorizing ? 0 : -180, colorizing ? 360 : 180, v => Set(shift with { Hue = v }), 1, "0", FieldWidth));
-            rows.Children.Add(Ui.SliderField("Saturation", shift.Saturation, -100, 100, v => Set(shift with { Saturation = v }), 1, "0", FieldWidth));
-            rows.Children.Add(Ui.SliderField("Lightness", shift.Lightness, -100, 100, v => Set(shift with { Lightness = v }), 1, "0", FieldWidth));
+            // The hue track is the hue circle centred on the range's own color (red for Master), so the color under the value is
+            // what that range becomes; colorizing picks an absolute hue, so its track runs red to red. Saturation runs from gray to
+            // the range's color, or to the tint being picked. Reset is no shift; colorizing at zero is Photoshop's starting tint.
+            var rangeHue = Math.Max(0, (int)range - 1) * 60.0;
+            Controls.SliderField saturation = null!;
+            var hueField = Ui.SliderField("Hue", shift.Hue, colorizing ? 0 : -180, colorizing ? 360 : 180, v =>
+            {
+                Set(shift with { Hue = v });
+                if (colorizing) saturation.Track = Controls.SliderTracks.Saturation(v);
+            }, 1, "0", FieldWidth, Controls.SliderTracks.Spectrum(colorizing ? 180 : rangeHue), reset: 0);
+            saturation = Ui.SliderField("Saturation", shift.Saturation, -100, 100, v => Set(shift with { Saturation = v }), 1, "0", FieldWidth,
+                Controls.SliderTracks.Saturation(colorizing ? shift.Hue : rangeHue), reset: 0);
+            rows.Children.Add(hueField);
+            rows.Children.Add(saturation);
+            rows.Children.Add(Ui.SliderField("Lightness", shift.Lightness, -100, 100, v => Set(shift with { Lightness = v }), 1, "0", FieldWidth, Controls.SliderTracks.Lightness, reset: 0));
         }
         var picker = Ui.Combo(Enum.GetValues<HueRange>(), HueRange.Master, r => r.ToString(), r => { range = r; Build(); });
         var colorize = Ui.Check("Colorize", hue.Colorize, v =>
@@ -159,16 +172,25 @@ public static class AdjustmentDialogs
     /// <summary>Each slider says how bright that family of colors becomes, as Photoshop's do; the tint colors the gray.</summary>
     private static Control BlackAndWhiteEditor(BlackAndWhiteAdjustment bw, Action<Adjustment> update)
     {
+        var defaults = new BlackAndWhiteAdjustment();
         var weights = new StackPanel { Spacing = 8 };
         for (var i = 0; i < ColorFamilies.Length; i++)
         {
             var index = i;
+            // Each track runs dark to light in the family's own hue, 60 degrees apart from red round to magenta.
             weights.Children.Add(Ui.SliderField(ColorFamilies[i], bw.Weights[i], BlackAndWhiteAdjustment.MinWeight, BlackAndWhiteAdjustment.MaxWeight,
-                v => update(bw = bw.WithWeight(index, v)), 1, "0", FieldWidth));
+                v => update(bw = bw.WithWeight(index, v)), 1, "0", FieldWidth, Controls.SliderTracks.Luminance(i * 60), reset: defaults.Weights[i]));
         }
         var tintRows = new StackPanel { Spacing = 8, IsVisible = bw.Tint, Margin = new Thickness(0, 4, 0, 0) };
-        tintRows.Children.Add(Ui.SliderField("Hue", bw.TintHue, 0, 360, v => update(bw = bw with { TintHue = v }), 1, "0", FieldWidth));
-        tintRows.Children.Add(Ui.SliderField("Saturation", bw.TintSaturation, 0, 100, v => update(bw = bw with { TintSaturation = v }), 1, "0", FieldWidth));
+        Controls.SliderField tintSaturation = null!;
+        tintRows.Children.Add(Ui.SliderField("Hue", bw.TintHue, 0, 360, v =>
+        {
+            update(bw = bw with { TintHue = v });
+            tintSaturation.Track = Controls.SliderTracks.Saturation(v);
+        }, 1, "0", FieldWidth, Controls.SliderTracks.Spectrum(180), reset: defaults.TintHue));
+        tintSaturation = Ui.SliderField("Saturation", bw.TintSaturation, 0, 100, v => update(bw = bw with { TintSaturation = v }), 1, "0", FieldWidth,
+            Controls.SliderTracks.Saturation(bw.TintHue), reset: defaults.TintSaturation);
+        tintRows.Children.Add(tintSaturation);
         var tint = Ui.Check("Tint", bw.Tint, v => { tintRows.IsVisible = v; update(bw = bw with { Tint = v }); });
         ToolTip.SetTip(tint, "Color the result while keeping its tones, for a sepia or a cyanotype");
         var reset = Ui.TextButton("Reset", () =>
@@ -181,6 +203,7 @@ public static class AdjustmentDialogs
 
     private static readonly string[] BalanceRanges = ["Shadows", "Midtones", "Highlights"];
     private static readonly string[] BalancePairs = ["Cyan / Red", "Magenta / Green", "Yellow / Blue"];
+    private static readonly IReadOnlyList<Color>[] BalanceTracks = [Controls.SliderTracks.CyanRed, Controls.SliderTracks.MagentaGreen, Controls.SliderTracks.YellowBlue];
 
     /// <summary>Three shifts each for the shadows, midtones and highlights, with Preserve Luminosity.</summary>
     private static Control ColorBalanceEditor(ColorBalanceAdjustment balance, Action<Adjustment> update)
@@ -193,7 +216,7 @@ public static class AdjustmentDialogs
             {
                 var (r, c) = (range, channel);
                 panel.Children.Add(Ui.SliderField(BalancePairs[channel], balance.Shift(range, channel), ColorBalanceAdjustment.MinShift, ColorBalanceAdjustment.MaxShift,
-                    v => update(balance = balance.WithShift(r, c, v)), 1, "0", FieldWidth));
+                    v => update(balance = balance.WithShift(r, c, v)), 1, "0", FieldWidth, BalanceTracks[channel], reset: 0));
             }
         }
         var preserve = Ui.Check("Preserve Luminosity", balance.PreserveLuminosity, v => update(balance = balance with { PreserveLuminosity = v }));
@@ -249,8 +272,9 @@ public static class AdjustmentDialogs
         timer.Tick += (_, _) => { timer.Stop(); changed(current); };
         void Update(FilterSettings value) { current = value; timer.Stop(); timer.Start(); }
         var panel = new StackPanel { Spacing = 8 };
+        // A filter opens with its defaults, so Reset puts a slider back to the value it opened with.
         void Slider(string label, double value, double min, double max, Func<double, FilterSettings> apply, double step = 1, string format = "0") =>
-            panel.Children.Add(Ui.SliderField(label, value, min, max, v => Update(apply(v)), step, format, FieldWidth));
+            panel.Children.Add(Ui.SliderField(label, value, min, max, v => Update(apply(v)), step, format, FieldWidth, reset: value));
         switch (initial.Kind)
         {
             case FilterKind.GaussianBlur:

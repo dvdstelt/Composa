@@ -61,6 +61,48 @@ public class DialogTests
         Capture(window, "28-color-balance");
     }
 
+    /// <summary>The color sliders show their colors on the track and reset to the adjustment's neutral values, not to what the dialog opened with.</summary>
+    [AvaloniaFact]
+    public void Color_sliders_carry_tracks_and_reset_to_the_neutral_value()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var hue = new HueSaturationAdjustment().WithShift(HueRange.Master, new HslShift(40, -20, 10));
+        var reported = new List<Adjustment>();
+        _ = AdjustmentDialogs.Edit(window, hue, reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = window.OwnedWindows.Last();
+        SliderField Field(string label) => dialog.GetVisualDescendants().OfType<SliderField>().Single(f => f.Label == label);
+        Assert.Equal(13, Field("Hue").Track!.Count);                       // The hue circle.
+        Assert.Equal(SliderTracks.Lightness, Field("Lightness").Track);
+        Assert.All(new[] { "Hue", "Saturation", "Lightness" }, label => Assert.Equal(0, Field(label).Reset));
+        Assert.Equal(40, Field("Hue").Value);
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        var bw = new BlackAndWhiteAdjustment { Reds = 250, Tint = true, TintHue = 200 };
+        _ = AdjustmentDialogs.Edit(window, bw, reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        dialog = window.OwnedWindows.Last();
+        Assert.Equal(new BlackAndWhiteAdjustment().Reds, Field("Reds").Reset);
+        Assert.Equal(250, Field("Reds").Value);
+        var tintSaturation = Field("Saturation");
+        Assert.Equal(SliderTracks.Saturation(200), tintSaturation.Track);
+        Field("Hue").Value = 30;                                            // Set from code: the track waits for the user's change.
+        Assert.Equal(SliderTracks.Saturation(200), tintSaturation.Track);
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        _ = AdjustmentDialogs.Edit(window, new ColorBalanceAdjustment(), reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        dialog = window.OwnedWindows.Last();
+        var pairs = dialog.GetVisualDescendants().OfType<SliderField>().Where(f => f.Label == "Cyan / Red").ToList();
+        Assert.Equal(3, pairs.Count);
+        Assert.All(pairs, f => { Assert.Equal(SliderTracks.CyanRed, f.Track); Assert.Equal(0, f.Reset); });
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+    }
+
     [AvaloniaFact]
     public void Raw_develop_dialog_previews_the_frame_and_returns_the_settings()
     {
