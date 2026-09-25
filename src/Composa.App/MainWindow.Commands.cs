@@ -590,19 +590,44 @@ public sealed partial class MainWindow
             if (path == null) return false;
             if (!path.EndsWith(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)) path += ProjectFile.Extension;
         }
-        try
+        // Another save of this document still writing finishes first; this one then saves whatever changed since.
+        if (saving.TryGetValue(target, out var earlier)) await earlier.Task;
+        var task = Write(target, path);
+        saving[target] = (path, task);
+        UpdateStatus();
+        try { return await task; }
+        finally
         {
-            Busy(() => ProjectFile.Save(target.Document, path));
-            target.MarkSaved(path);
-            recovery?.Forget(target);
-            settings.AddRecent(Path.GetFullPath(path));
-            return true;
+            if (saving.TryGetValue(target, out var current) && current.Task == task) saving.Remove(target);
+            UpdateStatus();
         }
+    }
+
+    /// <summary>The saves still writing, by document. Close and quit wait for them, and the status bar names them.</summary>
+    private readonly Dictionary<EditorSession, (string Path, Task<bool> Task)> saving = [];
+
+    /// <summary>True while a save of the document is still being written.</summary>
+    public bool IsSaving(EditorSession target) => saving.ContainsKey(target);
+
+    /// <summary>
+    /// Writes the document as it is now, off the UI thread, so the tools stay usable while a large project encodes.
+    /// Committed bitmaps are immutable, so the snapshot can be read while editing goes on; only that snapshot counts as
+    /// saved, and an edit made meanwhile leaves the document modified.
+    /// </summary>
+    private async Task<bool> Write(EditorSession target, string path)
+    {
+        var snapshot = target.Document.Clone();
+        var revision = target.Revision;
+        try { await Task.Run(() => ProjectFile.Save(snapshot, path)); }
         catch (Exception error)
         {
             await Prompts.Alert(this, "Couldn't save", error.Message);
             return false;
         }
+        target.MarkSaved(path, revision);
+        recovery?.Forget(target);
+        settings.AddRecent(Path.GetFullPath(path));
+        return true;
     }
 
     private async Task Export(ExportFormat format)

@@ -215,10 +215,16 @@ public sealed partial class EditorSession
         HistoryChanged?.Invoke();
     }
 
-    public void MarkSaved(string path)
+    public void MarkSaved(string path) => MarkSaved(path, Revision);
+
+    /// <summary>
+    /// Records that the document as it was at <paramref name="revision"/> is on disk at <paramref name="path"/>. A
+    /// save writes a snapshot off the UI thread, so an edit made while it was writing keeps the document modified.
+    /// </summary>
+    public void MarkSaved(string path, int revision)
     {
         FilePath = path;
-        IsModified = false;
+        IsModified = Revision != revision;
         HistoryChanged?.Invoke();
     }
 

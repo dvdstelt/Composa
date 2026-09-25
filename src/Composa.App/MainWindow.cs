@@ -229,6 +229,8 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> CloseSession(EditorSession item)
     {
+        // A save still writing finishes first, so its file is never cut short and the prompt knows whether it is needed.
+        while (saving.TryGetValue(item, out var writing)) await writing.Task;
         // Text still being typed is an open edit: commit it so it counts as a change and is in what gets saved.
         if (item.IsEditingText) item.FinishText();
         if (item.IsModified)
@@ -276,8 +278,10 @@ public sealed partial class MainWindow : Window
     {
         RememberWindow();
         if (session?.IsEditingText == true) session.FinishText();
-        if (closingConfirmed || sessions.All(s => !s.IsModified)) return;
+        if (closingConfirmed || (saving.Count == 0 && sessions.All(s => !s.IsModified))) return;
         e.Cancel = true;
+        // Saves still writing finish before the window goes, so no file is cut short.
+        while (saving.Count > 0) await Task.WhenAll(saving.Values.Select(w => w.Task).ToList());
         foreach (var item in sessions.Where(s => s.IsModified).ToList())
             if (!await CloseSession(item)) return;
         closingConfirmed = true;
@@ -459,7 +463,7 @@ public sealed partial class MainWindow : Window
         }
         zoomText.Text = canvas.Zoom >= 0.1 ? $"{canvas.Zoom * 100:0.#}%" : $"{canvas.Zoom * 100:0.##}%";
         sizeText.Text = $"{session.Document.Width} × {session.Document.Height} px · {session.Document.Resolution:0.#} ppi · sRGB";
-        hintText.Text = problem ?? Hint(session);
+        hintText.Text = problem ?? (saving.Count > 0 ? "Saving " + string.Join(", ", saving.Values.Select(w => Path.GetFileName(w.Path))) + "…" : Hint(session));
         hintText.Foreground = problem != null ? new SolidColorBrush(Color.Parse("#FFB454")) : Palette.Secondary;
     }
 
