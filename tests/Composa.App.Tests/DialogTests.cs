@@ -204,14 +204,14 @@ public class CameraRawDialogTests
         var groups = dialog.GetVisualDescendants().OfType<Expander>().ToList();
         Assert.Equal(9, groups.Count);
         var headers = groups.Select(g => ((Grid)g.Header!).Children.OfType<TextBlock>().Single().Text).ToList();
-        Assert.Equal(["Light", "Color", "Effects", "Curve", "Color Mixer", "Color Grading", "Detail", "Optics", "Calibration"], headers);
-        Assert.True(groups[0].IsExpanded && groups[1].IsExpanded && !groups[2].IsExpanded);
+        Assert.Equal(["Light", "Color", "Color Grading", "Effects", "Curve", "Color Mixer", "Detail", "Optics", "Calibration"], headers);
+        Assert.True(groups[0].IsExpanded && groups[1].IsExpanded && groups[2].IsExpanded && !groups[3].IsExpanded); // Light, Color and Color Grading open, as upstream opens them.
         // The Light group's eye is shown because Exposure is set; clicking it renders without the group.
         var eye = ((Grid)groups[0].Header!).Children.OfType<Button>().Single();
         Assert.True(eye.IsVisible);
-        Assert.False(((Grid)groups[2].Header!).Children.OfType<Button>().Single().IsVisible);
+        Assert.False(((Grid)groups[3].Header!).Children.OfType<Button>().Single().IsVisible);
         // Color sliders show their colors; every slider resets to a fresh grade's value, read from the defaults.
-        groups[4].IsExpanded = groups[6].IsExpanded = true;                 // A collapsed group keeps its sliders out of the tree.
+        groups[5].IsExpanded = groups[6].IsExpanded = true;                 // A collapsed group keeps its sliders out of the tree.
         Dispatcher.UIThread.RunJobs();
         var fields = dialog.GetVisualDescendants().OfType<SliderField>().ToList();
         Assert.Equal(SliderTracks.Temperature, fields.Single(f => f.Label == "Temperature").Track);
@@ -220,7 +220,7 @@ public class CameraRawDialogTests
         Assert.Equal(0.5, fields.Single(f => f.Label == "Exposure").Value);
         Assert.Equal(new CameraRawDetail().SharpenRadius, fields.Single(f => f.Label == "Radius").Reset);
         Assert.Equal(SliderTracks.Hue(CameraRawMixer.Centers[3]), fields.Single(f => f.Label == "Greens").Track);
-        groups[4].IsExpanded = groups[6].IsExpanded = false;
+        groups[5].IsExpanded = groups[6].IsExpanded = false;
         Dispatcher.UIThread.RunJobs();
         Screenshots.Save(dialog, "30-camera-raw");
         eye.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));

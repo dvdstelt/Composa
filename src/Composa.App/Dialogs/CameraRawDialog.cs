@@ -12,7 +12,7 @@ namespace Composa.App.Dialogs;
 
 /// <summary>
 /// The Camera Raw Filter's panel: a histogram of the graded layer, a thumbnail that doubles as the white-balance
-/// eyedropper, then the groups Light, Color, Effects, Curve, Color Mixer, Color Grading, Detail, Optics and
+/// eyedropper, then the groups Light, Color, Color Grading, Effects, Curve, Color Mixer, Detail, Optics and
 /// Calibration, each collapsible and switchable off with an eye without clearing its sliders. Changes preview live
 /// on the canvas through <paramref name="changed"/>; OK returns the grade as rendered (a hidden group contributes nothing).
 /// </summary>
@@ -134,6 +134,26 @@ public static class CameraRawDialog
             Slider("Vibrance", s => s.Vibrance, -100, 100, (s, v) => s with { Vibrance = v }, tip: "Strengthens quiet colors more than strong ones, and protects skin tones", track: Controls.SliderTracks.Chroma),
             Slider("Saturation", s => s.Saturation, -100, 100, (s, v) => s with { Saturation = v }, track: Controls.SliderTracks.Chroma)), open: true);
 
+        // Color Grading, directly under Color and open like it, as upstream shows it: four wheels as sliders, then blending and balance.
+        var wheelRows = new List<Control>();
+        for (var i = 0; i < 4; i++)
+        {
+            var index = i;
+            wheelRows.Add(Heading(CameraRawGrading.Names[i]));
+            // Saturation runs from gray to the wheel's hue and follows the Hue slider as it turns.
+            Controls.SliderField saturation = null!;
+            var hue = Slider("Hue", s => s.Grading.Wheels[index].Hue, 0, 360, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Hue = v }) }, tip: "Around the color wheel", track: Controls.SliderTracks.Spectrum(180));
+            hue.Changed += v => saturation.Track = Controls.SliderTracks.Saturation(v);
+            saturation = Slider("Saturation", s => s.Grading.Wheels[index].Saturation, 0, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Saturation = v }) }, tip: "How strongly the tint takes; 0 leaves this wheel off", track: Controls.SliderTracks.Saturation(initial.Grading.Wheels[i].Hue));
+            wheelRows.Add(hue);
+            wheelRows.Add(saturation);
+            wheelRows.Add(Slider("Luminance", s => s.Grading.Wheels[index].Luminance, -100, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Luminance = v }) }, track: Controls.SliderTracks.Lightness));
+        }
+        wheelRows.Add(Heading("Overlap"));
+        wheelRows.Add(Slider("Blending", s => s.Grading.Blending, 0, 100, (s, v) => s with { Grading = s.Grading with { Blending = v } }, tip: "How much the three tonal wheels overlap"));
+        wheelRows.Add(Slider("Balance", s => s.Grading.Balance, -100, 100, (s, v) => s with { Grading = s.Grading with { Balance = v } }, tip: "Negative favors the shadows, positive the highlights"));
+        Group(CameraRawGroup.Grading, "Color Grading", Column(wheelRows.ToArray()), open: true);
+
         // Effects.
         var glowStyles = Enum.GetValues<CameraRawGlowStyle>();
         var vignetteStyles = Enum.GetValues<CameraRawVignetteStyle>();
@@ -216,25 +236,6 @@ public static class CameraRawDialog
             Ui.Row(8, Ui.Label("Adjust", Palette.Secondary), Ui.Combo(mixerTabs, "Hue", t => t, t => { mixerTab = Array.IndexOf(mixerTabs, t); BuildMixer(); }, 130)),
             mixerRows));
 
-        // Color Grading: four wheels as sliders, then blending and balance.
-        var wheelRows = new List<Control>();
-        for (var i = 0; i < 4; i++)
-        {
-            var index = i;
-            wheelRows.Add(Heading(CameraRawGrading.Names[i]));
-            // Saturation runs from gray to the wheel's hue and follows the Hue slider as it turns.
-            Controls.SliderField saturation = null!;
-            var hue = Slider("Hue", s => s.Grading.Wheels[index].Hue, 0, 360, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Hue = v }) }, tip: "Around the color wheel", track: Controls.SliderTracks.Spectrum(180));
-            hue.Changed += v => saturation.Track = Controls.SliderTracks.Saturation(v);
-            saturation = Slider("Saturation", s => s.Grading.Wheels[index].Saturation, 0, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Saturation = v }) }, tip: "How strongly the tint takes; 0 leaves this wheel off", track: Controls.SliderTracks.Saturation(initial.Grading.Wheels[i].Hue));
-            wheelRows.Add(hue);
-            wheelRows.Add(saturation);
-            wheelRows.Add(Slider("Luminance", s => s.Grading.Wheels[index].Luminance, -100, 100, (s, v) => s with { Grading = s.Grading.WithWheel(index, s.Grading.Wheels[index] with { Luminance = v }) }, track: Controls.SliderTracks.Lightness));
-        }
-        wheelRows.Add(Heading("Overlap"));
-        wheelRows.Add(Slider("Blending", s => s.Grading.Blending, 0, 100, (s, v) => s with { Grading = s.Grading with { Blending = v } }, tip: "How much the three tonal wheels overlap"));
-        wheelRows.Add(Slider("Balance", s => s.Grading.Balance, -100, 100, (s, v) => s with { Grading = s.Grading with { Balance = v } }, tip: "Negative favors the shadows, positive the highlights"));
-        Group(CameraRawGroup.Grading, "Color Grading", Column(wheelRows.ToArray()));
 
         // Detail.
         Group(CameraRawGroup.Detail, "Detail", Column(
