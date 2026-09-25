@@ -75,7 +75,7 @@ public class PsdImportUiTests
             Assert.Equal(3, folder.Children.Count);
             Assert.Equal("Import Photoshop File", session.History.UndoName);
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     /// <summary>Opened, an SVG becomes a document at the size it declares; placed, it is drawn to fit the canvas.</summary>
@@ -112,6 +112,6 @@ public class PsdImportUiTests
             Assert.Equal((800, 400), (fitted.Pixels!.Width, fitted.Pixels.Height));
             Assert.Equal((0d, 100d, 800d, 400d), (fitted.Transform.X, fitted.Transform.Y, fitted.Transform.Width, fitted.Transform.Height));
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 }

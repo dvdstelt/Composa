@@ -1,3 +1,4 @@
+using Composa.Core.Tests;
 using Composa.IO;
 using SkiaSharp;
 using Magick = ImageMagick;
@@ -72,7 +73,7 @@ public class BundledImageMagickTests
             using var decoded = SKBitmap.Decode(magick.Convert(path, ImageMagickOutput.Png));
             Assert.Equal((40, 30), (decoded.Width, decoded.Height));
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     /// <summary>SVG import draws through the bundled library's librsvg, at the resolution that gives the size asked for.</summary>
@@ -92,7 +93,7 @@ public class BundledImageMagickTests
             Assert.Equal((200, 100), (doubled.Width, doubled.Height));
             Assert.Equal(SKColors.Red, doubled.GetPixel(100, 50));
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     [Fact]
@@ -106,6 +107,6 @@ public class BundledImageMagickTests
             var error = Assert.Throws<InvalidDataException>(() => magick.Convert(path, ImageMagickOutput.Pam16));
             Assert.Contains(Path.GetFileName(path), error.Message);
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 }
