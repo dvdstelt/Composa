@@ -131,9 +131,12 @@ public static class Ui
     }
 
     /// <summary>A Krita-style field whose fill is the slider: drag to change, Alt-drag for fine steps, double-click to type. See <see cref="Controls.SliderField"/>.</summary>
-    public static Controls.SliderField SliderField(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0", double width = 120)
+    /// <param name="track">The colors along the box when the value is a color or moves one (see <see cref="Controls.SliderTracks"/>).</param>
+    /// <param name="reset">The value the field's Reset button puts back; null leaves the button out.</param>
+    public static Controls.SliderField SliderField(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0", double width = 120,
+        IReadOnlyList<Avalonia.Media.Color>? track = null, double? reset = null)
     {
-        var field = new Controls.SliderField(label, value, min, max, step, format) { Width = width };
+        var field = new Controls.SliderField(label, value, min, max, step, format) { Width = width, Track = track, Reset = reset };
         field.Changed += changed;
         return field;
     }

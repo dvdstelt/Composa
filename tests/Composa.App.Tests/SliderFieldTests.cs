@@ -217,3 +217,78 @@ public class SliderFieldTests
         Screenshots.Save(window, "45-options-bar-move");
     }
 }
+
+/// <summary>A colored track along the field and the Reset button that the editor shows on the left.</summary>
+public class SliderFieldTrackTests
+{
+    private readonly Window window;
+    private readonly SliderField field;
+
+    public SliderFieldTrackTests()
+    {
+        field = Ui.SliderField("Hue", 30, -180, 180, _ => { }, 1, "0", 330, SliderTracks.Spectrum(0), reset: 0);
+        window = new Window { Width = 400, Height = 100, Content = new StackPanel { Margin = new Thickness(20), Children = { field } } };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    private Point Center(Control control) => control.TranslatePoint(new Point(control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
+
+    private void DoubleClick(Point at)
+    {
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void The_spectrum_runs_around_the_hue_circle_and_the_reset_button_puts_the_value_back()
+    {
+        var reported = new List<double>();
+        field.Changed += reported.Add;
+        var track = SliderTracks.Spectrum(0);
+        Assert.Equal(13, track.Count);
+        Assert.Equal(track[0], track[12]);                                  // Red to red: the circle closes.
+        Assert.True(track[6].R > track[6].G && track[6].R > track[6].B);    // Its middle is the centre hue.
+        Assert.True(track[2].B > track[2].R && track[2].B > track[2].G);    // Blue sits 120 degrees before it, green 120 after.
+        Assert.True(track[10].G > track[10].R && track[10].G > track[10].B);
+        Assert.False(field.IsResetVisible);
+
+        DoubleClick(Center(field));
+        Assert.True(field.IsEditing);
+        Assert.True(field.IsResetVisible);
+        var reset = field.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Reset");
+        var button = (Border)reset.Parent!;
+        Assert.True(button.Bounds.Left < 10);                                // On the left of the box.
+        var editor = field.GetVisualDescendants().OfType<TextBox>().Single();
+        Assert.True(editor.Bounds.Left >= button.Bounds.Right);            // The editor keeps the rest.
+        Screenshots.Save(window, "42-slider-track-reset");
+
+        var at = Center(button);
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(field.IsEditing);
+        Assert.False(field.IsResetVisible);
+        Assert.Equal(0, field.Value);
+        Assert.Equal([0], reported);                                        // One change, from the reset alone.
+    }
+
+    [AvaloniaFact]
+    public void A_field_without_a_reset_value_has_no_reset_button()
+    {
+        var plain = Ui.SliderField("Amount", 20, 0, 100, _ => { }, 1, "0", 330, SliderTracks.Chroma);
+        ((StackPanel)window.Content!).Children.Add(plain);
+        Dispatcher.UIThread.RunJobs();
+        DoubleClick(Center(plain));
+        Assert.True(plain.IsEditing);
+        Assert.False(plain.IsResetVisible);
+        var editor = plain.GetVisualDescendants().OfType<TextBox>().Single();
+        Assert.Equal(0, editor.Bounds.Left);
+        plain.Reset = 0;                                                    // Setting it while open shows the button at once.
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(plain.IsResetVisible);
+    }
+}
