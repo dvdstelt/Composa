@@ -65,7 +65,7 @@ public class ImageMagickTests
             Assert.Equal((250, 125), (doubled.Width, doubled.Height));
             TestImages.AssertColor(SKColors.Red, doubled.GetPixel(125, 62));
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class ImageMagickTests
             Assert.Equal((20, 10), (shrunk.Width, shrunk.Height));
             Assert.Contains("room", Assert.Throws<InvalidDataException>(() => SvgImporter.Render(path, null, remainingPixels: 100)).Message);
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     /// <summary>A file ImageMagick cannot read says so in the exception the callers already handle, rather than in an empty result.</summary>
@@ -108,7 +108,7 @@ public class ImageMagickTests
             var error = Assert.Throws<InvalidDataException>(() => tool.Convert(path, ImageMagickOutput.Png));
             Assert.Contains(Path.GetFileName(path), error.Message);
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 
     /// <summary>A RAW file must report what is missing, not whatever an unrelated program printed.</summary>
@@ -124,6 +124,6 @@ public class ImageMagickTests
             var error = Assert.Throws<InvalidDataException>(() => RawImporter.Decode(path));
             Assert.Contains("ImageMagick", error.Message);
         }
-        finally { File.Delete(path); }
+        finally { TempFiles.Delete(path); }
     }
 }

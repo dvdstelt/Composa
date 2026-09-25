@@ -13,5 +13,6 @@
     <Using Include="Xunit" />
     <!-- The Photoshop file writer is shared with the core tests, so both suites build the same fixtures. -->
     <Compile Include="../Composa.Core.Tests/PsdWriter.cs" Link="PsdWriter.cs" />
+    <Compile Include="../Composa.Core.Tests/TempFiles.cs" Link="TempFiles.cs" />
   </ItemGroup>
 </Project>
