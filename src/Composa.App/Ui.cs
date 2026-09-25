@@ -141,6 +141,19 @@ public static class Ui
         return field;
     }
 
+    /// <summary>
+    /// An angle dial with the slider field beside it, each following the other, together <paramref name="width"/> wide so the row
+    /// lines up with the plain fields around it. The field's reset turns the dial too.
+    /// </summary>
+    public static Control AngleField(string label, double value, double min, double max, Action<double> changed, double width,
+        Controls.AngleDialStyle style = Controls.AngleDialStyle.Light, double? reset = null)
+    {
+        var dial = new Controls.AngleDial(value, min, max, style);
+        var field = SliderField(label, dial.Value, min, max, v => { dial.Value = v; changed(v); }, 1, "0", width - Controls.AngleDial.DefaultSize - 10, reset: reset);
+        dial.Changed += v => { field.Value = v; changed(v); };
+        return Row(10, dial, field);
+    }
+
     public static Border Separator(bool vertical = true) => vertical
         ? new Border { Width = 1, Background = Palette.Divider, Margin = new Thickness(4, 6) }
         : new Border { Height = 1, Background = Palette.Divider };
