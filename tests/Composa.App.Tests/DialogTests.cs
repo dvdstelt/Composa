@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Composa.App.Controls;
@@ -59,6 +60,75 @@ public class DialogTests
         Capture(window, "27-black-white");
         _ = AdjustmentDialogs.Edit(window, new ColorBalanceAdjustment(), _ => { }, histogram, SKColors.Black, SKColors.White);
         Capture(window, "28-color-balance");
+    }
+
+    /// <summary>The color sliders show their colors on the track and reset to the adjustment's neutral values, not to what the dialog opened with.</summary>
+    [AvaloniaFact]
+    public void Color_sliders_carry_tracks_and_reset_to_the_neutral_value()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var hue = new HueSaturationAdjustment().WithShift(HueRange.Master, new HslShift(40, -20, 10));
+        var reported = new List<Adjustment>();
+        _ = AdjustmentDialogs.Edit(window, hue, reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = window.OwnedWindows.Last();
+        SliderField Field(string label) => dialog.GetVisualDescendants().OfType<SliderField>().Single(f => f.Label == label);
+        Assert.Equal(13, Field("Hue").Track!.Count);                       // The hue circle.
+        Assert.Equal(SliderTracks.Lightness, Field("Lightness").Track);
+        Assert.All(new[] { "Hue", "Saturation", "Lightness" }, label => Assert.Equal(0, Field(label).Reset));
+        Assert.Equal(40, Field("Hue").Value);
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        var bw = new BlackAndWhiteAdjustment { Reds = 250, Tint = true, TintHue = 200 };
+        _ = AdjustmentDialogs.Edit(window, bw, reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        dialog = window.OwnedWindows.Last();
+        Assert.Equal(new BlackAndWhiteAdjustment().Reds, Field("Reds").Reset);
+        Assert.Equal(250, Field("Reds").Value);
+        var tintSaturation = Field("Saturation");
+        Assert.Equal(SliderTracks.Saturation(200), tintSaturation.Track);
+        Field("Hue").Value = 30;                                            // Set from code: the track waits for the user's change.
+        Assert.Equal(SliderTracks.Saturation(200), tintSaturation.Track);
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+
+        _ = AdjustmentDialogs.Edit(window, new ColorBalanceAdjustment(), reported.Add, null, SKColors.Black, SKColors.White);
+        Dispatcher.UIThread.RunJobs();
+        dialog = window.OwnedWindows.Last();
+        var pairs = dialog.GetVisualDescendants().OfType<SliderField>().Where(f => f.Label == "Cyan / Red").ToList();
+        Assert.Equal(3, pairs.Count);
+        Assert.All(pairs, f => { Assert.Equal(SliderTracks.CyanRed, f.Track); Assert.Equal(0, f.Reset); });
+        dialog.Close();
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    /// <summary>A negative or zero resolution is clamped as it is typed, so the dialog never carries an unusable one into the sizes.</summary>
+    [AvaloniaFact]
+    public void Image_size_clamps_a_negative_resolution_instead_of_getting_stuck()
+    {
+        var window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        var task = CanvasDialogs.ImageSize(window, 1920, 1080, 72);
+        Dispatcher.UIThread.RunJobs();
+        var dialog = window.OwnedWindows.Last();
+        var boxes = dialog.GetVisualDescendants().OfType<NumericUpDown>().ToList();
+        var (width, height, resolution) = (boxes[0], boxes[1], boxes[2]);
+        // Typed as a user would: the box clamps what is committed when the focus moves on, so nothing below 1 gets through.
+        var entry = resolution.GetVisualDescendants().OfType<TextBox>().Single();
+        entry.Focus();
+        entry.Text = "-5";
+        width.GetVisualDescendants().OfType<TextBox>().Single().Focus();
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, resolution.Value);
+        resolution.Value = 300;
+        width.Value = 960;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(540, height.Value);                                  // Proportions still follow after the bad entry.
+        dialog.Close(true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal((960, 540, 300d), task.Result);
     }
 
     [AvaloniaFact]
@@ -134,12 +204,24 @@ public class CameraRawDialogTests
         var groups = dialog.GetVisualDescendants().OfType<Expander>().ToList();
         Assert.Equal(9, groups.Count);
         var headers = groups.Select(g => ((Grid)g.Header!).Children.OfType<TextBlock>().Single().Text).ToList();
-        Assert.Equal(["Light", "Color", "Effects", "Curve", "Color Mixer", "Color Grading", "Detail", "Optics", "Calibration"], headers);
-        Assert.True(groups[0].IsExpanded && groups[1].IsExpanded && !groups[2].IsExpanded);
+        Assert.Equal(["Light", "Color", "Color Grading", "Effects", "Curve", "Color Mixer", "Detail", "Optics", "Calibration"], headers);
+        Assert.True(groups[0].IsExpanded && groups[1].IsExpanded && groups[2].IsExpanded && !groups[3].IsExpanded); // Light, Color and Color Grading open, as upstream opens them.
         // The Light group's eye is shown because Exposure is set; clicking it renders without the group.
         var eye = ((Grid)groups[0].Header!).Children.OfType<Button>().Single();
         Assert.True(eye.IsVisible);
-        Assert.False(((Grid)groups[2].Header!).Children.OfType<Button>().Single().IsVisible);
+        Assert.False(((Grid)groups[3].Header!).Children.OfType<Button>().Single().IsVisible);
+        // Color sliders show their colors; every slider resets to a fresh grade's value, read from the defaults.
+        groups[5].IsExpanded = groups[6].IsExpanded = true;                 // A collapsed group keeps its sliders out of the tree.
+        Dispatcher.UIThread.RunJobs();
+        var fields = dialog.GetVisualDescendants().OfType<SliderField>().ToList();
+        Assert.Equal(SliderTracks.Temperature, fields.Single(f => f.Label == "Temperature").Track);
+        Assert.Null(fields.Single(f => f.Label == "Exposure").Track);
+        Assert.Equal(0, fields.Single(f => f.Label == "Exposure").Reset);
+        Assert.Equal(0.5, fields.Single(f => f.Label == "Exposure").Value);
+        Assert.Equal(new CameraRawDetail().SharpenRadius, fields.Single(f => f.Label == "Radius").Reset);
+        Assert.Equal(SliderTracks.Hue(CameraRawMixer.Centers[3]), fields.Single(f => f.Label == "Greens").Track);
+        groups[5].IsExpanded = groups[6].IsExpanded = false;
+        Dispatcher.UIThread.RunJobs();
         Screenshots.Save(dialog, "30-camera-raw");
         eye.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
         dialog.Close(true);

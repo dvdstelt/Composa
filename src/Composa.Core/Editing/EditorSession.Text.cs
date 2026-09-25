@@ -149,12 +149,11 @@ public sealed partial class EditorSession
     private void SyncTextLayer()
     {
         if (TextEdit is not { } editor || textLayer is not { } layer || document.Find(layer.Id) != layer) return;
-        if (layer.Text == editor.Style) return;
-        SetText(layer, editor.Style);
+        if (layer.Text != editor.Style) SetText(layer, editor.Style);
         TextChanged?.Invoke();
     }
 
-    /// <summary>Raised while typing, after the layer has been redrawn.</summary>
+    /// <summary>Raised while typing, after the layer has been redrawn, and when the caret moves: the bar's color follows the letter at the caret.</summary>
     public event Action? TextChanged;
 
     /// <summary>
@@ -173,7 +172,7 @@ public sealed partial class EditorSession
         {
             if (document.Find(layer.Id) == layer && layer.Text != style) SetText(layer, style);
             Commit();
-            TextDefaults = style with { Text = "", BoxWidth = null, BoxHeight = null };
+            TextDefaults = style.AsDefaults();
         }
         InvalidateAll();
         LayersChanged?.Invoke();
@@ -217,16 +216,33 @@ public sealed partial class EditorSession
     public void ChangeTextStyle(Func<TextStyle, TextStyle> change)
     {
         if (TextEdit is { } editor) { editor.ChangeStyle(change); return; }
-        if (ActiveLayer is not { Text: { } current } live) { TextDefaults = change(TextDefaults).Clamped() with { Text = "" }; return; }
+        if (ActiveLayer is not { Text: { } current } live) { TextDefaults = change(TextDefaults).Clamped().AsDefaults(); return; }
         var style = change(current).Clamped();
         if (style == current) return;
         Apply(StyleEditName, () => SetText(live, style));
         // Exactly one revision on: the commit above, with no other edit (or undo) between the two changes.
         if (styleEdit is { } last && last.LayerId == live.Id && last.Revision == Revision - 1) History.MergeLast(StyleEditName);
         styleEdit = (live.Id, Revision);
-        TextDefaults = style with { Text = "", BoxWidth = null, BoxHeight = null };
+        TextDefaults = style.AsDefaults();
         TextChanged?.Invoke();
     }
+
+    /// <summary>The color the Type bar's swatch shows: the letter at the caret while typing, otherwise the style's own.</summary>
+    public uint CurrentTextColor => TextEdit?.ColorAtCaret ?? CurrentTextStyle.Color;
+
+    /// <summary>
+    /// A color picked in the Type bar (or as the foreground while typing): paints the selected letters of the text
+    /// being typed, or all of the text when nothing is selected or no text is open, which drops its per-letter colors.
+    /// </summary>
+    public void SetTextColor(uint color)
+    {
+        if (TextEdit is { } editor) { editor.SetColor(color); return; }
+        ChangeTextStyle(st => st.WithColor(color, 0, 0));
+    }
+
+    /// <summary>Puts back the colors the text had when a picker opened, letter for letter as long as the wording is still the same.</summary>
+    public void RestoreTextColors(TextStyle original) =>
+        ChangeTextStyle(st => st with { Color = original.Color, ColorRuns = original.Text == st.Text ? original.ColorRuns : null });
 
     /// <summary>
     /// Shows a style on a text layer that is not open for typing while a dialog is still choosing it. Call between a
@@ -264,7 +280,7 @@ public sealed partial class EditorSession
     public bool RecolorText(Layer layer, SKColor color)
     {
         if (layer.Text is not { } style) return false;
-        var tinted = style with { Color = (uint)color | 0xFF000000 };
+        var tinted = style.WithColor((uint)color, 0, 0);
         if (tinted == style) return true;
         if (TextEdit != null && textLayer == layer) { TextEdit.ChangeStyle(_ => tinted); return true; }
         Apply("Fill Text", () => SetText(layer, tinted));

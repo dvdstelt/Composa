@@ -5,11 +5,21 @@ using Avalonia.Media;
 
 namespace Composa.App.Controls;
 
+/// <summary>What an <see cref="AngleDial"/> shows.</summary>
+public enum AngleDialStyle
+{
+    /// <summary>A hand pointing at a light, with the shadow's stub opposite: the angle of a shadow or glow.</summary>
+    Light,
+    /// <summary>A line through the centre with a dot at the end the number counts towards: a direction, as a motion blur's.</summary>
+    Line
+}
+
 /// <summary>
 /// Photoshop's angle dial for a light: a circle with a hand that points at the light, in degrees counterclockwise from the right, with a
 /// bright dot at its tip, and a dim stub on the far side of the centre showing where the shadow falls. Press or drag anywhere on it to
 /// turn the hand to the pointer; Shift snaps to 15 degree steps; the wheel and the arrow keys turn it by one degree. Setting
-/// <see cref="Value"/> from code redraws without raising <see cref="Changed"/>.
+/// <see cref="Value"/> from code redraws without raising <see cref="Changed"/>. The <see cref="AngleDialStyle.Line"/> style draws a
+/// line through the centre instead of a hand, for a direction rather than a light; it turns the full circle like the hand does.
 /// </summary>
 public sealed class AngleDial : Control
 {
@@ -26,22 +36,26 @@ public sealed class AngleDial : Control
     private static readonly IPen TickPen = new Pen(new SolidColorBrush(Color.Parse("#3A3A3A")));
 
     private readonly double min, max;
+    private readonly AngleDialStyle style;
     private double value;
     private bool hovered, pressed;
 
     /// <summary>Raised for every angle the user sets, already normalised into the dial's range.</summary>
     public event Action<double>? Changed;
 
-    public AngleDial(double value, double min = -180, double max = 180)
+    public AngleDial(double value, double min = -180, double max = 180, AngleDialStyle style = AngleDialStyle.Light)
     {
-        this.min = min; this.max = max;
+        this.min = min; this.max = max; this.style = style;
         this.value = Normalise(value);
         Width = Height = DefaultSize;
         Focusable = true;
         Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(this, "The hand points at the light; the shadow falls the other way\nDrag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°");
+        var what = style == AngleDialStyle.Line ? "The line is the direction; the dot marks the end the number counts towards" : "The hand points at the light; the shadow falls the other way";
+        ToolTip.SetTip(this, what + "\nDrag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°");
         ToolTip.SetShowDelay(this, 450);
     }
+
+    public AngleDialStyle Style => style;
 
     public double Value
     {
@@ -93,9 +107,16 @@ public sealed class AngleDial : Control
                 context.DrawLine(TickPen, centre + new Vector(dx * (radius - 4), dy * (radius - 4)), centre + new Vector(dx * (radius - 1), dy * (radius - 1)));
             }
             var (hx, hy) = Direction(value);
+            var tip = centre + new Vector(hx * (radius - 5), hy * (radius - 5));
+            if (style == AngleDialStyle.Line)
+            {
+                // One line through the centre, with a small dot marking the end the number counts towards.
+                context.DrawLine(HandPen, centre - new Vector(hx * (radius - 5), hy * (radius - 5)), tip);
+                context.DrawEllipse(Palette.Foreground, null, tip, 2.5, 2.5);
+                return;
+            }
             // The shadow's side first, so the hand and the light sit on top of it.
             context.DrawLine(ShadowPen, centre - new Vector(hx * (radius - 9), hy * (radius - 9)), centre - new Vector(hx * (radius - 4), hy * (radius - 4)));
-            var tip = centre + new Vector(hx * (radius - 5), hy * (radius - 5));
             context.DrawLine(HandPen, centre, tip);
             context.DrawEllipse(Palette.Foreground, null, centre, 2, 2);
             context.DrawEllipse(LightBrush, null, tip, 3, 3);

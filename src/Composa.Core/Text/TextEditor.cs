@@ -48,7 +48,7 @@ public sealed class TextEditor
         int start = SelectionStart, end = SelectionEnd;
         var content = Text.Remove(start, end - start).Insert(start, text);
         if (content.Length > TextStyle.MaxLength) return;
-        Apply(Style with { Text = content }, start + text.Length);
+        Apply(Style.WithReplacedCharacters(start, end, text.Length) with { Text = content }, start + text.Length);
     }
 
     public void Backspace(bool word = false)
@@ -57,7 +57,7 @@ public sealed class TextEditor
         if (Caret == 0) return;
         var to = word ? Layout.WordStart(Caret) : Caret - Step(Caret, -1);
         Record(typing: !word);
-        Apply(Style with { Text = Text.Remove(to, Caret - to) }, to);
+        Apply(Style.WithReplacedCharacters(to, Caret, 0) with { Text = Text.Remove(to, Caret - to) }, to);
     }
 
     public void Delete(bool word = false)
@@ -66,14 +66,14 @@ public sealed class TextEditor
         if (Caret >= Text.Length) return;
         var to = word ? Layout.WordEnd(Caret) : Caret + Step(Caret, 1);
         Record(typing: false);
-        Apply(Style with { Text = Text.Remove(Caret, to - Caret) }, Caret);
+        Apply(Style.WithReplacedCharacters(Caret, to, 0) with { Text = Text.Remove(Caret, to - Caret) }, Caret);
     }
 
     private void DeleteSelection()
     {
         Record(typing: false);
-        var start = SelectionStart;
-        Apply(Style with { Text = Text.Remove(start, SelectionEnd - start) }, start);
+        int start = SelectionStart, end = SelectionEnd;
+        Apply(Style.WithReplacedCharacters(start, end, 0) with { Text = Text.Remove(start, end - start) }, start);
     }
 
     /// <summary>A surrogate pair is one character to the caret.</summary>
@@ -92,6 +92,18 @@ public sealed class TextEditor
         Record(typing: false);
         Apply(next, Caret, Anchor);
     }
+
+    /// <summary>Paints the selected letters in a color, or all of the text (dropping its per-letter colors) when nothing is selected. Undoable within the editor.</summary>
+    public void SetColor(uint color)
+    {
+        var next = Style.WithColor(color, SelectionStart, SelectionEnd);
+        if (next == Style) return;
+        Record(typing: false);
+        Apply(next, Caret, Anchor);
+    }
+
+    /// <summary>The color the Type bar shows: the first selected letter's, otherwise the letter before the caret's, which is what typing next takes.</summary>
+    public uint ColorAtCaret => Style.ColorAt(HasSelection ? SelectionStart : Math.Max(0, Caret - 1));
 
     // ---- Caret ----------------------------------------------------------------------------------------------------
 

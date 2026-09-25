@@ -23,6 +23,12 @@ public sealed record ShapeStyle(ShapeKind Kind, uint Fill, double CornerRadius)
 
 public enum TextAlignment { Left, Center, Right }
 
+/// <summary>Letters painted in a color other than their style's own: a character range into the text (end exclusive) and its opaque color.</summary>
+public sealed record TextColorRun(int Start, int Length, uint Color)
+{
+    [System.Text.Json.Serialization.JsonIgnore] public int End => Start + Length;
+}
+
 /// <summary>Live text: kept as characters and redrawn sharp whenever it is edited or its layer is scaled.</summary>
 public sealed record TextStyle
 {
@@ -44,6 +50,11 @@ public sealed record TextStyle
     /// <summary>Fixed paragraph bounds in layer pixels; text wraps inside them. Null is point text, which is as big as what is typed.</summary>
     public double? BoxWidth { get; init; }
     public double? BoxHeight { get; init; }
+    /// <summary>
+    /// Letters in a color other than <see cref="Color"/>, as character indices into <see cref="Text"/>, sorted and not
+    /// overlapping. Null when the whole text is one color, which is what every style starts as.
+    /// </summary>
+    public IReadOnlyList<TextColorRun>? ColorRuns { get; init; }
 
     [System.Text.Json.Serialization.JsonIgnore] public double LineHeight => Leading > 0 ? Leading : Size * 1.2;
     [System.Text.Json.Serialization.JsonIgnore] public bool IsBox => BoxWidth != null && BoxHeight != null;
@@ -61,9 +72,99 @@ public sealed record TextStyle
             Leading = double.IsFinite(Leading) ? Math.Clamp(Leading, 0, 5000) : 0,
             BoxWidth = box ? Math.Clamp(Math.Round(BoxWidth!.Value), MinBox, MaxBox) : null,
             BoxHeight = box ? Math.Clamp(Math.Round(BoxHeight!.Value), MinBox, MaxBox) : null,
-            Color = Color | 0xFF000000
+            Color = Color | 0xFF000000,
+            ColorRuns = ValidRuns(ColorRuns, text.Length)
         };
     }
+
+    /// <summary>The runs as they are when they are sorted, disjoint and inside the text, with their colors opaque; otherwise none, since a damaged file cannot say which letter has which color.</summary>
+    private static IReadOnlyList<TextColorRun>? ValidRuns(IReadOnlyList<TextColorRun>? runs, int length)
+    {
+        if (runs == null || runs.Count == 0) return null;
+        var end = 0;
+        foreach (var run in runs)
+        {
+            if (run.Start < end || run.Length <= 0 || run.Start > length - run.Length) return null;
+            end = run.End;
+        }
+        return runs.All(r => (r.Color & 0xFF000000) == 0xFF000000) ? runs : runs.Select(r => r with { Color = r.Color | 0xFF000000 }).ToList();
+    }
+
+    /// <summary>The color of the character at an index: its run's, or the style's own.</summary>
+    public uint ColorAt(int index)
+    {
+        if (ColorRuns != null)
+            foreach (var run in ColorRuns)
+                if (run.Start <= index && index < run.End) return run.Color;
+        return Color;
+    }
+
+    /// <summary>
+    /// Paints the characters from <paramref name="start"/> to <paramref name="end"/> (exclusive) in a color. An empty
+    /// range, or one covering the whole text, recolors all of it and drops the runs.
+    /// </summary>
+    public TextStyle WithColor(uint color, int start, int end)
+    {
+        color |= 0xFF000000;
+        var count = Text.Length;
+        start = Math.Clamp(start, 0, count);
+        end = Math.Clamp(end, start, count);
+        if (start == end || (start == 0 && end == count)) return this with { Color = color, ColorRuns = null };
+        var colors = UnitColors();
+        for (var i = start; i < end; i++) colors[i] = color;
+        return this with { ColorRuns = Runs(colors, Color) };
+    }
+
+    /// <summary>
+    /// Keeps the colors on their letters when the characters from <paramref name="start"/> to <paramref name="end"/>
+    /// are replaced by <paramref name="length"/> new ones, which take the color of the letter before them, as typing
+    /// does. Call before <see cref="Text"/> changes.
+    /// </summary>
+    public TextStyle WithReplacedCharacters(int start, int end, int length)
+    {
+        if (ColorRuns == null) return this;
+        var colors = UnitColors();
+        start = Math.Clamp(start, 0, colors.Count);
+        end = Math.Clamp(end, start, colors.Count);
+        var inherited = start > 0 ? colors[start - 1] : end > start ? colors[start] : colors.Count > 0 ? colors[0] : Color;
+        colors.RemoveRange(start, end - start);
+        colors.InsertRange(start, Enumerable.Repeat(inherited, Math.Max(0, length)));
+        return this with { ColorRuns = Runs(colors, Color) };
+    }
+
+    /// <summary>The style the next text takes: the same look, without this text's wording, box and per-letter colors.</summary>
+    public TextStyle AsDefaults() => this with { Text = "", BoxWidth = null, BoxHeight = null, ColorRuns = null };
+
+    private List<uint> UnitColors()
+    {
+        var colors = Enumerable.Repeat(Color, Text.Length).ToList();
+        foreach (var run in ColorRuns ?? [])
+            for (var i = Math.Max(0, run.Start); i < Math.Min(colors.Count, run.End); i++) colors[i] = run.Color;
+        return colors;
+    }
+
+    private static IReadOnlyList<TextColorRun>? Runs(List<uint> colors, uint baseColor)
+    {
+        var runs = new List<TextColorRun>();
+        for (var i = 0; i < colors.Count; i++)
+        {
+            if (colors[i] == baseColor) continue;
+            if (runs.Count > 0 && runs[^1].End == i && runs[^1].Color == colors[i]) runs[^1] = runs[^1] with { Length = runs[^1].Length + 1 };
+            else runs.Add(new TextColorRun(i, 1, colors[i]));
+        }
+        return runs.Count == 0 ? null : runs;
+    }
+
+    // The runs are a list, which a record compares by reference; styles are compared everywhere to tell a real change
+    // from none, so equality is spelled out. A new property belongs in both members.
+    public bool Equals(TextStyle? other) =>
+        other is not null && Text == other.Text && FontFamily == other.FontFamily && Size == other.Size && Color == other.Color
+        && Bold == other.Bold && Italic == other.Italic && Alignment == other.Alignment && Tracking == other.Tracking && Leading == other.Leading
+        && BoxWidth == other.BoxWidth && BoxHeight == other.BoxHeight
+        && (ColorRuns == null ? other.ColorRuns == null : other.ColorRuns != null && ColorRuns.SequenceEqual(other.ColorRuns));
+
+    public override int GetHashCode() =>
+        HashCode.Combine(Text, FontFamily, Size, Color, Bold, Italic, Alignment, HashCode.Combine(Tracking, Leading, BoxWidth, BoxHeight, ColorRuns?.Count ?? 0));
 
     /// <summary>The same text drawn <paramref name="factor"/> times as large: size, spacing and box together.</summary>
     public TextStyle Scaled(double factor) => Scaled(factor, factor);

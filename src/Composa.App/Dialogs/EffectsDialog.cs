@@ -24,13 +24,7 @@ public static class EffectsDialog
         Control Slider(string label, double value, double min, double max, Action<double> changed, double step = 1, string format = "0") =>
             Ui.SliderField(label, value, min, max, changed, step, format, fieldWidth);
         // Photoshop's dial for the light's direction, with the field beside it for an exact number; each follows the other.
-        Control Angle(double value, Action<double> changed)
-        {
-            var dial = new Controls.AngleDial(value);
-            var field = Ui.SliderField("Angle", dial.Value, -180, 180, v => { dial.Value = v; changed(v); }, 1, "0", fieldWidth - Controls.AngleDial.DefaultSize - 10);
-            dial.Changed += v => { field.Value = v; changed(v); };
-            return Ui.Row(10, dial, field);
-        }
+        Control Angle(double value, Action<double> changed) => Ui.AngleField("Angle", value, -180, 180, changed, fieldWidth);
         Control Swatch()
         {
             var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };

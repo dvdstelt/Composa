@@ -4,12 +4,23 @@ All notable changes to Composa are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
-Catches up with Compositor 1.2.11.
+Catches up with Compositor 1.2.11 and 1.3.2.
 
 ### Added
 
+- Letters of a text layer can have their own colors: select some of the text while typing and pick a color from the Type bar's swatch or the foreground swatch, and only those letters take it. With nothing selected, or on a text layer that is not open for typing, the color goes on all of the text as before. New letters take the color of the letter before them, the swatch shows the color at the caret, and Fill still paints every letter. Project files that use this are format version 4.
+- Saving writes in the background: the document as it is when you press Save goes to disk off the UI thread, so the tools stay usable while a large project encodes, and only that version counts as saved. The status bar names the file while it writes; closing waits for a save still writing.
+- Camera Raw's Color Grading group sits directly under Color and opens with it.
+- Hue/Saturation, Black & White and Color Balance sliders show their colors on the track. Hue shows the hue circle centred on the selected range's color (red to red when colorizing), Saturation runs from gray to the range's color or the tint, Lightness from black to white, each Black & White family from dark to light in its own hue, and Color Balance from each color to its opposite. Camera Raw's Temperature, Tint, Vibrance, Saturation, Glow Warmth, Color Mixer, Color Grading and Calibration sliders show theirs too.
+- Every slider in a dialog can be reset: double-click it to type and a Reset button appears on its left, which puts it back to the value that changes nothing, or to a filter's default. Camera Raw's sliders reset to a fresh grade's values.
+- Motion Blur's angle has a dial beside the field, as the shadow effects have. It is drawn as a line through the centre, since a blur runs along one, and turns the full circle: the angle now runs from -180 to 180 rather than -90 to 90, as Photoshop's does.
+
 - Drag a number's label to change its value, as in Photoshop: the transform bar's X, Y, W, H and angle, the text size, tracking and leading, the object selection's edge offset, and the width, height and resolution in the New Canvas, Canvas Size and Image Size dialogs. Dragging moves in whole numbers, Alt makes it ten times finer, and typing still takes decimals.
 - A layer mask can be painted anywhere on the canvas, past the layer's own pixels, with the brush, a gradient or a fill. The mask grows with its layer; new area starts as the mask's background, so a hide-all mask stays black and a reveal-all mask stays white.
+
+### Fixed
+
+- Closing the window or a tab while typing text commits the text first, so the save prompt appears and the text is in what gets saved. Before, a document with nothing else changed closed without a word and the text was lost.
 
 ### Removed
 

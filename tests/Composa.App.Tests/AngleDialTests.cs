@@ -8,6 +8,7 @@ using Avalonia.VisualTree;
 using Composa.App.Controls;
 using Composa.App.Dialogs;
 using Composa.Editing;
+using Composa.Filters;
 using Composa.Model;
 using SkiaSharp;
 
@@ -112,5 +113,89 @@ public class AngleDialTests
     {
         Assert.True(Screenshots.Save(dialog, "46-drop-shadow-dialog"));
         Assert.Equal(4, dialog.GetVisualDescendants().OfType<SliderField>().Count());
+    }
+}
+
+/// <summary>Motion Blur's dial is a line through the centre that turns the full circle, with the field and its Reset following it.</summary>
+public class LineDialTests
+{
+    private readonly MainWindow window;
+    private readonly Window dialog;
+    private readonly AngleDial dial;
+    private readonly SliderField field;
+    private readonly List<FilterSettings> reported = [];
+
+    public LineDialTests()
+    {
+        window = new MainWindow { Width = 1280, Height = 800 };
+        window.Show();
+        _ = AdjustmentDialogs.EditFilter(window, new FilterSettings { Kind = FilterKind.MotionBlur, Angle = 30, Radius = 30 }, reported.Add);
+        Dispatcher.UIThread.RunJobs();
+        dialog = window.OwnedWindows.Last();
+        dial = dialog.GetVisualDescendants().OfType<AngleDial>().Single();
+        field = dialog.GetVisualDescendants().OfType<SliderField>().Single(f => f.Label == "Angle");
+    }
+
+    private Point OnDial(double degrees, double radius = 15)
+    {
+        var radians = degrees * Math.PI / 180;
+        var local = new Point(dial.Bounds.Width / 2 + Math.Cos(radians) * radius, dial.Bounds.Height / 2 - Math.Sin(radians) * radius);
+        return dial.TranslatePoint(local, dialog)!.Value;
+    }
+
+    /// <summary>The angle the filter last received; changes reach it through a short timer.</summary>
+    private async Task<double> Angle()
+    {
+        var count = reported.Count;
+        for (var i = 0; i < 100 && reported.Count == count; i++) { await Task.Delay(10); Dispatcher.UIThread.RunJobs(); }
+        return reported.Last().Angle;
+    }
+
+    [AvaloniaFact]
+    public async Task The_line_dial_turns_the_full_circle_and_the_field_and_the_reset_follow_it()
+    {
+        Assert.Equal(AngleDialStyle.Line, dial.Style);
+        Assert.Equal(30, dial.Value);
+        Assert.Equal(30, field.Value);
+
+        // The dot follows the pointer all the way round: the far side of the 30 degree line reads 210 as -150, not as 30.
+        dialog.MouseDown(OnDial(135), MouseButton.Left);
+        dialog.MouseUp(OnDial(135), MouseButton.Left);
+        Assert.Equal(135, dial.Value);
+        Assert.Equal(135, field.Value);
+        Assert.Equal(135, await Angle());
+        dialog.MouseDown(OnDial(-150), MouseButton.Left);
+        dialog.MouseUp(OnDial(-150), MouseButton.Left);
+        Assert.Equal(-150, dial.Value);
+        Assert.Equal(-150, await Angle());
+
+        // The arrows keep turning past the edge instead of stopping there: straight left reads 180, one more is -179.
+        dialog.MouseDown(OnDial(180), MouseButton.Left);
+        dialog.MouseUp(OnDial(180), MouseButton.Left);
+        Assert.Equal(180, dial.Value);
+        Assert.True(dial.IsFocused);
+        dialog.KeyPressQwerty(PhysicalKey.ArrowUp, RawInputModifiers.None);
+        Assert.Equal(-179, dial.Value);
+        Assert.Equal(-179, field.Value);
+        Assert.Equal(-179, await Angle());
+
+        // Typing into the field turns the dial, and the field's Reset turns it back to the angle the filter opened with.
+        field.BeginEdit();
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(field.IsResetVisible);
+        var editor = field.GetVisualDescendants().OfType<TextBox>().Single();
+        editor.Text = "-60";
+        dialog.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Equal(-60, dial.Value);
+        Assert.Equal(-60, await Angle());
+        field.BeginEdit();
+        Dispatcher.UIThread.RunJobs();
+        var reset = field.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Reset");
+        var at = ((Control)reset.Parent!).TranslatePoint(new Point(10, 8), dialog)!.Value;
+        dialog.MouseDown(at, MouseButton.Left);
+        dialog.MouseUp(at, MouseButton.Left);
+        Assert.Equal(30, dial.Value);
+        Assert.Equal(30, await Angle());
+        Screenshots.Save(dialog, "14-motion-blur");
     }
 }

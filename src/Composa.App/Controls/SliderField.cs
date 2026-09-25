@@ -11,7 +11,9 @@ namespace Composa.App.Controls;
 /// A numeric field whose fill is the slider, as in Krita and Affinity Photo: drag anywhere on it to change the value, hold Alt while
 /// dragging for ten times finer steps, double-click to type an exact value, and step by one with the scroll wheel or the arrow keys.
 /// Label and value are drawn inside the box, so a row of them stays on one centre line. Setting <see cref="Value"/> from code
-/// redraws without raising <see cref="Changed"/>; only the user's input does.
+/// redraws without raising <see cref="Changed"/>; only the user's input does. A <see cref="Track"/> paints the colors the value
+/// moves through along the box, and a <see cref="Reset"/> value adds a button on the left while the editor is open that puts the
+/// value back to it.
 /// </summary>
 public sealed class SliderField : Control
 {
@@ -26,8 +28,17 @@ public sealed class SliderField : Control
     private static readonly IPen BorderPen = new Pen(new SolidColorBrush(Color.Parse("#454545")));
     private static readonly IPen FocusPen = new Pen(Palette.Accent);
     private static readonly IPen HoverPen = new Pen(new SolidColorBrush(Color.Parse("#6A6A6A")));
+    private static readonly IBrush TextShadowBrush = new SolidColorBrush(Color.Parse("#B0000000"));
+    /// <summary>How much of the track shows beyond the value, and how much up to it.</summary>
+    private const double TrackRestOpacity = 0.3, TrackFillOpacity = 0.85;
+    private const double ResetWidth = 48, ResetMargin = 3;
 
     private readonly TextBox editor;
+    private readonly Border resetButton;
+    private readonly TextBlock resetText;
+    private IReadOnlyList<Color>? track;
+    private LinearGradientBrush? trackBrush;
+    private double? reset;
     private readonly string label;
     private readonly double min, max, step;
     private readonly string format;
@@ -58,6 +69,14 @@ public sealed class SliderField : Control
         editor.LostFocus += (_, _) => { if (editing) CommitEdit(); };
         VisualChildren.Add(editor);
         LogicalChildren.Add(editor);
+        // Not focusable, so pressing it leaves the editor focused until the reset has closed it on purpose.
+        resetText = new TextBlock { Text = "Reset", FontSize = 11.5, Foreground = Palette.Secondary, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        resetButton = new Border { IsVisible = false, Background = Palette.PanelRaised, CornerRadius = new CornerRadius(3), Child = resetText, Cursor = new Cursor(StandardCursorType.Hand), Focusable = false };
+        resetButton.PointerEntered += (_, _) => resetText.Foreground = Palette.Foreground;
+        resetButton.PointerExited += (_, _) => resetText.Foreground = Palette.Secondary;
+        resetButton.PointerPressed += OnResetPressed;
+        VisualChildren.Add(resetButton);
+        LogicalChildren.Add(resetButton);
         ToolTip.SetTip(this, BuildTip());
         ToolTip.SetShowDelay(this, 450);
     }
@@ -67,6 +86,38 @@ public sealed class SliderField : Control
     public double Maximum => max;
     public double Step => step;
     public bool IsEditing => editing;
+
+    /// <summary>The colors along the box, left to right, when the value is a color or moves one; null keeps the plain fill.</summary>
+    public IReadOnlyList<Color>? Track
+    {
+        get => track;
+        set
+        {
+            track = value;
+            trackBrush = null;
+            if (value is { Count: > 0 })
+            {
+                trackBrush = new LinearGradientBrush { StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative), EndPoint = new RelativePoint(1, 0, RelativeUnit.Relative) };
+                for (var i = 0; i < value.Count; i++) trackBrush.GradientStops.Add(new GradientStop(value[i], value.Count == 1 ? 0 : (double)i / (value.Count - 1)));
+            }
+            InvalidateVisual();
+        }
+    }
+
+    /// <summary>The value a reset puts back, usually the one that changes nothing. Null leaves the editor without a Reset button.</summary>
+    public double? Reset
+    {
+        get => reset;
+        set
+        {
+            reset = value;
+            ToolTip.SetTip(this, BuildTip());
+            if (editing) { resetButton.IsVisible = value != null; InvalidateArrange(); }
+        }
+    }
+
+    /// <summary>True while the editor is open with its Reset button showing.</summary>
+    public bool IsResetVisible => resetButton.IsVisible;
 
     /// <summary>The current value. Setting it from code updates the drawing and any open editor without raising <see cref="Changed"/>.</summary>
     public double Value
@@ -101,7 +152,7 @@ public sealed class SliderField : Control
     private Control BuildTip()
     {
         var unit = step.ToString(format == "0" && step != Math.Floor(step) ? "0.##" : format, System.Globalization.CultureInfo.CurrentCulture);
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto"), ColumnSpacing = 10, RowSpacing = 2 };
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto,Auto,Auto,Auto"), ColumnSpacing = 10, RowSpacing = 2 };
         void Row(int row, string what, string how)
         {
             var w = new TextBlock { Text = what, Foreground = Palette.Secondary };
@@ -113,18 +164,23 @@ public sealed class SliderField : Control
         Row(1, "Fine steps", "Hold Alt while dragging");
         Row(2, "Exact value", "Double-click to type");
         Row(3, $"Step by {unit}", "Arrow keys or scroll wheel");
+        if (reset != null) Row(4, "Reset", "Double-click, then Reset");
         return grid;
     }
 
     protected override Size MeasureOverride(Size availableSize)
     {
         editor.Measure(availableSize);
+        resetButton.Measure(availableSize);
         return new Size(double.IsFinite(availableSize.Width) ? availableSize.Width : 0, double.IsFinite(availableSize.Height) ? availableSize.Height : DefaultHeight);
     }
 
     protected override Size ArrangeOverride(Size finalSize)
     {
-        editor.Arrange(new Rect(finalSize));
+        // The Reset button takes the left of the box while it shows; the editor has the rest.
+        var left = resetButton.IsVisible ? ResetWidth + ResetMargin * 2 : 0;
+        resetButton.Arrange(new Rect(ResetMargin, ResetMargin, ResetWidth, Math.Max(0, finalSize.Height - ResetMargin * 2)));
+        editor.Arrange(new Rect(left, 0, Math.Max(0, finalSize.Width - left), finalSize.Height));
         return finalSize;
     }
 
@@ -146,9 +202,21 @@ public sealed class SliderField : Control
         {
             var fraction = max > min ? (value - min) / (max - min) : 0;
             var fillWidth = Math.Round(bounds.Width * Math.Clamp(fraction, 0, 1));
-            if (fillWidth > 0)
-                using (context.PushClip(new RoundedRect(outline, radius)))
+            using (context.PushClip(new RoundedRect(outline, radius)))
+            {
+                if (trackBrush != null)
+                {
+                    // The whole track shows dimly so the colors ahead of the value can be read; up to the value it is bright.
+                    using (context.PushOpacity(TrackRestOpacity))
+                        context.DrawRectangle(trackBrush, null, bounds);
+                    if (fillWidth > 0)
+                        using (context.PushClip(new Rect(0, 0, fillWidth, bounds.Height)))
+                        using (context.PushOpacity(TrackFillOpacity))
+                            context.DrawRectangle(trackBrush, null, bounds);
+                }
+                else if (fillWidth > 0)
                     context.DrawRectangle(FillBrush, null, new Rect(0, 0, fillWidth, bounds.Height));
+            }
             var fontSize = TextElement.GetFontSize(this);
             var typeface = new Typeface(TextElement.GetFontFamily(this));
             var opacity = IsEnabled ? 1.0 : 0.45;
@@ -156,8 +224,18 @@ public sealed class SliderField : Control
             {
                 var name = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, Palette.Secondary);
                 var number = new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, Palette.Foreground);
-                context.DrawText(name, new Point(8, (bounds.Height - name.Height) / 2));
-                context.DrawText(number, new Point(bounds.Width - 8 - number.Width, (bounds.Height - number.Height) / 2));
+                var namePoint = new Point(8, (bounds.Height - name.Height) / 2);
+                var numberPoint = new Point(bounds.Width - 8 - number.Width, (bounds.Height - number.Height) / 2);
+                if (trackBrush != null)
+                {
+                    // A bright track would swallow the text; a shadow under it keeps it readable on every color.
+                    var shadowName = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, TextShadowBrush);
+                    var shadowNumber = new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, TextShadowBrush);
+                    context.DrawText(shadowName, namePoint + new Vector(0, 1));
+                    context.DrawText(shadowNumber, numberPoint + new Vector(0, 1));
+                }
+                context.DrawText(name, namePoint);
+                context.DrawText(number, numberPoint);
             }
         }
         var pen = dragging || editing || IsFocused ? FocusPen : hovered ? HoverPen : BorderPen;
@@ -267,9 +345,20 @@ public sealed class SliderField : Control
         ToolTip.SetIsOpen(this, false);
         editor.Text = Text;
         editor.IsVisible = true;
+        resetButton.IsVisible = reset != null;
+        InvalidateArrange();
         editor.Focus();
         editor.SelectAll();
         InvalidateVisual();
+    }
+
+    private void OnResetPressed(object? sender, PointerPressedEventArgs e)
+    {
+        // The press has already moved focus to the field, which closed the editor: reset all the same.
+        if (reset is not { } target || !e.GetCurrentPoint(resetButton).Properties.IsLeftButtonPressed) return;
+        e.Handled = true;
+        if (editing) EndEdit();
+        SetFromUser(target);
     }
 
     private void OnEditorKeyDown(object? sender, KeyEventArgs e)
@@ -297,6 +386,7 @@ public sealed class SliderField : Control
     {
         editing = false;
         editor.IsVisible = false;
+        resetButton.IsVisible = false;
         if (editor.IsFocused) Focus();
         InvalidateVisual();
     }

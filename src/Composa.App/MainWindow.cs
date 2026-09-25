@@ -229,6 +229,10 @@ public sealed partial class MainWindow : Window
 
     private async Task<bool> CloseSession(EditorSession item)
     {
+        // A save still writing finishes first, so its file is never cut short and the prompt knows whether it is needed.
+        while (saving.TryGetValue(item, out var writing)) await writing.Task;
+        // Text still being typed is an open edit: commit it so it counts as a change and is in what gets saved.
+        if (item.IsEditingText) item.FinishText();
         if (item.IsModified)
         {
             if (item != session) SetSession(item);
@@ -273,8 +277,11 @@ public sealed partial class MainWindow : Window
     private async void OnClosing(object? sender, WindowClosingEventArgs e)
     {
         RememberWindow();
-        if (closingConfirmed || sessions.All(s => !s.IsModified)) return;
+        if (session?.IsEditingText == true) session.FinishText();
+        if (closingConfirmed || (saving.Count == 0 && sessions.All(s => !s.IsModified))) return;
         e.Cancel = true;
+        // Saves still writing finish before the window goes, so no file is cut short.
+        while (saving.Count > 0) await Task.WhenAll(saving.Values.Select(w => w.Task).ToList());
         foreach (var item in sessions.Where(s => s.IsModified).ToList())
             if (!await CloseSession(item)) return;
         closingConfirmed = true;
@@ -396,14 +403,14 @@ public sealed partial class MainWindow : Window
         if (session == null) return;
         var target = session;
         // Text being typed follows the foreground color, so it previews the picker's working color as the Type bar's own
-        // swatch does, and goes back to its own color on Cancel.
+        // swatch does (on the selected letters, or all of them), and goes back to its own colors on Cancel.
         var editing = foreground ? target.TextEdit : null;
-        var original = target.CurrentTextStyle.Color;
-        void Recolor(SKColor color) { if (editing != null && target.TextEdit == editing) target.ChangeTextStyle(st => st with { Color = (uint)color | 0xFF000000 }); }
+        var original = target.CurrentTextStyle;
+        void Recolor(SKColor color) { if (editing != null && target.TextEdit == editing) target.SetTextColor((uint)color | 0xFF000000); }
         var picked = await Dialogs.Prompts.Color(this, foreground ? "Foreground Color" : "Background Color", foreground ? target.Foreground : target.Background, editing != null ? Recolor : null);
         if (picked is not { } color)
         {
-            Recolor(new SKColor(original));
+            if (editing != null && target.TextEdit == editing) target.RestoreTextColors(original);
             return;
         }
         if (foreground) target.Foreground = color; else target.Background = color;
@@ -456,7 +463,7 @@ public sealed partial class MainWindow : Window
         }
         zoomText.Text = canvas.Zoom >= 0.1 ? $"{canvas.Zoom * 100:0.#}%" : $"{canvas.Zoom * 100:0.##}%";
         sizeText.Text = $"{session.Document.Width} × {session.Document.Height} px · {session.Document.Resolution:0.#} ppi · sRGB";
-        hintText.Text = problem ?? Hint(session);
+        hintText.Text = problem ?? (saving.Count > 0 ? "Saving " + string.Join(", ", saving.Values.Select(w => Path.GetFileName(w.Path))) + "…" : Hint(session));
         hintText.Foreground = problem != null ? new SolidColorBrush(Color.Parse("#FFB454")) : Palette.Secondary;
     }
 
