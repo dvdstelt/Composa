@@ -64,11 +64,4 @@ public static class BlendModeExtensions
         BlendMode.HardMix => "Hard Mix",
         _ => mode.ToString()
     };
-
-    /// <summary>The mode with a display name, as the macOS app writes it in its manifests; Normal for anything unknown.</summary>
-    public static BlendMode FromDisplayName(string? name)
-    {
-        foreach (var mode in Enum.GetValues<BlendMode>()) if (mode.DisplayName() == name) return mode;
-        return BlendMode.Normal;
-    }
 }

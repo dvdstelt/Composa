@@ -67,7 +67,6 @@ public sealed partial class MainWindow
             Item("New Canvas…", () => _ = NewCanvas(), Key.N, ctrl, needsDocument: false),
             Item("Open…", () => _ = Open(), Key.O, ctrl, needsDocument: false),
             recentMenu = Sub("Open Recent"),
-            Item("Open macOS Project Folder (.comp)…", () => _ = OpenMacProject(), needsDocument: false),
             Item("Place Images as Layers…", () => _ = PlaceImages()),
             Line(),
             Item("Save", () => _ = Save(session!, false), Key.S, ctrl),
@@ -470,11 +469,6 @@ public sealed partial class MainWindow
                     if (await ImportPhotoshop(path, DocumentLimits.DocumentPixelBudget) is not { } import) continue;
                     AddSession(EditorSession.OpenPhotoshop(import, Path.GetFileNameWithoutExtension(path)));
                 }
-                else if (MacProject.IsProject(path))
-                {
-                    // Projects from the macOS app open as unsaved documents; saving writes this app's own format.
-                    AddSession(new EditorSession(MacProject.Load(path)) { SuggestedName = Path.GetFileNameWithoutExtension(path.TrimEnd(Path.DirectorySeparatorChar)) });
-                }
                 else if (Path.GetExtension(path).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase))
                 {
                     var loaded = new EditorSession(ProjectFile.Load(path));
@@ -497,12 +491,6 @@ public sealed partial class MainWindow
             catch (Exception error) { _ = Prompts.Alert(this, "Couldn't open " + Path.GetFileName(path), error.Message); continue; }
             settings.AddRecent(Path.GetFullPath(path));
         }
-    }
-
-    private async Task OpenMacProject()
-    {
-        var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Open macOS Composa Project (.comp folder)" });
-        await OpenPaths(folders.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
     private async Task PlaceImages()
@@ -577,7 +565,7 @@ public sealed partial class MainWindow
     {
         var paths = e.DataTransfer.TryGetFiles()?.Select(f => f.TryGetLocalPath()).OfType<string>().ToList() ?? [];
         if (paths.Count == 0) return;
-        var projects = paths.Where(p => MacProject.IsProject(p) || Path.GetExtension(p).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)).ToList();
+        var projects = paths.Where(p => Path.GetExtension(p).Equals(ProjectFile.Extension, StringComparison.OrdinalIgnoreCase)).ToList();
         var images = paths.Except(projects).ToList();
         _ = OpenPaths(projects);
         if (session == null || projects.Count > 0) _ = OpenPaths(images);

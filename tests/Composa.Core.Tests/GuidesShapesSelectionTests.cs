@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Composa.Editing;
 using Composa.IO;
 using Composa.Model;
@@ -121,7 +120,7 @@ public class GuideTests
     }
 
     [Fact]
-    public void Guides_round_trip_through_the_project_and_from_macOS()
+    public void Guides_round_trip_through_the_project()
     {
         var session = EditorSession.NewCanvas(80, 40);
         session.AddGuide(GuideAxis.Vertical, 16);
@@ -130,22 +129,6 @@ public class GuideTests
         ProjectFile.Write(session.Document, stream);
         stream.Position = 0;
         Assert.Equal(session.Guides, ProjectFile.Read(stream).Guides);
-
-        var folder = Path.Combine(Path.GetTempPath(), "composa-guides-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(Path.Combine(folder, "images"));
-        try
-        {
-            var manifest = new
-            {
-                format = "com.compositor.project", version = 8, colorSpace = "sRGB", documentID = Guid.NewGuid(), width = 50, height = 50,
-                layers = Array.Empty<object>(), guides = new object[] { new { id = Guid.NewGuid(), axis = "vertical", position = 16.0 }, new { id = Guid.NewGuid(), axis = "horizontal", position = 12.0 } }
-            };
-            File.WriteAllText(Path.Combine(folder, "manifest.json"), JsonSerializer.Serialize(manifest));
-            var loaded = MacProject.Load(folder);
-            Assert.Equal([GuideAxis.Vertical, GuideAxis.Horizontal], loaded.Guides.Select(g => g.Axis));
-            Assert.Equal([16.0, 12.0], loaded.Guides.Select(g => g.Position));
-        }
-        finally { Directory.Delete(folder, recursive: true); }
     }
 }
 
