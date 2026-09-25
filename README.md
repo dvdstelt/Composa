@@ -85,6 +85,7 @@ Composa is developed on Linux, on X11 and Wayland (through XWayland), and that i
 - A mask always moves and scales with its layer; it cannot be unlinked and transformed on its own.
 - Layers cannot be dragged between tabs. Copy and paste (Ctrl+C, Ctrl+V) carries whole layers across when nothing is selected, and pixels when something is; layers pasted into another project arrive centered on its canvas.
 - Hue/Saturation offers the master and six fixed color ranges; the ranges' widths are not adjustable.
+- Double-clicking a slider types an exact value; a Reset button then appears on its left. The macOS app resets on double-click and types in a separate field.
 - Point text grows from the edge its alignment reads from (right-aligned text grows leftward); the macOS app keeps the top-left corner.
 - Layer effects are drawn on the CPU from a cached image; while a brush stroke is in progress they follow the pixels the stroke started from and catch up when it ends.
 - Photoshop files are opened, never written. Horizontal text with one style stays editable; vertical, sheared or unevenly scaled text, smart objects and paths other than solid rectangles and ellipses arrive as pixels, layer effects are dropped, and adjustments other than Levels, Curves, Hue/Saturation, Brightness/Contrast, Exposure, Black & White, Color Balance and Invert are skipped; every such change is listed before the import goes ahead. Only 8-bit RGB `.psd` and `.psb` files open (no CMYK or 16-bit).
