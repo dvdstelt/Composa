@@ -30,22 +30,22 @@ public static class EffectsDialog
             var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
             void Paint() => swatch.Background = new SolidColorBrush(new SKColor(effects.ColorOf(kind) ?? 0xFF000000).ToAvalonia());
             Paint();
-            ToolTip.SetTip(swatch, LayerEffects.DisplayName(kind) + " color");
+            ToolTip.SetTip(swatch, Loc.Format("{0} color", Loc.T(LayerEffects.DisplayName(kind))));
             swatch.PointerPressed += async (_, _) =>
             {
-                if (TopLevel.GetTopLevel(swatch) is not Window window || await Prompts.Color(window, LayerEffects.DisplayName(kind) + " Color", new SKColor(effects.ColorOf(kind) ?? 0xFF000000)) is not { } picked) return;
+                if (TopLevel.GetTopLevel(swatch) is not Window window || await Prompts.Color(window, Loc.Format("{0} Color", Loc.T(LayerEffects.DisplayName(kind))), new SKColor(effects.ColorOf(kind) ?? 0xFF000000)) is not { } picked) return;
                 Set(effects.WithColor(kind, (uint)picked | 0xFF000000));
                 Paint();
             };
-            return Ui.Row(10, Ui.Label("Color", Palette.Secondary, weight: FontWeight.Normal) is var l ? Width(l, 70) : l, swatch);
+            return Ui.Row(10, Ui.Label(Loc.T("Color"), Palette.Secondary, weight: FontWeight.Normal) is var l ? Width(l, 70) : l, swatch);
         }
 
         switch (kind)
         {
             case LayerEffectKind.Stroke:
                 var stroke = effects.Stroke!;
-                rows.Children.Add(Ui.Row(10, Width(Ui.Label("Position", Palette.Secondary), 70),
-                    Ui.Combo(new[] { "Outside", "Inside" }, stroke.Inside ? "Inside" : "Outside", v => v, v => Set(effects with { Stroke = effects.Stroke! with { Inside = v == "Inside" } }), 120)));
+                rows.Children.Add(Ui.Row(10, Width(Ui.Label(Loc.T("Position"), Palette.Secondary), 70),
+                    Ui.Combo(new[] { "Outside", "Inside" }, stroke.Inside ? "Inside" : "Outside", v => Loc.T(v), v => Set(effects with { Stroke = effects.Stroke! with { Inside = v == "Inside" } }), 120)));
                 rows.Children.Add(Swatch());
                 rows.Children.Add(Slider("Size", stroke.Size, 0, 100, v => Set(effects with { Stroke = effects.Stroke! with { Size = v } })));
                 rows.Children.Add(Slider("Opacity", stroke.Opacity * 100, 0, 100, v => Set(effects with { Stroke = effects.Stroke! with { Opacity = v / 100 } })));

@@ -13,7 +13,7 @@ public static class TrimDialog
         var basedOn = new StackPanel { Spacing = 4 };
         foreach (var choice in Enum.GetValues<TrimBasedOn>())
         {
-            var radio = new RadioButton { Content = TrimOptions.DisplayName(choice), IsChecked = choice == initial.BasedOn, GroupName = "trim-based-on" };
+            var radio = new RadioButton { Content = Loc.T(TrimOptions.DisplayName(choice)), IsChecked = choice == initial.BasedOn, GroupName = "trim-based-on" };
             radio.IsCheckedChanged += (_, _) => { if (radio.IsChecked == true) options = options with { BasedOn = choice }; };
             basedOn.Children.Add(radio);
         }
@@ -31,9 +31,9 @@ public static class TrimDialog
         Edge("Left", initial.Left, (o, v) => o with { Left = v }, 1, 0);
         Edge("Right", initial.Right, (o, v) => o with { Right = v }, 1, 2);
         var body = Ui.Column(14,
-            Ui.Label("Based On", Palette.Secondary, weight: Avalonia.Media.FontWeight.SemiBold), basedOn,
+            Ui.Label(Loc.T("Based On"), Palette.Secondary, weight: Avalonia.Media.FontWeight.SemiBold), basedOn,
             Ui.Separator(false),
-            Ui.Label("Trim Away", Palette.Secondary, weight: Avalonia.Media.FontWeight.SemiBold), edges);
+            Ui.Label(Loc.T("Trim Away"), Palette.Secondary, weight: Avalonia.Media.FontWeight.SemiBold), edges);
         body.MinWidth = 260;
         dialog = new DialogWindow("Trim", body) { CanAccept = initial.TrimsAny };
         return await dialog.Ask(owner) ? options : null;

@@ -12,17 +12,17 @@ public static class LookDialogs
     public static async Task<int?> ExportLook(Window owner, IReadOnlyList<string> baked, IReadOnlyList<(string Name, string Why)> leftOut, int initialSize)
     {
         var size = Filters.LookBake.Sizes.Contains(initialSize) ? initialSize : 33;
-        var rows = new List<Control> { Ui.Label("Baked into the look, bottom to top:") };
+        var rows = new List<Control> { Ui.Label(Loc.T("Baked into the look, bottom to top:")) };
         foreach (var name in baked) rows.Add(Indented(Ui.Label(name, Palette.Secondary)));
         if (leftOut.Count > 0)
         {
-            var heading = Ui.Label("Left out, because a look can only change colors:");
+            var heading = Ui.Label(Loc.T("Left out, because a look can only change colors:"));
             heading.Margin = new Avalonia.Thickness(0, 8, 0, 0);
             rows.Add(heading);
             foreach (var (name, why) in leftOut) rows.Add(Indented(Ui.Label($"{name} {why}", Palette.Secondary)));
         }
-        var sizes = Ui.Combo(Filters.LookBake.Sizes, size, n => $"{n} points", n => size = n, 130);
-        var sizeRow = Ui.Row(8, Ui.Label("Size"), sizes);
+        var sizes = Ui.Combo(Filters.LookBake.Sizes, size, n => Loc.Format("{0} points", n), n => size = n, 130);
+        var sizeRow = Ui.Row(8, Ui.Label(Loc.T("Size")), sizes);
         sizeRow.Margin = new Avalonia.Thickness(0, 12, 0, 0);
         rows.Add(sizeRow);
         var body = new StackPanel { Spacing = 4, MaxWidth = 420 };

@@ -24,7 +24,7 @@ public sealed class HistoryPanel : UserControl
     private EditorSession? session;
     private readonly StackPanel rows = new() { Background = Brushes.Transparent };
     private readonly ScrollViewer scroll;
-    private readonly TextBlock dropped = new() { Text = "Older steps are no longer kept", Foreground = Palette.Secondary, FontSize = 11, Margin = new Thickness(10, 0, 10, 4), IsVisible = false };
+    private readonly TextBlock dropped = new() { Text = Loc.T("Older steps are no longer kept"), Foreground = Palette.Secondary, FontSize = 11, Margin = new Thickness(10, 0, 10, 4), IsVisible = false };
     private bool scrubbing;
     private int? pendingIndex;
     private bool pendingPosted;
@@ -124,7 +124,7 @@ public sealed class HistoryPanel : UserControl
         var brush = ahead ? Palette.Secondary : Palette.Foreground;
         var name = new TextBlock
         {
-            Text = step.Name, Foreground = brush, FontStyle = ahead ? FontStyle.Italic : FontStyle.Normal,
+            Text = Loc.T(step.Name), Foreground = brush, FontStyle = ahead ? FontStyle.Italic : FontStyle.Normal,
             TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(8, 0, 0, 0)
         };
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto") };
@@ -136,7 +136,7 @@ public sealed class HistoryPanel : UserControl
             var disk = Icons.Create(Icons.Disk, 12, Palette.Secondary);
             // The icon itself ignores the pointer, so the tip sits on a box around it.
             var mark = new Border { Background = Brushes.Transparent, Child = disk, Margin = new Thickness(6, 0, 0, 0) };
-            ToolTip.SetTip(mark, "This is the state in the file");
+            ToolTip.SetTip(mark, Loc.T("This is the state in the file"));
             Grid.SetColumn(mark, 2);
             grid.Children.Add(mark);
         }

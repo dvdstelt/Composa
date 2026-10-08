@@ -122,9 +122,9 @@ public sealed partial class MainWindow : Window
     {
         var abandoned = recovery!.FindAbandoned();
         if (abandoned.Count == 0) return;
-        var names = string.Join("\n", abandoned.Select(e => $"• {e.Title} (autosaved {e.SavedAt:g})"));
+        var names = string.Join("\n", abandoned.Select(e => Loc.Format("• {0} (autosaved {1})", e.Title, e.SavedAt.ToString("g"))));
         var recover = await Dialogs.Prompts.Confirm(this, "Recover Unsaved Work",
-            $"Composa did not close normally last time. These documents had unsaved changes:\n\n{names}\n\nRecover them? Choosing Cancel discards the autosaved copies.", "Recover");
+            Loc.T("Composa did not close normally last time. These documents had unsaved changes:") + "\n\n" + names + "\n\n" + Loc.T("Recover them? Choosing Cancel discards the autosaved copies."), "Recover");
         foreach (var entry in abandoned)
         {
             if (recover)
@@ -138,7 +138,7 @@ public sealed partial class MainWindow : Window
                 }
                 catch (Exception error)
                 {
-                    await Dialogs.Prompts.Alert(this, "Couldn't recover " + entry.Title, error.Message + "\n\nThe autosaved copy was kept at " + entry.ProjectPath);
+                    await Dialogs.Prompts.Alert(this, Loc.Format("Couldn't recover {0}", entry.Title), error.Message + "\n\n" + Loc.Format("The autosaved copy was kept at {0}", entry.ProjectPath));
                     continue;
                 }
             }
@@ -234,7 +234,7 @@ public sealed partial class MainWindow : Window
         tabs.Children.Clear();
         foreach (var item in sessions)
         {
-            var label = Ui.Label(item.Title + (item.IsModified ? " •" : ""), item == session ? Palette.Foreground : Palette.Secondary);
+            var label = Ui.Label(DisplayedTitle(item) + (item.IsModified ? " •" : ""), item == session ? Palette.Foreground : Palette.Secondary);
             var close = new Button { Classes = { "flat" }, Padding = new Thickness(3), Content = Icons.Create(Icons.Close, 10), VerticalAlignment = VerticalAlignment.Center };
             close.Click += (_, e) => { _ = CloseSession(item); e.Handled = true; };
             var tab = new Border
@@ -272,7 +272,7 @@ public sealed partial class MainWindow : Window
     {
         MenuItem Entry(string header, Action run, bool enabled = true)
         {
-            var entry = new MenuItem { Header = header, IsEnabled = enabled };
+            var entry = new MenuItem { Header = Loc.T(header), IsEnabled = enabled };
             entry.Click += (_, _) => run();
             return entry;
         }
@@ -492,8 +492,8 @@ public sealed partial class MainWindow : Window
         }
 
         foregroundSwatch.Cursor = backgroundSwatch.Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(foregroundSwatch, "Foreground color");
-        ToolTip.SetTip(backgroundSwatch, "Background color");
+        ToolTip.SetTip(foregroundSwatch, Loc.T("Foreground color"));
+        ToolTip.SetTip(backgroundSwatch, Loc.T("Background color"));
         foregroundSwatch.PointerPressed += (_, _) => _ = PickColor(foreground: true);
         backgroundSwatch.PointerPressed += (_, _) => _ = PickColor(foreground: false);
         backgroundSwatch.Margin = new Thickness(14, 14, 0, 0);
@@ -532,9 +532,9 @@ public sealed partial class MainWindow : Window
 
     private Panel BuildWelcome()
     {
-        var title = Ui.Label("Composa", size: 26, weight: FontWeight.SemiBold);
+        var title = Ui.Label(Loc.T("Composa"), size: 26, weight: FontWeight.SemiBold);
         title.HorizontalAlignment = HorizontalAlignment.Center;
-        var subtitle = Ui.Label("Create a canvas, open a project or image, or drop files here.", Palette.Secondary);
+        var subtitle = Ui.Label(Loc.T("Create a canvas, open a project or image, or drop files here."), Palette.Secondary);
         subtitle.HorizontalAlignment = HorizontalAlignment.Center;
         var buttons = Ui.Row(10, Ui.TextButton("New Canvas…", () => _ = NewCanvas(), accent: true), Ui.TextButton("Open…", () => _ = Open()));
         buttons.HorizontalAlignment = HorizontalAlignment.Center;
@@ -542,12 +542,14 @@ public sealed partial class MainWindow : Window
         var recent = settings.RecentFiles.Where(p => File.Exists(p) || Directory.Exists(p)).Take(6).ToList();
         if (recent.Count > 0)
         {
-            var heading = Ui.Label("Recent", Palette.Secondary);
+            var heading = Ui.Label(Loc.T("Recent"), Palette.Secondary);
             heading.HorizontalAlignment = HorizontalAlignment.Center;
             heading.Margin = new Thickness(0, 18, 0, 0);
             box.Children.Add(heading);
             foreach (var path in recent)
             {
+                // A recent file's name is the person's own text, so it is never translated: Ui.Label is the
+                // helper that leaves such text exactly as it is.
                 var link = new Button { Classes = { "flat" }, Content = Ui.Label(Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar)), Palette.Accent), HorizontalAlignment = HorizontalAlignment.Center, Padding = new Thickness(8, 3) };
                 ToolTip.SetTip(link, path);
                 link.Click += (_, _) => _ = OpenPaths([path]);
@@ -557,6 +559,13 @@ public sealed partial class MainWindow : Window
         box.VerticalAlignment = VerticalAlignment.Center;
         return new Panel { Children = { box } };
     }
+
+    /// <summary>
+    /// A tab's text. A document's own name is the person's and is never translated; only the nameless
+    /// default a new canvas starts with is the application's word to say, so that one reads in the language.
+    /// </summary>
+    private static string DisplayedTitle(EditorSession item) =>
+        item.FilePath == null && item.SuggestedName == null ? Loc.T("Untitled") : item.Title;
 
     private void UpdateColors()
     {
@@ -624,34 +633,59 @@ public sealed partial class MainWindow : Window
         {
             zoomText.Text = "";
             sizeText.Text = "";
-            hintText.Text = "Ready when you are";
+            hintText.Text = Loc.T("Ready when you are");
             return;
         }
         zoomText.Text = canvas.Zoom >= 0.1 ? $"{canvas.Zoom * 100:0.#}%" : $"{canvas.Zoom * 100:0.##}%";
-        sizeText.Text = $"{session.Document.Width} × {session.Document.Height} px · {session.Document.Resolution:0.#} ppi · sRGB";
-        hintText.Text = problem ?? (saving.Count > 0 ? "Saving " + string.Join(", ", saving.Values.Select(w => Path.GetFileName(w.Path))) + "…" : note ?? Hint(session));
+        sizeText.Text = Loc.Format("{0} × {1} px · {2} ppi · sRGB", session.Document.Width, session.Document.Height, session.Document.Resolution.ToString("0.#"));
+        hintText.Text = problem ?? (saving.Count > 0 ? Loc.Format("Saving {0}…", string.Join(", ", saving.Values.Select(w => Path.GetFileName(w.Path)))) : note ?? Hint(session));
         hintText.Foreground = problem != null ? new SolidColorBrush(Color.Parse("#FFB454")) : Palette.Secondary;
     }
 
-    private static string Hint(EditorSession s) => s.Tool == Tool.Move ? ToolHint(s) : ToolHint(s) + " · Ctrl-drag moves the layer";
+    private static string Hint(EditorSession s) => s.Tool == Tool.Move ? ToolHint(s) : ToolHint(s) + " · " + Loc.T("Ctrl-drag moves the layer");
 
+    /// <summary>
+    /// The verb for the smear tool's current mode. Liquify is spelled out because "liquify" reads oddly
+    /// in a sentence; the others are their enum name in lower case, exactly as the hint always showed them.
+    /// </summary>
+    private static string SmearVerb(EditorSession s) => s.SmearMode switch
+    {
+        SmearMode.Liquify => Loc.T("push pixels"),
+        SmearMode.Blur => Loc.T("blur"),
+        SmearMode.Smudge => Loc.T("smudge"),
+        SmearMode.Dodge => Loc.T("dodge"),
+        _ => Loc.T("burn"),
+    };
+
+    /// <summary>
+    /// What the status bar says about the tool in hand. Each sentence is looked up on its own, so a
+    /// ternary branch translates separately and a sentence nothing translated stays English.
+    /// </summary>
     private static string ToolHint(EditorSession s) => s.Tool switch
     {
-        Tool.Move => "Drag to move · Handles resize (Shift free, Alt from center) · Outside a corner rotates · Ctrl-drag a corner distorts · Ctrl-click picks a layer · 1–0 opacity",
-        Tool.Marquee => "Drag to select · Shift add · Alt subtract · Shift+Alt intersect · Drag inside to move · Delete clears · Ctrl+D deselect",
-        Tool.Lasso => s.LassoKind == LassoKind.Freehand ? "Drag to select · Shift add · Alt subtract · Drag inside to move" : "Click corners · Click the start, double-click or Enter to close · Backspace removes a corner · Escape cancels",
-        Tool.Wand => s.WandMode == WandMode.Object ? "Click an object to select its outline · Drag a box around a small one · Tab for Wand · Shift add · Alt subtract" : "Click to select similar colors · Tab for Object · Shift add · Alt subtract",
-        Tool.Crop => "Drag to crop · Shift keeps proportions · Alt symmetric · Enter applies · Escape cancels",
-        Tool.Brush => (s.EraserMode ? "Drag to erase" : "Drag to paint · Alt-click picks a color") + " · Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity",
-        Tool.SpotHealing => "Drag over blemishes to heal · [ ] size",
-        Tool.CloneStamp => "Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity",
-        Tool.Smear => "Drag to " + (s.SmearMode == SmearMode.Liquify ? "push pixels" : s.SmearMode.ToString().ToLowerInvariant()) + " · [ ] size · 1–0 strength",
-        Tool.Gradient => "Drag to draw from foreground to " + (s.GradientToTransparent ? "transparent" : "background") + " · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels",
-        Tool.Shape => s.ShapeKind == ShapeKind.Line ? "Drag to draw a line on a new layer · Shift snaps to 45° · Tab for the next shape" : "Drag to draw a shape on a new layer · Shift square · Alt from center · Tab for the next shape",
-        Tool.Text => s.IsEditingText ? "Type · Drag the box's handles to resize it · Alt+arrows tracking and leading · Ctrl+Enter finishes · Escape cancels" : "Click for point text · Drag a box for paragraph text · Click text to edit it",
-        Tool.Eyedropper => "Click to pick the foreground color · Alt-click for the background",
-        Tool.Hand => "Drag to pan · Ctrl+wheel zooms",
-        _ => "Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly"
+        Tool.Move => Loc.T("Drag to move · Handles resize (Shift free, Alt from center) · Outside a corner rotates · Ctrl-drag a corner distorts · Ctrl-click picks a layer · 1–0 opacity"),
+        Tool.Marquee => Loc.T("Drag to select · Shift add · Alt subtract · Shift+Alt intersect · Drag inside to move · Delete clears · Ctrl+D deselect"),
+        Tool.Lasso => s.LassoKind == LassoKind.Freehand
+            ? Loc.T("Drag to select · Shift add · Alt subtract · Drag inside to move")
+            : Loc.T("Click corners · Click the start, double-click or Enter to close · Backspace removes a corner · Escape cancels"),
+        Tool.Wand => s.WandMode == WandMode.Object
+            ? Loc.T("Click an object to select its outline · Drag a box around a small one · Tab for Wand · Shift add · Alt subtract")
+            : Loc.T("Click to select similar colors · Tab for Object · Shift add · Alt subtract"),
+        Tool.Crop => Loc.T("Drag to crop · Shift keeps proportions · Alt symmetric · Enter applies · Escape cancels"),
+        Tool.Brush => (s.EraserMode ? Loc.T("Drag to erase") : Loc.T("Drag to paint · Alt-click picks a color")) + Loc.T("· Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity"),
+        Tool.SpotHealing => Loc.T("Drag over blemishes to heal · [ ] size"),
+        Tool.CloneStamp => Loc.T("Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity"),
+        Tool.Smear => Loc.Format("Drag to {0} · [ ] size · 1–0 strength", SmearVerb(s)),
+        Tool.Gradient => Loc.Format("Drag to draw from foreground to {0} · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels", s.GradientToTransparent ? Loc.T("transparent") : Loc.In("background", "Gradient")),
+        Tool.Shape => s.ShapeKind == ShapeKind.Line
+            ? Loc.T("Drag to draw a line on a new layer · Shift snaps to 45° · Tab for the next shape")
+            : Loc.T("Drag to draw a shape on a new layer · Shift square · Alt from center · Tab for the next shape"),
+        Tool.Text => s.IsEditingText
+            ? Loc.T("Type · Drag the box's handles to resize it · Alt+arrows tracking and leading · Ctrl+Enter finishes · Escape cancels")
+            : Loc.T("Click for point text · Drag a box for paragraph text · Click text to edit it"),
+        Tool.Eyedropper => Loc.T("Click to pick the foreground color · Alt-click for the background"),
+        Tool.Hand => Loc.T("Drag to pan · Ctrl+wheel zooms"),
+        _ => Loc.T("Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly")
     };
 
     private bool reportingFailure;

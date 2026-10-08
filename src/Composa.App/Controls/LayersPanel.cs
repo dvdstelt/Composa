@@ -67,7 +67,7 @@ public sealed class LayersPanel : UserControl
         for (var group = 0; group < BlendModeExtensions.Groups.Length; group++)
         {
             if (group > 0) { items.Add(new ComboBoxItem { Content = Ui.Separator(false), IsEnabled = false, Padding = new Thickness(0, 4), MinHeight = 0 }); blendAt.Add(null); }
-            foreach (var mode in BlendModeExtensions.Groups[group]) { items.Add(new ComboBoxItem { Content = mode.DisplayName() }); blendAt.Add(mode); }
+            foreach (var mode in BlendModeExtensions.Groups[group]) { items.Add(new ComboBoxItem { Content = Loc.T(mode.DisplayName()) }); blendAt.Add(mode); }
         }
         blend = new ComboBox { ItemsSource = items, HorizontalAlignment = HorizontalAlignment.Stretch };
         blend.SelectionChanged += (_, _) =>
@@ -88,12 +88,12 @@ public sealed class LayersPanel : UserControl
         opacity.KeyUp += (_, _) => EndOpacityDrag();
 
         var header = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto"), RowDefinitions = new RowDefinitions("Auto,Auto"), Margin = new Thickness(10, 8, 10, 6) };
-        var title = Ui.Label("Layers", weight: FontWeight.SemiBold);
+        var title = Ui.Label(Loc.T("Layers"), weight: FontWeight.SemiBold);
         title.Margin = new Thickness(0, 0, 0, 6);
         Grid.SetColumnSpan(title, 3);
         var blendRow = new Grid { ColumnDefinitions = new ColumnDefinitions("112,10,Auto,*,Auto") };
         blendRow.Children.Add(blend);
-        var opacityLabel = Ui.Label("Opacity", Palette.Secondary);
+        var opacityLabel = Ui.Label(Loc.T("Opacity"), Palette.Secondary);
         Grid.SetColumn(opacityLabel, 2);
         blendRow.Children.Add(opacityLabel);
         Grid.SetColumn(opacity, 3);
@@ -109,7 +109,7 @@ public sealed class LayersPanel : UserControl
         var adjustmentMenu = new ContextMenu();
         foreach (var kind in Enum.GetValues<AdjustmentKind>())
         {
-            var item = new MenuItem { Header = Adjustment.Create(kind).DisplayName + "…" };
+            var item = new MenuItem { Header = Loc.T(Adjustment.Create(kind).DisplayName) + "…" };
             item.Click += (_, _) => NewAdjustmentRequested?.Invoke(kind);
             adjustmentMenu.Items.Add(item);
         }
@@ -118,7 +118,7 @@ public sealed class LayersPanel : UserControl
         var effectsMenu = new ContextMenu();
         foreach (var kind in Enum.GetValues<LayerEffectKind>())
         {
-            var item = new MenuItem { Header = LayerEffects.DisplayName(kind) + "…" };
+            var item = new MenuItem { Header = Loc.T(LayerEffects.DisplayName(kind)) + "…" };
             item.Click += (_, _) => NewEffectRequested?.Invoke(kind);
             effectsMenu.Items.Add(item);
         }
@@ -245,7 +245,7 @@ public sealed class LayersPanel : UserControl
         var dim = !layer.Visible || !parentVisible;
 
         var eye = new Button { Classes = { "flat" }, Width = 28, Height = 28, Padding = new Thickness(0), Content = Icons.Create(Icons.Eye, 15, layer.Visible ? null : new SolidColorBrush(Color.Parse("#555555"))) };
-        ToolTip.SetTip(eye, "Show or hide (drag down the column to swipe, Alt-click to show only this layer)");
+        ToolTip.SetTip(eye, Loc.T("Show or hide (drag down the column to swipe, Alt-click to show only this layer)"));
         eye.AddHandler(PointerPressedEvent, (_, e) =>
         {
             if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
@@ -285,7 +285,7 @@ public sealed class LayersPanel : UserControl
             var maskThumb = Thumb(new Image { Source = Thumbnail(layer.Mask), Stretch = Stretch.Uniform, Opacity = layer.MaskEnabled ? 1 : 0.35 },
                 layer.Id == current.ActiveLayer?.Id && current.IsEditingMask);
             maskThumb.PointerPressed += (_, _) => thumbnailTarget = true;
-            ToolTip.SetTip(maskThumb, "Layer mask: click to paint on it, Shift-click to disable, Ctrl-click to load as selection");
+            ToolTip.SetTip(maskThumb, Loc.T("Layer mask: click to paint on it, Shift-click to disable, Ctrl-click to load as selection"));
             maskThumb.AddHandler(PointerPressedEvent, (_, e) =>
             {
                 if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) { current.SetMaskEnabled(layer, !layer.MaskEnabled); e.Handled = true; }
@@ -345,9 +345,9 @@ public sealed class LayersPanel : UserControl
         var enabled = layer.Effects!.IsEnabled(kind);
         var selected = current.SelectedEffect is { } s && s.LayerId == layer.Id && s.Kind == kind;
         var eye = new Button { Classes = { "flat" }, Width = 24, Height = 22, Padding = new Thickness(0), Content = Icons.Create(enabled ? Icons.Eye : Icons.EyeOff, 12, enabled ? Palette.Secondary : new SolidColorBrush(Color.Parse("#555555"))) };
-        ToolTip.SetTip(eye, enabled ? "Hide " + LayerEffects.DisplayName(kind).ToLowerInvariant() : "Show " + LayerEffects.DisplayName(kind).ToLowerInvariant());
+        ToolTip.SetTip(eye, enabled ? Loc.Format("Hide {0}", Loc.T(LayerEffects.DisplayName(kind).ToLowerInvariant())) : Loc.Format("Show {0}", Loc.T(LayerEffects.DisplayName(kind).ToLowerInvariant())));
         eye.Click += (_, _) => current.ToggleEffect(layer, kind);
-        var name = Ui.Label(LayerEffects.DisplayName(kind), enabled ? Palette.Foreground : Palette.Secondary);
+        var name = Ui.Label(Loc.T(LayerEffects.DisplayName(kind)), enabled ? Palette.Foreground : Palette.Secondary);
         name.FontSize = 11.5;
         var content = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6, Margin = new Thickness(depth * 14 + 46, 0, 0, 0), Opacity = parentVisible ? 1 : 0.45, Children = { eye, name } };
         var row = new Border
@@ -355,7 +355,7 @@ public sealed class LayersPanel : UserControl
             Child = content, Background = selected ? Palette.Selected : Brushes.Transparent, Padding = new Thickness(4, 1), Height = 24,
             BorderBrush = Palette.Divider, BorderThickness = new Thickness(0, 0, 0, 1), Tag = (layer, kind)
         };
-        ToolTip.SetTip(row, "Click to select, double-click to edit, Alt-drag onto another layer to copy the " + LayerEffects.DisplayName(kind).ToLowerInvariant());
+        ToolTip.SetTip(row, Loc.Format("Click to select, double-click to edit, Alt-drag onto another layer to copy the {0}", Loc.T(LayerEffects.DisplayName(kind).ToLowerInvariant())));
         row.PointerPressed += (_, e) =>
         {
             if (e.Source == eye || (e.Source as Control)?.FindAncestorOfType<Button>() == eye) return;
@@ -379,11 +379,11 @@ public sealed class LayersPanel : UserControl
         var menu = new ContextMenu();
         void Add(string header, Action action)
         {
-            var item = new MenuItem { Header = header };
+            var item = new MenuItem { Header = Loc.T(header) };
             item.Click += (_, _) => action();
             menu.Items.Add(item);
         }
-        Add("Edit " + LayerEffects.DisplayName(kind) + "…", () => EditEffectRequested?.Invoke(layer, kind));
+        Add(Loc.Format("Edit {0}…", Loc.T(LayerEffects.DisplayName(kind))), () => EditEffectRequested?.Invoke(layer, kind));
         Add(enabled ? "Hide" : "Show", () => current.ToggleEffect(layer, kind));
         Add("Delete", () => current.RemoveEffect(layer, kind));
         row.ContextMenu = menu;
@@ -499,7 +499,7 @@ public sealed class LayersPanel : UserControl
         Add(current.MergeTitle, current.MergeLayers, current.CanMerge);
         menu.Items.Add(new Separator());
 
-        var addMask = new MenuItem { Header = "Add Mask", IsEnabled = layer.Mask == null };
+        var addMask = new MenuItem { Header = Loc.T("Add Mask"), IsEnabled = layer.Mask == null };
         Add("Reveal All (White)", () => current.AddMask(layer), parent: addMask);
         Add("Hide All (Black)", () => current.AddMask(layer, hideAll: true), parent: addMask);
         menu.Items.Add(addMask);

@@ -16,6 +16,7 @@ on:
       - 'src/Composa.Core/Models/**' # The model files the packages carry.
       - '.github/workflows/**'
       - '**/*.csproj'
+      - '**/*.resx' # The interface words, whose satellite assemblies the packages must carry.
       - '**/*.props'
       - '**/*.targets'
       - 'global.json'

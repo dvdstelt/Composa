@@ -24,6 +24,13 @@ public sealed class Settings
     /// <summary>Rebound shortcuts by command id: a gesture string, or empty for none. Missing entries keep the default.</summary>
     public Dictionary<string, string> Shortcuts { get; set; } = [];
 
+    /// <summary>
+    /// The language the interface is drawn in: "auto" follows the operating system, "en" is English,
+    /// or a culture code among <see cref="Loc.Available"/>. Names stay English underneath, so this
+    /// changes only what is read on screen; a document, a rebound key and an agent's call are untouched.
+    /// </summary>
+    public string Language { get; set; } = Loc.SystemLanguage;
+
     /// <summary>Whether the MCP server runs, so an AI agent can drive the editor. Off until someone switches it on.</summary>
     public bool AllowAiControl { get; set; }
 

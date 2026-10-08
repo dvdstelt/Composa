@@ -55,7 +55,7 @@ public static class AdjustmentDialogs
             BlackAndWhiteAdjustment bw => BlackAndWhiteEditor(bw, Update),
             ColorBalanceAdjustment balance => ColorBalanceEditor(balance, Update),
             ColorLookupAdjustment lookup => ColorLookupEditor(owner, lookup, picture, pickFile, Update),
-            _ => Ui.Label("This adjustment has no settings.", Palette.Secondary)
+            _ => Ui.Label(Loc.T("This adjustment has no settings."), Palette.Secondary)
         };
         var previewBox = Ui.Check("Preview", true, v => { preview = v; timer.Stop(); timer.Start(); });
         var dialog = new DialogWindow(initial.DisplayName, Ui.Column(12, body, previewBox));
@@ -92,9 +92,9 @@ public static class AdjustmentDialogs
     private static Control NoiseEditor(AddNoiseAdjustment noise, Action<Adjustment> update)
     {
         var amount = Ui.SliderField("Amount", noise.Amount, AddNoiseAdjustment.MinAmount, 100, v => update(noise = noise with { Amount = v }), 0.1, "0.0", FieldWidth, reset: new AddNoiseAdjustment().Amount);
-        var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => d, d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
+        var distribution = Ui.Combo(NoiseDistributions, noise.Gaussian ? "Gaussian" : "Uniform", d => Loc.T(d), d => update(noise = noise with { Gaussian = d == "Gaussian" }), 120);
         var mono = Ui.Check("Monochromatic", noise.Monochromatic, v => update(noise = noise with { Monochromatic = v }));
-        return Ui.Column(10, amount, Ui.Row(10, Ui.Label("Distribution", Palette.Secondary), distribution), mono);
+        return Ui.Column(10, amount, Ui.Row(10, Ui.Label(Loc.T("Distribution"), Palette.Secondary), distribution), mono);
     }
 
     private static Control LevelsEditor(LevelsAdjustment levels, Histogram? histogram, Action<Adjustment> update)
@@ -113,7 +113,7 @@ public static class AdjustmentDialogs
             rows.Children.Add(Ui.SliderField("Output black", range.OutputBlack, 0, 255, v => Set(range with { OutputBlack = v }), 1, "0", FieldWidth));
             rows.Children.Add(Ui.SliderField("Output white", range.OutputWhite, 0, 255, v => Set(range with { OutputWhite = v }), 1, "0", FieldWidth));
         }
-        var picker = Ui.Combo(Channels, "RGB", c => c, c => { channel = Array.IndexOf(Channels, c); graph.Channel = channel == 0 ? 3 : channel - 1; Build(); });
+        var picker = Ui.Combo(Channels, "RGB", c => Loc.T(c), c => { channel = Array.IndexOf(Channels, c); graph.Channel = channel == 0 ? 3 : channel - 1; Build(); });
         var auto = Ui.TextButton("Auto", () =>
         {
             if (histogram == null) return;
@@ -122,17 +122,17 @@ public static class AdjustmentDialogs
         });
         var reset = Ui.TextButton("Reset", () => { update(levels = new LevelsAdjustment()); Build(); });
         Build();
-        return Ui.Column(10, Ui.Row(10, Ui.Label("Channel", Palette.Secondary), picker, auto, reset), graph, rows);
+        return Ui.Column(10, Ui.Row(10, Ui.Label(Loc.T("Channel"), Palette.Secondary), picker, auto, reset), graph, rows);
     }
 
     private static Control CurvesEditor(CurvesAdjustment curves, Histogram? histogram, Action<Adjustment> update)
     {
         var editor = new CurveEditor { Width = 300, Height = 300, Curves = curves, Histogram = histogram };
         editor.Changed += value => update(curves = value);
-        var picker = Ui.Combo(Channels, "RGB", c => c, c => editor.Channel = Array.IndexOf(Channels, c));
+        var picker = Ui.Combo(Channels, "RGB", c => Loc.T(c), c => editor.Channel = Array.IndexOf(Channels, c));
         var reset = Ui.TextButton("Reset", () => { editor.Curves = curves = new CurvesAdjustment(); update(curves); });
-        return Ui.Column(10, Ui.Row(10, Ui.Label("Channel", Palette.Secondary), picker, reset), editor,
-            Ui.Label("Click to add a point, drag to move it, drag it off the graph to remove it.", Palette.Secondary));
+        return Ui.Column(10, Ui.Row(10, Ui.Label(Loc.T("Channel"), Palette.Secondary), picker, reset), editor,
+            Ui.Label(Loc.T("Click to add a point, drag to move it, drag it off the graph to remove it."), Palette.Secondary));
     }
 
     private static Control HueEditor(HueSaturationAdjustment hue, Action<Adjustment> update)
@@ -161,7 +161,7 @@ public static class AdjustmentDialogs
             rows.Children.Add(saturation);
             rows.Children.Add(Ui.SliderField("Lightness", shift.Lightness, -100, 100, v => Set(shift with { Lightness = v }), 1, "0", FieldWidth, Controls.SliderTracks.Lightness, reset: 0));
         }
-        var picker = Ui.Combo(Enum.GetValues<HueRange>(), HueRange.Master, r => r.ToString(), r => { range = r; Build(); });
+        var picker = Ui.Combo(Enum.GetValues<HueRange>(), HueRange.Master, r => Loc.T(r.ToString()), r => { range = r; Build(); });
         var colorize = Ui.Check("Colorize", hue.Colorize, v =>
         {
             var master = hue.Shifts[0];
@@ -170,7 +170,7 @@ public static class AdjustmentDialogs
             Build();
         });
         Build();
-        return Ui.Column(10, Ui.Row(10, Ui.Label("Range", Palette.Secondary), picker, colorize), rows);
+        return Ui.Column(10, Ui.Row(10, Ui.Label(Loc.T("Range"), Palette.Secondary), picker, colorize), rows);
     }
 
     private static readonly string[] ColorFamilies = ["Reds", "Yellows", "Greens", "Cyans", "Blues", "Magentas"];
@@ -198,7 +198,7 @@ public static class AdjustmentDialogs
             Controls.SliderTracks.Saturation(bw.TintHue), reset: defaults.TintSaturation);
         tintRows.Children.Add(tintSaturation);
         var tint = Ui.Check("Tint", bw.Tint, v => { tintRows.IsVisible = v; update(bw = bw with { Tint = v }); });
-        ToolTip.SetTip(tint, "Color the result while keeping its tones, for a sepia or a cyanotype");
+        ToolTip.SetTip(tint, Loc.T("Color the result while keeping its tones, for a sepia or a cyanotype"));
         var reset = Ui.TextButton("Reset", () =>
         {
             update(bw = new BlackAndWhiteAdjustment { Tint = bw.Tint, TintHue = bw.TintHue, TintSaturation = bw.TintSaturation });
@@ -217,7 +217,7 @@ public static class AdjustmentDialogs
         var panel = new StackPanel { Spacing = 6 };
         for (var range = 0; range < 3; range++)
         {
-            panel.Children.Add(Ui.Label(BalanceRanges[range], Palette.Secondary, weight: FontWeight.SemiBold));
+            panel.Children.Add(Ui.Label(Loc.T(BalanceRanges[range]), Palette.Secondary, weight: FontWeight.SemiBold));
             for (var channel = 0; channel < 3; channel++)
             {
                 var (r, c) = (range, channel);
@@ -226,7 +226,7 @@ public static class AdjustmentDialogs
             }
         }
         var preserve = Ui.Check("Preserve Luminosity", balance.PreserveLuminosity, v => update(balance = balance with { PreserveLuminosity = v }));
-        ToolTip.SetTip(preserve, "Put each pixel's brightness back afterwards, so only the color moves");
+        ToolTip.SetTip(preserve, Loc.T("Put each pixel's brightness back afterwards, so only the color moves"));
         preserve.Margin = new Thickness(0, 6, 0, 0);
         panel.Children.Add(preserve);
         return panel;
@@ -247,10 +247,10 @@ public static class AdjustmentDialogs
         }
         Button Swatch(string label, Func<uint> get, Action<uint> set)
         {
-            var button = new Button { Content = label };
+            var button = new Button { Content = Loc.T(label) };
             button.Click += async (_, _) =>
             {
-                if (await Prompts.Color((Window)TopLevel.GetTopLevel(button)!, label, new SKColor(get())) is not { } picked) return;
+                if (await Prompts.Color((Window)TopLevel.GetTopLevel(button)!, Loc.T(label), new SKColor(get())) is not { } picked) return;
                 set((uint)picked);
                 Paint();
                 update(map);
@@ -290,12 +290,12 @@ public static class AdjustmentDialogs
             foreach (var (frame, selected) in chosen) frame.BorderBrush = selected() ? Palette.Accent : Brushes.Transparent;
         }
 
-        Border Tile(string name, ColorLattice lattice, Func<bool> selected, string tip)
+        Border Tile(string name, string display, ColorLattice lattice, Func<bool> selected, string tip)
         {
             using var shown = sample.Copy();
             new ColorLookupAdjustment { Lattice = lattice }.Apply(shown);
             var image = new Image { Source = Ui.ToAvaloniaBitmap(shown, LookThumb), Width = LookThumb, Height = LookThumb * sample.Height / sample.Width, Stretch = Stretch.Uniform };
-            var label = Ui.Label(name, size: 11);
+            var label = Ui.Label(display, size: 11);
             label.TextTrimming = TextTrimming.CharacterEllipsis;
             label.MaxWidth = LookThumb;
             label.HorizontalAlignment = HorizontalAlignment.Center;
@@ -311,7 +311,7 @@ public static class AdjustmentDialogs
         }
 
         foreach (var name in Looks.Names)
-            tiles.Children.Add(Tile(name, Looks.Find(name)!, () => lookup.Lattice?.Id == Looks.Find(name)!.Id, Looks.Describe(name)));
+            tiles.Children.Add(Tile(name, Loc.T(name), Looks.Find(name)!, () => lookup.Lattice?.Id == Looks.Find(name)!.Id, Loc.T(Looks.Describe(name))));
 
         // A file's tile comes and goes with the file: loading another replaces it.
         var fileName = Ui.Label("", Palette.Secondary, 12);
@@ -321,7 +321,7 @@ public static class AdjustmentDialogs
         void ShowFile(string name, ColorLattice lattice)
         {
             if (fileTile != null) { tiles.Children.Remove(fileTile); chosen.RemoveAll(c => c.Frame == fileTile); }
-            fileTile = Tile(name, lattice, () => lookup.Lattice?.Id == lattice.Id, lattice.Title.Length > 0 ? lattice.Title : name);
+            fileTile = Tile(name, name, lattice, () => lookup.Lattice?.Id == lattice.Id, lattice.Title.Length > 0 ? lattice.Title : name);
             tiles.Children.Add(fileTile);
             fileName.Text = name;
         }
@@ -334,7 +334,7 @@ public static class AdjustmentDialogs
             try { lattice = ColorLattice.Load(path); }
             catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException)
             {
-                await Prompts.Alert(owner, "Color Lookup", $"{Path.GetFileName(path)} could not be read. {error.Message}");
+                await Prompts.Alert(owner, Loc.T("Color Lookup"), Loc.Format("{0} could not be read. {1}", Path.GetFileName(path), error.Message));
                 return;
             }
             var name = Path.GetFileName(path);
@@ -399,22 +399,22 @@ public static class AdjustmentDialogs
                 break;
             case FilterKind.AddNoise:
                 Slider("Amount", initial.Amount, 0, 100, v => current with { Amount = v });
-                panel.Children.Add(Ui.Row(10, Ui.Label("Distribution", Palette.Secondary),
-                    Ui.Combo(NoiseDistributions, initial.Gaussian ? "Gaussian" : "Uniform", d => d, d => Update(current with { Gaussian = d == "Gaussian" }), 120)));
+                panel.Children.Add(Ui.Row(10, Ui.Label(Loc.T("Distribution"), Palette.Secondary),
+                    Ui.Combo(NoiseDistributions, initial.Gaussian ? "Gaussian" : "Uniform", d => Loc.T(d), d => Update(current with { Gaussian = d == "Gaussian" }), 120)));
                 panel.Children.Add(Ui.Check("Monochromatic", initial.Monochrome, v => Update(current with { Monochrome = v })));
                 break;
             case FilterKind.Vignette:
                 var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
                 void PaintSwatch() => swatch.Background = new SolidColorBrush(new SKColor(current.VignetteColor).ToAvalonia());
                 PaintSwatch();
-                ToolTip.SetTip(swatch, "Choose the vignette color");
+                ToolTip.SetTip(swatch, Loc.T("Choose the vignette color"));
                 swatch.PointerPressed += async (_, _) =>
                 {
-                    if (await Prompts.Color(owner, "Vignette Color", new SKColor(current.VignetteColor)) is not { } picked) return;
+                    if (await Prompts.Color(owner, Loc.T("Vignette Color"), new SKColor(current.VignetteColor)) is not { } picked) return;
                     Update(current with { VignetteColor = (uint)picked | 0xFF000000 });
                     PaintSwatch();
                 };
-                var colorLabel = Ui.Label("Color", Palette.Secondary);
+                var colorLabel = Ui.Label(Loc.T("Color"), Palette.Secondary);
                 colorLabel.Width = 90;
                 panel.Children.Add(Ui.Row(8, colorLabel, swatch));
                 Slider("Amount", initial.VignetteAmount, 0, 100, v => current with { VignetteAmount = v });
@@ -424,7 +424,7 @@ public static class AdjustmentDialogs
                 Slider("Highlights", initial.VignetteHighlights, 0, 100, v => current with { VignetteHighlights = v });
                 panel.Children.Add(new TextBlock
                 {
-                    Text = "Blends the color into the edges while keeping the center. On an empty layer it paints across the whole canvas.",
+                    Text = Loc.T("Blends the color into the edges while keeping the center. On an empty layer it paints across the whole canvas."),
                     Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
                 });
                 break;
@@ -443,19 +443,19 @@ public static class AdjustmentDialogs
                 Slider("Remove Distortion", initial.Distortion, -100, 100, v => current with { Distortion = v });
                 panel.Children.Add(new TextBlock
                 {
-                    Text = "Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion).",
+                    Text = Loc.T("Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion)."),
                     Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
                 });
                 break;
             case FilterKind.Painterly:
-                panel.Children.Add(Ui.Row(10, Ui.Label("Style", Palette.Secondary),
-                    Ui.Combo(Enum.GetValues<PainterlyStyle>(), initial.Painterly.Style, PainterlySettings.DisplayName, v => Update(current with { Painterly = current.Painterly with { Style = v } }), 140)));
+                panel.Children.Add(Ui.Row(10, Ui.Label(Loc.T("Style"), Palette.Secondary),
+                    Ui.Combo(Enum.GetValues<PainterlyStyle>(), initial.Painterly.Style, v => Loc.T(PainterlySettings.DisplayName(v)), v => Update(current with { Painterly = current.Painterly with { Style = v } }), 140)));
                 Slider("Brush Size", initial.Painterly.BrushSize, 0, 200, v => current with { Painterly = current.Painterly with { BrushSize = v } });
                 Slider("Passes", initial.Painterly.Passes, 1, 4, v => current with { Painterly = current.Painterly with { Passes = (int)Math.Round(v) } });
                 Slider("Detail", initial.Painterly.Detail, 0, 100, v => current with { Painterly = current.Painterly with { Detail = v } });
                 panel.Children.Add(new TextBlock
                 {
-                    Text = "Repaints the layer in brush strokes that follow the picture's edges, the largest brush first and each smaller one only where the picture still differs. A brush size of 0 fits the brush to the picture. Gaps between strokes stay transparent.",
+                    Text = Loc.T("Repaints the layer in brush strokes that follow the picture's edges, the largest brush first and each smaller one only where the picture still differs. A brush size of 0 fits the brush to the picture. Gaps between strokes stay transparent."),
                     Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
                 });
                 break;
@@ -486,20 +486,20 @@ public static class AdjustmentDialogs
                         var swatch = new Border { Width = 44, Height = 24, CornerRadius = new CornerRadius(3), BorderBrush = Brushes.White, BorderThickness = new Thickness(1), Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand) };
                         void Paint() => swatch.Background = new SolidColorBrush(new SKColor(get(current.Dither)).ToAvalonia());
                         Paint();
-                        ToolTip.SetTip(swatch, $"Choose the {title.ToLowerInvariant()} color");
+                        ToolTip.SetTip(swatch, Loc.Format("Choose the {0} color", Loc.T(title)));
                         swatch.PointerPressed += async (_, _) =>
                         {
                             // The picker shows on the layer as it goes; Cancel puts the color back.
                             var before = current.Dither;
-                            var picked = await Prompts.Color(owner, title + " Color", new SKColor(get(before)), color => { Set(dd => apply((uint)color | 0xFF000000, dd)); Paint(); });
+                            var picked = await Prompts.Color(owner, Loc.T(title), new SKColor(get(before)), color => { Set(dd => apply((uint)color | 0xFF000000, dd)); Paint(); });
                             Set(_ => picked is { } color ? apply((uint)color | 0xFF000000, before) : before);
                             Paint();
                         };
                         return swatch;
                     }
 
-                    section.Children.Add(Ui.Row(10, Ui.Label("Style", Palette.Secondary),
-                        Ui.Combo(styles, d.Style, DitherSettings.DisplayName, v => { Set(dd => dd with { Style = v }); Rebuild(); }, 200)));
+                    section.Children.Add(Ui.Row(10, Ui.Label(Loc.T("Style"), Palette.Secondary),
+                        Ui.Combo(styles, d.Style, v => Loc.T(DitherSettings.DisplayName(v)), v => { Set(dd => dd with { Style = v }); Rebuild(); }, 200)));
                     if (d.Style != DitherStyle.Ascii) DitherSlider("Pixel Size", d.PixelSize, DitherSettings.MinPixelSize, DitherSettings.MaxPixelSize, (v, dd) => dd with { PixelSize = (int)Math.Round(v) }, defaults.PixelSize);
                     else DitherSlider("Text Size", d.TextSize, DitherSettings.MinTextSize, DitherSettings.MaxTextSize, (v, dd) => dd with { TextSize = (int)Math.Round(v) }, defaults.TextSize);
                     if (d.IsHalftone)
@@ -510,10 +510,10 @@ public static class AdjustmentDialogs
                     if (d.Style == DitherStyle.Ascii)
                     {
                         var characters = new TextBox { Text = d.Characters, Width = FieldWidth - 90, FontFamily = new FontFamily("monospace") };
-                        ToolTip.SetTip(characters, "The characters to draw with, in any order: each spot gets the one whose ink best matches its tone");
+                        ToolTip.SetTip(characters, Loc.T("The characters to draw with, in any order: each spot gets the one whose ink best matches its tone"));
                         // The property rather than TextChanged, which the box raises only after it has been through the input loop.
                         characters.PropertyChanged += (_, e) => { if (e.Property == TextBox.TextProperty) Set(dd => dd with { Characters = characters.Text ?? "" }); };
-                        section.Children.Add(Ui.Row(10, Ui.Label("Characters", Palette.Secondary), characters));
+                        section.Children.Add(Ui.Row(10, Ui.Label(Loc.T("Characters"), Palette.Secondary), characters));
                     }
                     if (d.HasTones) DitherSlider("Tones", d.Levels, DitherSettings.MinLevels, DitherSettings.MaxLevels, (v, dd) => dd with { Levels = (int)Math.Round(v) }, defaults.Levels);
                     if (d.Diffuses) DitherSlider("Diffusion", d.Diffusion, 0, 100, (v, dd) => dd with { Diffusion = v }, defaults.Diffusion);
@@ -521,36 +521,36 @@ public static class AdjustmentDialogs
                     DitherSlider("Contrast", d.Contrast, -100, 100, (v, dd) => dd with { Contrast = v }, defaults.Contrast);
                     var colorsRow = new List<Control>
                     {
-                        Ui.Label("Colors", Palette.Secondary),
-                        Ui.Combo(Enum.GetValues<DitherColors>(), d.Colors, DitherSettings.DisplayName, v => { Set(dd => dd with { Colors = v }); Rebuild(); }, 140)
+                        Ui.Label(Loc.T("Colors"), Palette.Secondary),
+                        Ui.Combo(Enum.GetValues<DitherColors>(), d.Colors, v => Loc.T(DitherSettings.DisplayName(v)), v => { Set(dd => dd with { Colors = v }); Rebuild(); }, 140)
                     };
                     if (d.Colors == DitherColors.TwoColors)
                     {
-                        colorsRow.Add(Ui.Label("Dark", Palette.Secondary));
+                        colorsRow.Add(Ui.Label(Loc.T("Dark"), Palette.Secondary));
                         colorsRow.Add(Swatch("Dark", dd => dd.Dark, (c, dd) => dd with { Dark = c }));
-                        colorsRow.Add(Ui.Label("Light", Palette.Secondary));
+                        colorsRow.Add(Ui.Label(Loc.T("Light"), Palette.Secondary));
                         colorsRow.Add(Swatch("Light", dd => dd.Light, (c, dd) => dd with { Light = c }));
                     }
                     section.Children.Add(Ui.Row(10, colorsRow.ToArray()));
                     if (d.Style != DitherStyle.Ascii)
                     {
-                        shapeRow = Ui.Row(10, Ui.Label("Pixel Shape", Palette.Secondary),
-                            Ui.Combo(Enum.GetValues<DitherPixelShape>(), d.PixelShape, DitherSettings.DisplayName, v => Set(dd => dd with { PixelShape = v }), 140));
-                        ToolTip.SetTip(shapeRow, "Draw each chunky pixel as a solid square, or as a round dot like a dot-matrix screen");
+                        shapeRow = Ui.Row(10, Ui.Label(Loc.T("Pixel Shape"), Palette.Secondary),
+                            Ui.Combo(Enum.GetValues<DitherPixelShape>(), d.PixelShape, v => Loc.T(DitherSettings.DisplayName(v)), v => Set(dd => dd with { PixelShape = v }), 140));
+                        ToolTip.SetTip(shapeRow, Loc.T("Draw each chunky pixel as a solid square, or as a round dot like a dot-matrix screen"));
                         shapeRow.IsEnabled = d.PixelSize > 1;
                         section.Children.Add(shapeRow);
                     }
                     if (d.DrawsMarks)
                     {
                         var lightOnDark = Ui.Check("Light on Dark", d.LightOnDark, v => Set(dd => dd with { LightOnDark = v }));
-                        ToolTip.SetTip(lightOnDark, "Draw the marks for the light tones on the dark color, like a glowing screen");
+                        ToolTip.SetTip(lightOnDark, Loc.T("Draw the marks for the light tones on the dark color, like a glowing screen"));
                         section.Children.Add(lightOnDark);
                     }
                 }
                 Rebuild();
                 panel.Children.Add(new TextBlock
                 {
-                    Text = "Turns the layer into dithered pixels. Diffusion and Bayer styles quantize to a number of tones; halftone shapes, Mac patterns and ASCII draw marks that cover as much of each cell as the tone calls for. Pixel Size makes chunky pixels. Density adds or removes ink before dithering.",
+                    Text = Loc.T("Turns the layer into dithered pixels. Diffusion and Bayer styles quantize to a number of tones; halftone shapes, Mac patterns and ASCII draw marks that cover as much of each cell as the tone calls for. Pixel Size makes chunky pixels. Density adds or removes ink before dithering."),
                     Foreground = Palette.Secondary, MaxWidth = 380, TextWrapping = TextWrapping.Wrap
                 });
                 break;
@@ -565,14 +565,14 @@ public static class AdjustmentDialogs
                     var plain = Composa.Vision.SubjectFinder.Resolve(current.Detect) == Composa.Vision.SubjectDetect.Backdrop;
                     tolerance.IsEnabled = plain;
                     note.Text = plain
-                        ? "Removes the plain backdrop connected to the layer's edges by making it transparent. Raise the tolerance to take more."
-                        : "A model run on this machine finds the subject and hides everything else behind a layer mask, so a wrong edge can be painted back.";
-                    if (!plain && Composa.Vision.SubjectFinder.FallbackReason(current.Detect) is { } reason) note.Text = reason;
+                        ? Loc.T("Removes the plain backdrop connected to the layer's edges by making it transparent. Raise the tolerance to take more.")
+                        : Loc.T("A model run on this machine finds the subject and hides everything else behind a layer mask, so a wrong edge can be painted back.");
+                    if (!plain && Composa.Vision.SubjectFinder.FallbackReason(current.Detect) is { } reason) note.Text = Loc.T(reason);
                 }
-                var detect = Ui.Combo(detects, initial.Detect, Composa.Vision.SubjectFinder.DisplayName, v => { Update(current with { Detect = v }); Describe(); }, 160);
+                var detect = Ui.Combo(detects, initial.Detect, v => Loc.T(Composa.Vision.SubjectFinder.DisplayName(v)), v => { Update(current with { Detect = v }); Describe(); }, 160);
                 detect.IsEnabled = canDetect;
-                ToolTip.SetTip(detect, canDetect ? "A model for any subject or for a person, or the plain backdrop touching the layer's edges" : "A mask is edited by erasing, so only the plain backdrop applies");
-                panel.Children.Add(Ui.Row(10, Ui.Label("Detect", Palette.Secondary), detect));
+                ToolTip.SetTip(detect, Loc.T(canDetect ? "A model for any subject or for a person, or the plain backdrop touching the layer's edges" : "A mask is edited by erasing, so only the plain backdrop applies"));
+                panel.Children.Add(Ui.Row(10, Ui.Label(Loc.T("Detect"), Palette.Secondary), detect));
                 panel.Children.Add(tolerance);
                 panel.Children.Add(note);
                 Describe();

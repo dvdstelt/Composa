@@ -70,7 +70,7 @@ public sealed class SliderField : Control
         VisualChildren.Add(editor);
         LogicalChildren.Add(editor);
         // Not focusable, so pressing it leaves the editor focused until the reset has closed it on purpose.
-        resetText = new TextBlock { Text = "Reset", FontSize = 11.5, Foreground = Palette.Secondary, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        resetText = new TextBlock { Text = Loc.T("Reset"), FontSize = 11.5, Foreground = Palette.Secondary, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         resetButton = new Border { IsVisible = false, Background = Palette.PanelRaised, CornerRadius = new CornerRadius(3), Child = resetText, Cursor = new Cursor(StandardCursorType.Hand), Focusable = false };
         resetButton.PointerEntered += (_, _) => resetText.Foreground = Palette.Foreground;
         resetButton.PointerExited += (_, _) => resetText.Foreground = Palette.Secondary;
@@ -160,11 +160,12 @@ public sealed class SliderField : Control
             Grid.SetRow(w, row); Grid.SetColumn(w, 0); Grid.SetRow(h, row); Grid.SetColumn(h, 1);
             grid.Children.Add(w); grid.Children.Add(h);
         }
-        Row(0, "Change", "Drag left or right");
-        Row(1, "Fine steps", "Hold Alt while dragging");
-        Row(2, "Exact value", "Double-click to type");
-        Row(3, $"Step by {unit}", "Arrow keys or scroll wheel");
-        if (reset != null) Row(4, "Reset", "Double-click, then Reset");
+        // The help table a scrub field shows; every word is interface text.
+        Row(0, Loc.T("Change"), Loc.T("Drag left or right"));
+        Row(1, Loc.T("Fine steps"), Loc.T("Hold Alt while dragging"));
+        Row(2, Loc.T("Exact value"), Loc.T("Double-click to type"));
+        Row(3, Loc.Format("Step by {0}", unit), Loc.T("Arrow keys or scroll wheel"));
+        if (reset != null) Row(4, Loc.T("Reset"), Loc.T("Double-click, then Reset"));
         return grid;
     }
 
@@ -222,14 +223,14 @@ public sealed class SliderField : Control
             var opacity = IsEnabled ? 1.0 : 0.45;
             using (context.PushOpacity(opacity))
             {
-                var name = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, Palette.Secondary);
+                var name = new FormattedText(Loc.T(label), System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, Palette.Secondary);
                 var number = new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, Palette.Foreground);
                 var namePoint = new Point(8, (bounds.Height - name.Height) / 2);
                 var numberPoint = new Point(bounds.Width - 8 - number.Width, (bounds.Height - number.Height) / 2);
                 if (trackBrush != null)
                 {
                     // A bright track would swallow the text; a shadow under it keeps it readable on every color.
-                    var shadowName = new FormattedText(label, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, TextShadowBrush);
+                    var shadowName = new FormattedText(Loc.T(label), System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, TextShadowBrush);
                     var shadowNumber = new FormattedText(Text, System.Globalization.CultureInfo.CurrentCulture, FlowDirection.LeftToRight, typeface, fontSize, TextShadowBrush);
                     context.DrawText(shadowName, namePoint + new Vector(0, 1));
                     context.DrawText(shadowNumber, numberPoint + new Vector(0, 1));

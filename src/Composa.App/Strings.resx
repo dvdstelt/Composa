@@ -1,0 +1,802 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" /></xsd:sequence><xsd:attribute name="name" use="required" type="xsd:string" /><xsd:attribute name="type" type="xsd:string" /><xsd:attribute name="mimetype" type="xsd:string" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element>
+          <xsd:element name="assembly"><xsd:complexType><xsd:attribute name="alias" type="xsd:string" /><xsd:attribute name="name" type="xsd:string" /></xsd:complexType></xsd:element>
+          <xsd:element name="data"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" /><xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" /><xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" /><xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" /><xsd:attribute ref="xml:space" /></xsd:complexType></xsd:element>
+          <xsd:element name="resheader"><xsd:complexType><xsd:sequence><xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" /></xsd:sequence><xsd:attribute name="name" type="xsd:string" use="required" /></xsd:complexType></xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader>
+  <data name="Hide {0}" xml:space="preserve"><value>Hide {0}</value></data>
+  <data name="Show {0}" xml:space="preserve"><value>Show {0}</value></data>
+  <data name="{0} × {1} px" xml:space="preserve"><value>{0} × {1} px</value></data>
+  <data name="Undo {0}" xml:space="preserve"><value>Undo {0}</value></data>
+  <data name="Redo {0}" xml:space="preserve"><value>Redo {0}</value></data>
+  <data name="Undo" xml:space="preserve"><value>Undo</value></data>
+  <data name="Redo" xml:space="preserve"><value>Redo</value></data>
+  <data name="Release Clipping Mask" xml:space="preserve"><value>Release Clipping Mask</value></data>
+  <data name="Create Clipping Mask" xml:space="preserve"><value>Create Clipping Mask</value></data>
+  <data name="Click to select, double-click to edit, Alt-drag onto another layer to copy the {0}" xml:space="preserve"><value>Click to select, double-click to edit, Alt-drag onto another layer to copy the {0}</value></data>
+  <data name="Edit {0}…" xml:space="preserve"><value>Edit {0}…</value></data>
+  <data name="Ready when you are" xml:space="preserve"><value>Ready when you are</value></data>
+  <data name="Saving {0}…" xml:space="preserve"><value>Saving {0}…</value></data>
+  <data name="Ctrl-drag moves the layer" xml:space="preserve"><value>Ctrl-drag moves the layer</value></data>
+  <data name="push pixels" xml:space="preserve"><value>push pixels</value></data>
+  <data name="blur" xml:space="preserve"><value>blur</value></data>
+  <data name="smudge" xml:space="preserve"><value>smudge</value></data>
+  <data name="dodge" xml:space="preserve"><value>dodge</value></data>
+  <data name="burn" xml:space="preserve"><value>burn</value></data>
+  <data name="background@Gradient" xml:space="preserve"><value>background</value></data>
+  <data name="Drag to move · Handles resize (Shift free, Alt from center) · Outside a corner rotates · Ctrl-drag a corner distorts · Ctrl-click picks a layer · 1–0 opacity" xml:space="preserve"><value>Drag to move · Handles resize (Shift free, Alt from center) · Outside a corner rotates · Ctrl-drag a corner distorts · Ctrl-click picks a layer · 1–0 opacity</value></data>
+  <data name="Drag to select · Shift add · Alt subtract · Shift+Alt intersect · Drag inside to move · Delete clears · Ctrl+D deselect" xml:space="preserve"><value>Drag to select · Shift add · Alt subtract · Shift+Alt intersect · Drag inside to move · Delete clears · Ctrl+D deselect</value></data>
+  <data name="Drag to select · Shift add · Alt subtract · Drag inside to move" xml:space="preserve"><value>Drag to select · Shift add · Alt subtract · Drag inside to move</value></data>
+  <data name="Click corners · Click the start, double-click or Enter to close · Backspace removes a corner · Escape cancels" xml:space="preserve"><value>Click corners · Click the start, double-click or Enter to close · Backspace removes a corner · Escape cancels</value></data>
+  <data name="Click an object to select its outline · Drag a box around a small one · Tab for Wand · Shift add · Alt subtract" xml:space="preserve"><value>Click an object to select its outline · Drag a box around a small one · Tab for Wand · Shift add · Alt subtract</value></data>
+  <data name="Click to select similar colors · Tab for Object · Shift add · Alt subtract" xml:space="preserve"><value>Click to select similar colors · Tab for Object · Shift add · Alt subtract</value></data>
+  <data name="Drag to crop · Shift keeps proportions · Alt symmetric · Enter applies · Escape cancels" xml:space="preserve"><value>Drag to crop · Shift keeps proportions · Alt symmetric · Enter applies · Escape cancels</value></data>
+  <data name="Drag to erase" xml:space="preserve"><value>Drag to erase</value></data>
+  <data name="Drag to paint · Alt-click picks a color" xml:space="preserve"><value>Drag to paint · Alt-click picks a color</value></data>
+  <data name="· Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity" xml:space="preserve"><value>· Shift-click draws a line · [ ] size · { } hardness · 1–0 opacity</value></data>
+  <data name="Drag over blemishes to heal · [ ] size" xml:space="preserve"><value>Drag over blemishes to heal · [ ] size</value></data>
+  <data name="Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity" xml:space="preserve"><value>Alt-click sets the source · Drag to clone · [ ] size · 1–0 opacity</value></data>
+  <data name="Drag to {0} · [ ] size · 1–0 strength" xml:space="preserve"><value>Drag to {0} · [ ] size · 1–0 strength</value></data>
+  <data name="Drag to draw from foreground to {0} · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels" xml:space="preserve"><value>Drag to draw from foreground to {0} · Drag an end to adjust · Shift snaps to 45° · Enter applies · Escape cancels</value></data>
+  <data name="Drag to draw a line on a new layer · Shift snaps to 45° · Tab for the next shape" xml:space="preserve"><value>Drag to draw a line on a new layer · Shift snaps to 45° · Tab for the next shape</value></data>
+  <data name="Drag to draw a shape on a new layer · Shift square · Alt from center · Tab for the next shape" xml:space="preserve"><value>Drag to draw a shape on a new layer · Shift square · Alt from center · Tab for the next shape</value></data>
+  <data name="Type · Drag the box's handles to resize it · Alt+arrows tracking and leading · Ctrl+Enter finishes · Escape cancels" xml:space="preserve"><value>Type · Drag the box's handles to resize it · Alt+arrows tracking and leading · Ctrl+Enter finishes · Escape cancels</value></data>
+  <data name="Click for point text · Drag a box for paragraph text · Click text to edit it" xml:space="preserve"><value>Click for point text · Drag a box for paragraph text · Click text to edit it</value></data>
+  <data name="Click to pick the foreground color · Alt-click for the background" xml:space="preserve"><value>Click to pick the foreground color · Alt-click for the background</value></data>
+  <data name="Drag to pan · Ctrl+wheel zooms" xml:space="preserve"><value>Drag to pan · Ctrl+wheel zooms</value></data>
+  <data name="Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly" xml:space="preserve"><value>Click to zoom in · Alt-click to zoom out · Drag right or left to zoom smoothly</value></data>
+  <data name="Auto Select" xml:space="preserve"><value>Auto Select</value></data>
+  <data name="Transform controls" xml:space="preserve"><value>Transform controls</value></data>
+  <data name="Opacity" xml:space="preserve"><value>Opacity</value></data>
+  <data name="Strength" xml:space="preserve"><value>Strength</value></data>
+  <data name="Fit" xml:space="preserve"><value>Fit</value></data>
+  <data name="Hardness" xml:space="preserve"><value>Hardness</value></data>
+  <data name="Size" xml:space="preserve"><value>Size</value></data>
+  <data name="Radius" xml:space="preserve"><value>Radius</value></data>
+  <data name="Spacing" xml:space="preserve"><value>Spacing</value></data>
+  <data name="Flow" xml:space="preserve"><value>Flow</value></data>
+  <data name="Tolerance" xml:space="preserve"><value>Tolerance</value></data>
+  <data name="Contiguous" xml:space="preserve"><value>Contiguous</value></data>
+  <data name="Sample All Layers" xml:space="preserve"><value>Sample All Layers</value></data>
+  <data name="Aligned" xml:space="preserve"><value>Aligned</value></data>
+  <data name="Corner radius" xml:space="preserve"><value>Corner radius</value></data>
+  <data name="Detect" xml:space="preserve"><value>Detect</value></data>
+  <data name="Any subject" xml:space="preserve"><value>Any subject</value></data>
+  <data name="Person" xml:space="preserve"><value>Person</value></data>
+  <data name="Plain backdrop" xml:space="preserve"><value>Plain backdrop</value></data>
+  <data name="Linear" xml:space="preserve"><value>Linear</value></data>
+  <data name="Edge" xml:space="preserve"><value>Edge</value></data>
+  <data name="Foreground to transparent" xml:space="preserve"><value>Foreground to transparent</value></data>
+  <data name="Fills with the foreground color" xml:space="preserve"><value>Fills with the foreground color</value></data>
+  <data name="Draws in the foreground color · Shift snaps to 45°" xml:space="preserve"><value>Draws in the foreground color · Shift snaps to 45°</value></data>
+  <data name="Moves every layer in the folder" xml:space="preserve"><value>Moves every layer in the folder</value></data>
+  <data name="Drag on the canvas to choose the area to keep" xml:space="preserve"><value>Drag on the canvas to choose the area to keep</value></data>
+  <data name="No layer selected" xml:space="preserve"><value>No layer selected</value></data>
+  <data name="Nothing to trim: no edge is transparent." xml:space="preserve"><value>Nothing to trim: no edge is transparent.</value></data>
+  <data name="Aligned to" xml:space="preserve"><value>Aligned to</value></data>
+  <data name="Align" xml:space="preserve"><value>Align</value></data>
+  <data name="Change Text Style" xml:space="preserve"><value>Change Text Style</value></data>
+  <data name="Done" xml:space="preserve"><value>Done</value></data>
+  <data name="Apply" xml:space="preserve"><value>Apply</value></data>
+  <data name="Bold" xml:space="preserve"><value>Bold</value></data>
+  <data name="Italic" xml:space="preserve"><value>Italic</value></data>
+  <data name="Leading" xml:space="preserve"><value>Leading</value></data>
+  <data name="Tracking" xml:space="preserve"><value>Tracking</value></data>
+  <data name="(Multiple)" xml:space="preserve"><value>(Multiple)</value></data>
+  <data name="Ready" xml:space="preserve"><value>Ready</value></data>
+  <data name="Move" xml:space="preserve"><value>Move</value></data>
+  <data name="Move tool" xml:space="preserve"><value>Move tool</value></data>
+  <data name="Marquee" xml:space="preserve"><value>Marquee</value></data>
+  <data name="Lasso" xml:space="preserve"><value>Lasso</value></data>
+  <data name="Wand" xml:space="preserve"><value>Wand</value></data>
+  <data name="Magic tool" xml:space="preserve"><value>Magic tool</value></data>
+  <data name="Brush" xml:space="preserve"><value>Brush</value></data>
+  <data name="Brush tool" xml:space="preserve"><value>Brush tool</value></data>
+  <data name="Eraser" xml:space="preserve"><value>Eraser</value></data>
+  <data name="Clone Stamp" xml:space="preserve"><value>Clone Stamp</value></data>
+  <data name="Smear" xml:space="preserve"><value>Smear</value></data>
+  <data name="Smear tool" xml:space="preserve"><value>Smear tool</value></data>
+  <data name="Shape" xml:space="preserve"><value>Shape</value></data>
+  <data name="Shape tool" xml:space="preserve"><value>Shape tool</value></data>
+  <data name="Text" xml:space="preserve"><value>Text</value></data>
+  <data name="Eyedropper" xml:space="preserve"><value>Eyedropper</value></data>
+  <data name="Hand" xml:space="preserve"><value>Hand</value></data>
+  <data name="Zoom" xml:space="preserve"><value>Zoom</value></data>
+  <data name="Crop" xml:space="preserve"><value>Crop</value></data>
+  <data name="Spot Healing" xml:space="preserve"><value>Spot Healing</value></data>
+  <data name="Rectangular Marquee" xml:space="preserve"><value>Rectangular Marquee</value></data>
+  <data name="Elliptical Marquee" xml:space="preserve"><value>Elliptical Marquee</value></data>
+  <data name="Freehand Lasso" xml:space="preserve"><value>Freehand Lasso</value></data>
+  <data name="Polygonal Lasso" xml:space="preserve"><value>Polygonal Lasso</value></data>
+  <data name="Layers" xml:space="preserve"><value>Layers</value></data>
+  <data name="History" xml:space="preserve"><value>History</value></data>
+  <data name="New Canvas" xml:space="preserve"><value>New Canvas</value></data>
+  <data name="Untitled" xml:space="preserve"><value>Untitled</value></data>
+  <data name="Open documents" xml:space="preserve"><value>Open documents</value></data>
+  <data name="This is the state in the file" xml:space="preserve"><value>This is the state in the file</value></data>
+  <data name="Reset" xml:space="preserve"><value>Reset</value></data>
+  <data name="None" xml:space="preserve"><value>None</value></data>
+  <data name="Press keys…" xml:space="preserve"><value>Press keys…</value></data>
+  <data name="Drag to change the value (Alt: finer)" xml:space="preserve"><value>Drag to change the value (Alt: finer)</value></data>
+  <data name="Keyboard Shortcuts" xml:space="preserve"><value>Keyboard Shortcuts</value></data>
+  <data name="Tools and Canvas" xml:space="preserve"><value>Tools and Canvas</value></data>
+  <data name="Menus" xml:space="preserve"><value>Menus</value></data>
+  <data name="Language" xml:space="preserve"><value>Language</value></data>
+  <data name="Follow the system" xml:space="preserve"><value>Follow the system</value></data>
+  <data name="English" xml:space="preserve"><value>English</value></data>
+  <data name="About Composa" xml:space="preserve"><value>About Composa</value></data>
+  <data name="Allow AI Control" xml:space="preserve"><value>Allow AI Control</value></data>
+  <data name="Check for Updates Automatically" xml:space="preserve"><value>Check for Updates Automatically</value></data>
+  <data name="Check for Updates…" xml:space="preserve"><value>Check for Updates…</value></data>
+  <data name="New Folder" xml:space="preserve"><value>New Folder</value></data>
+  <data name="Delete Layer" xml:space="preserve"><value>Delete Layer</value></data>
+  <data name="Duplicate Layer" xml:space="preserve"><value>Duplicate Layer</value></data>
+  <data name="Flatten" xml:space="preserve"><value>Flatten</value></data>
+  <data name="Merge" xml:space="preserve"><value>Merge</value></data>
+  <data name="Visible" xml:space="preserve"><value>Visible</value></data>
+  <data name="Create a canvas, open a project or image, or drop files here." xml:space="preserve"><value>Create a canvas, open a project or image, or drop files here.</value></data>
+  <data name="Recent" xml:space="preserve"><value>Recent</value></data>
+  <data name="Add Drop Shadow" xml:space="preserve"><value>Add Drop Shadow</value></data>
+  <data name="Remove Drop Shadow" xml:space="preserve"><value>Remove Drop Shadow</value></data>
+  <data name="Copy Drop Shadow" xml:space="preserve"><value>Copy Drop Shadow</value></data>
+  <data name="Edit Drop Shadow" xml:space="preserve"><value>Edit Drop Shadow</value></data>
+  <data name="Drop Shadow…" xml:space="preserve"><value>Drop Shadow…</value></data>
+  <data name="Drop Shadow" xml:space="preserve"><value>Drop Shadow</value></data>
+  <data name="Add Color Overlay" xml:space="preserve"><value>Add Color Overlay</value></data>
+  <data name="Remove Color Overlay" xml:space="preserve"><value>Remove Color Overlay</value></data>
+  <data name="Copy Color Overlay" xml:space="preserve"><value>Copy Color Overlay</value></data>
+  <data name="Edit Color Overlay" xml:space="preserve"><value>Edit Color Overlay</value></data>
+  <data name="Color Overlay…" xml:space="preserve"><value>Color Overlay…</value></data>
+  <data name="Color Overlay" xml:space="preserve"><value>Color Overlay</value></data>
+  <data name="Add Inner Shadow" xml:space="preserve"><value>Add Inner Shadow</value></data>
+  <data name="Remove Inner Shadow" xml:space="preserve"><value>Remove Inner Shadow</value></data>
+  <data name="Copy Inner Shadow" xml:space="preserve"><value>Copy Inner Shadow</value></data>
+  <data name="Edit Inner Shadow" xml:space="preserve"><value>Edit Inner Shadow</value></data>
+  <data name="Inner Shadow…" xml:space="preserve"><value>Inner Shadow…</value></data>
+  <data name="Inner Shadow" xml:space="preserve"><value>Inner Shadow</value></data>
+  <data name="Add Outer Glow" xml:space="preserve"><value>Add Outer Glow</value></data>
+  <data name="Remove Outer Glow" xml:space="preserve"><value>Remove Outer Glow</value></data>
+  <data name="Copy Outer Glow" xml:space="preserve"><value>Copy Outer Glow</value></data>
+  <data name="Edit Outer Glow" xml:space="preserve"><value>Edit Outer Glow</value></data>
+  <data name="Outer Glow…" xml:space="preserve"><value>Outer Glow…</value></data>
+  <data name="Outer Glow" xml:space="preserve"><value>Outer Glow</value></data>
+  <data name="Add Inner Glow" xml:space="preserve"><value>Add Inner Glow</value></data>
+  <data name="Remove Inner Glow" xml:space="preserve"><value>Remove Inner Glow</value></data>
+  <data name="Copy Inner Glow" xml:space="preserve"><value>Copy Inner Glow</value></data>
+  <data name="Edit Inner Glow" xml:space="preserve"><value>Edit Inner Glow</value></data>
+  <data name="Inner Glow…" xml:space="preserve"><value>Inner Glow…</value></data>
+  <data name="Inner Glow" xml:space="preserve"><value>Inner Glow</value></data>
+  <data name="Add Stroke" xml:space="preserve"><value>Add Stroke</value></data>
+  <data name="Remove Stroke" xml:space="preserve"><value>Remove Stroke</value></data>
+  <data name="Copy Stroke" xml:space="preserve"><value>Copy Stroke</value></data>
+  <data name="Edit Stroke" xml:space="preserve"><value>Edit Stroke</value></data>
+  <data name="Stroke…" xml:space="preserve"><value>Stroke…</value></data>
+  <data name="Stroke" xml:space="preserve"><value>Stroke</value></data>
+  <data name="Gaussian Blur" xml:space="preserve"><value>Gaussian Blur</value></data>
+  <data name="Motion Blur" xml:space="preserve"><value>Motion Blur</value></data>
+  <data name="Add Noise" xml:space="preserve"><value>Add Noise</value></data>
+  <data name="Bloom / Glow" xml:space="preserve"><value>Bloom / Glow</value></data>
+  <data name="Bloom / Glow…" xml:space="preserve"><value>Bloom / Glow…</value></data>
+  <data name="Dither" xml:space="preserve"><value>Dither</value></data>
+  <data name="Tonal Contrast" xml:space="preserve"><value>Tonal Contrast</value></data>
+  <data name="Lens Correction" xml:space="preserve"><value>Lens Correction</value></data>
+  <data name="Camera Raw Filter" xml:space="preserve"><value>Camera Raw Filter</value></data>
+  <data name="Remove Background" xml:space="preserve"><value>Remove Background</value></data>
+  <data name="Painterly" xml:space="preserve"><value>Painterly</value></data>
+  <data name="Atkinson (Classic Mac)" xml:space="preserve"><value>Atkinson (Classic Mac)</value></data>
+  <data name="Floyd-Steinberg" xml:space="preserve"><value>Floyd-Steinberg</value></data>
+  <data name="Halftone Dots" xml:space="preserve"><value>Halftone Dots</value></data>
+  <data name="Halftone Lines" xml:space="preserve"><value>Halftone Lines</value></data>
+  <data name="Halftone Diamonds" xml:space="preserve"><value>Halftone Diamonds</value></data>
+  <data name="Mac Patterns" xml:space="preserve"><value>Mac Patterns</value></data>
+  <data name="ASCII" xml:space="preserve"><value>ASCII</value></data>
+  <data name="Black &amp; White" xml:space="preserve"><value>Black &amp; White</value></data>
+  <data name="Two Colors" xml:space="preserve"><value>Two Colors</value></data>
+  <data name="Original" xml:space="preserve"><value>Original</value></data>
+  <data name="Light Gray" xml:space="preserve"><value>Light Gray</value></data>
+  <data name="Light Blue" xml:space="preserve"><value>Light Blue</value></data>
+  <data name="Light Red" xml:space="preserve"><value>Light Red</value></data>
+  <data name="Medium Blue" xml:space="preserve"><value>Medium Blue</value></data>
+  <data name="Top Left Pixel Color" xml:space="preserve"><value>Top Left Pixel Color</value></data>
+  <data name="Bottom Right Pixel Color" xml:space="preserve"><value>Bottom Right Pixel Color</value></data>
+  <data name="Transparent Pixels" xml:space="preserve"><value>Transparent Pixels</value></data>
+  <data name="Image Size" xml:space="preserve"><value>Image Size</value></data>
+  <data name="Rotate Layer" xml:space="preserve"><value>Rotate Layer</value></data>
+  <data name="New Guide" xml:space="preserve"><value>New Guide</value></data>
+  <data name="Move Guide" xml:space="preserve"><value>Move Guide</value></data>
+  <data name="Delete Guide" xml:space="preserve"><value>Delete Guide</value></data>
+  <data name="Add Image" xml:space="preserve"><value>Add Image</value></data>
+  <data name="Blend Mode" xml:space="preserve"><value>Blend Mode</value></data>
+  <data name="Rename Layer" xml:space="preserve"><value>Rename Layer</value></data>
+  <data name="Group Layers" xml:space="preserve"><value>Group Layers</value></data>
+  <data name="Ungroup Layers" xml:space="preserve"><value>Ungroup Layers</value></data>
+  <data name="Reorder Layers" xml:space="preserve"><value>Reorder Layers</value></data>
+  <data name="Delete Layer Mask" xml:space="preserve"><value>Delete Layer Mask</value></data>
+  <data name="Brush Strokes" xml:space="preserve"><value>Brush Strokes</value></data>
+  <data name="Layer via Copy" xml:space="preserve"><value>Layer via Copy</value></data>
+  <data name="Pasted Layer" xml:space="preserve"><value>Pasted Layer</value></data>
+  <data name="Select" xml:space="preserve"><value>Select</value></data>
+  <data name="Fill Text" xml:space="preserve"><value>Fill Text</value></data>
+  <data name="Color Range" xml:space="preserve"><value>Color Range</value></data>
+  <data name="Contract" xml:space="preserve"><value>Contract</value></data>
+  <data name="Expand" xml:space="preserve"><value>Expand</value></data>
+  <data name="Feather" xml:space="preserve"><value>Feather</value></data>
+  <data name="Trim" xml:space="preserve"><value>Trim</value></data>
+  <data name="Canvas Size" xml:space="preserve"><value>Canvas Size</value></data>
+  <data name="Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Move / Transform (V)" xml:space="preserve"><value>Move / Transform (V)</value></data>
+  <data name="Marquee (M)" xml:space="preserve"><value>Marquee (M)</value></data>
+  <data name="Lasso (L)" xml:space="preserve"><value>Lasso (L)</value></data>
+  <data name="Magic (W)" xml:space="preserve"><value>Magic (W)</value></data>
+  <data name="Crop (C)" xml:space="preserve"><value>Crop (C)</value></data>
+  <data name="Brush (B) · Eraser (E)" xml:space="preserve"><value>Brush (B) · Eraser (E)</value></data>
+  <data name="Spot Healing Brush (J)" xml:space="preserve"><value>Spot Healing Brush (J)</value></data>
+  <data name="Clone Stamp (S) · Alt-click sets the source" xml:space="preserve"><value>Clone Stamp (S) · Alt-click sets the source</value></data>
+  <data name="Smear (R)" xml:space="preserve"><value>Smear (R)</value></data>
+  <data name="Gradient (G)" xml:space="preserve"><value>Gradient (G)</value></data>
+  <data name="Shape (U)" xml:space="preserve"><value>Shape (U)</value></data>
+  <data name="Type (T) · click for point text, drag a paragraph box, click text to edit it" xml:space="preserve"><value>Type (T) · click for point text, drag a paragraph box, click text to edit it</value></data>
+  <data name="Eyedropper (I)" xml:space="preserve"><value>Eyedropper (I)</value></data>
+  <data name="Hand (H) · hold Space with any tool" xml:space="preserve"><value>Hand (H) · hold Space with any tool</value></data>
+  <data name="Zoom (Z)" xml:space="preserve"><value>Zoom (Z)</value></data>
+  <data name="Rectangle Marquee" xml:space="preserve"><value>Rectangle Marquee</value></data>
+  <data name="Ellipse Marquee" xml:space="preserve"><value>Ellipse Marquee</value></data>
+  <data name="Foreground color" xml:space="preserve"><value>Foreground color</value></data>
+  <data name="Background color" xml:space="preserve"><value>Background color</value></data>
+  <data name="Smoothing" xml:space="preserve"><value>Smoothing</value></data>
+  <data name="Select All" xml:space="preserve"><value>Select All</value></data>
+  <data name="Width" xml:space="preserve"><value>Width</value></data>
+  <data name="Type" xml:space="preserve"><value>Type</value></data>
+  <data name="Trim transparent edges" xml:space="preserve"><value>Trim transparent edges</value></data>
+  <data name="Ratio" xml:space="preserve"><value>Ratio</value></data>
+  <data name="Don't Save" xml:space="preserve"><value>Don't Save</value></data>
+  <data name="Relative" xml:space="preserve"><value>Relative</value></data>
+  <data name="Constrain proportions" xml:space="preserve"><value>Constrain proportions</value></data>
+  <data name="pixels/inch" xml:space="preserve"><value>pixels/inch</value></data>
+  <data name="Measuring…" xml:space="preserve"><value>Measuring…</value></data>
+  <data name="Quality" xml:space="preserve"><value>Quality</value></data>
+  <data name="Restore Defaults" xml:space="preserve"><value>Restore Defaults</value></data>
+  <data name="Delete Effect" xml:space="preserve"><value>Delete Effect</value></data>
+  <data name="Edit Text…" xml:space="preserve"><value>Edit Text…</value></data>
+  <data name="Edit Text" xml:space="preserve"><value>Edit Text</value></data>
+  <data name="Copy Image" xml:space="preserve"><value>Copy Image</value></data>
+  <data name="Show in Folder" xml:space="preserve"><value>Show in Folder</value></data>
+  <data name="Close Others" xml:space="preserve"><value>Close Others</value></data>
+  <data name="Samples the merged image" xml:space="preserve"><value>Samples the merged image</value></data>
+  <data name="Rectangle" xml:space="preserve"><value>Rectangle</value></data>
+  <data name="Rounded Rectangle" xml:space="preserve"><value>Rounded Rectangle</value></data>
+  <data name="Line" xml:space="preserve"><value>Line</value></data>
+  <data name="Liquify" xml:space="preserve"><value>Liquify</value></data>
+  <data name="Gradient" xml:space="preserve"><value>Gradient</value></data>
+  <data name="Magic Wand" xml:space="preserve"><value>Magic Wand</value></data>
+  <data name="Object Selection" xml:space="preserve"><value>Object Selection</value></data>
+  <data name="Collapse {0}" xml:space="preserve"><value>Collapse {0}</value></data>
+  <data name="Expand {0}" xml:space="preserve"><value>Expand {0}</value></data>
+  <data name="{0} and {1}" xml:space="preserve"><value>{0} and {1}</value></data>
+  <data name="{0}{1} · click and hold for {2}" xml:space="preserve"><value>{0}{1} · click and hold for {2}</value></data>
+  <data name="• {0} (autosaved {1})" xml:space="preserve"><value>• {0} (autosaved {1})</value></data>
+  <data name="{0} × {1} px · {2} ppi · sRGB" xml:space="preserve"><value>{0} × {1} px · {2} ppi · sRGB</value></data>
+  <data name="Step by {0}" xml:space="preserve"><value>Step by {0}</value></data>
+  <data name="Align {0}" xml:space="preserve"><value>Align {0}</value></data>
+  <data name="Save changes to &quot;{0}&quot; before closing?" xml:space="preserve"><value>Save changes to \&quot;{0}\&quot; before closing?</value></data>
+  <data name="Couldn't recover {0}" xml:space="preserve"><value>Couldn't recover {0}</value></data>
+  <data name="The autosaved copy was kept at {0}" xml:space="preserve"><value>The autosaved copy was kept at {0}</value></data>
+  <data name="Composa did not close normally last time. These documents had unsaved changes:" xml:space="preserve"><value>Composa did not close normally last time. These documents had unsaved changes:</value></data>
+  <data name="Recover them? Choosing Cancel discards the autosaved copies." xml:space="preserve"><value>Recover them? Choosing Cancel discards the autosaved copies.</value></data>
+  <data name="Recover Unsaved Work" xml:space="preserve"><value>Recover Unsaved Work</value></data>
+  <data name="Recover" xml:space="preserve"><value>Recover</value></data>
+  <data name="Recovered" xml:space="preserve"><value>Recovered</value></data>
+  <data name=" (recovered)" xml:space="preserve"><value> (recovered)</value></data>
+  <data name="Crop tool" xml:space="preserve"><value>Crop tool</value></data>
+  <data name="Gradient tool" xml:space="preserve"><value>Gradient tool</value></data>
+  <data name="Next shape" xml:space="preserve"><value>Next shape</value></data>
+  <data name="Type tool" xml:space="preserve"><value>Type tool</value></data>
+  <data name="Eyedropper tool" xml:space="preserve"><value>Eyedropper tool</value></data>
+  <data name="Hand tool" xml:space="preserve"><value>Hand tool</value></data>
+  <data name="Zoom tool" xml:space="preserve"><value>Zoom tool</value></data>
+  <data name="Cycle tool mode" xml:space="preserve"><value>Cycle tool mode</value></data>
+  <data name="Swap foreground and background" xml:space="preserve"><value>Swap foreground and background</value></data>
+  <data name="Reset colors to black and white" xml:space="preserve"><value>Reset colors to black and white</value></data>
+  <data name="Delete selection, layer or effect" xml:space="preserve"><value>Delete selection, layer or effect</value></data>
+  <data name="Toggle painting on the mask" xml:space="preserve"><value>Toggle painting on the mask</value></data>
+  <data name="Toggle painting on the mask (pipe)" xml:space="preserve"><value>Toggle painting on the mask (pipe)</value></data>
+  <data name="Marquee tool (again switches Rectangle and Ellipse)" xml:space="preserve"><value>Marquee tool (again switches Rectangle and Ellipse)</value></data>
+  <data name="Lasso tool (again switches Freehand and Polygonal)" xml:space="preserve"><value>Lasso tool (again switches Freehand and Polygonal)</value></data>
+  <data name="Smear tool (again switches its mode)" xml:space="preserve"><value>Smear tool (again switches its mode)</value></data>
+  <data name="Shape tool (again switches the shape)" xml:space="preserve"><value>Shape tool (again switches the shape)</value></data>
+  <data name="New canvas (Ctrl+N)" xml:space="preserve"><value>New canvas (Ctrl+N)</value></data>
+  <data name="Zoom out (Ctrl+-)" xml:space="preserve"><value>Zoom out (Ctrl+-)</value></data>
+  <data name="Zoom in (Ctrl++)" xml:space="preserve"><value>Zoom in (Ctrl++)</value></data>
+  <data name="Swap colors (X) · D resets to black and white" xml:space="preserve"><value>Swap colors (X) · D resets to black and white</value></data>
+  <data name="Add Mask" xml:space="preserve"><value>Add Mask</value></data>
+  <data name="Delete Mask" xml:space="preserve"><value>Delete Mask</value></data>
+  <data name="Enable Mask" xml:space="preserve"><value>Enable Mask</value></data>
+  <data name="Disable Mask" xml:space="preserve"><value>Disable Mask</value></data>
+  <data name="Apply Mask" xml:space="preserve"><value>Apply Mask</value></data>
+  <data name="Select Mask" xml:space="preserve"><value>Select Mask</value></data>
+  <data name="Select Pixels" xml:space="preserve"><value>Select Pixels</value></data>
+  <data name="Hide Layer" xml:space="preserve"><value>Hide Layer</value></data>
+  <data name="Show Layer" xml:space="preserve"><value>Show Layer</value></data>
+  <data name="Move Out of Folder" xml:space="preserve"><value>Move Out of Folder</value></data>
+  <data name="Rename…" xml:space="preserve"><value>Rename…</value></data>
+  <data name="Duplicate Layers" xml:space="preserve"><value>Duplicate Layers</value></data>
+  <data name="Delete Selected Layers" xml:space="preserve"><value>Delete Selected Layers</value></data>
+  <data name="New adjustment layer" xml:space="preserve"><value>New adjustment layer</value></data>
+  <data name="Layer effects: stroke, drop shadow, color overlay, inner shadow, outer glow, inner glow" xml:space="preserve"><value>Layer effects: stroke, drop shadow, color overlay, inner shadow, outer glow, inner glow</value></data>
+  <data name="New layer (Ctrl+Shift+N)" xml:space="preserve"><value>New layer (Ctrl+Shift+N)</value></data>
+  <data name="Group selected layers (Ctrl+G)" xml:space="preserve"><value>Group selected layers (Ctrl+G)</value></data>
+  <data name="Add layer mask (Alt: hide all)" xml:space="preserve"><value>Add layer mask (Alt: hide all)</value></data>
+  <data name="Delete layer, mask or effect" xml:space="preserve"><value>Delete layer, mask or effect</value></data>
+  <data name="Show or hide (drag down the column to swipe, Alt-click to show only this layer)" xml:space="preserve"><value>Show or hide (drag down the column to swipe, Alt-click to show only this layer)</value></data>
+  <data name="Layer mask: click to paint on it, Shift-click to disable, Ctrl-click to load as selection" xml:space="preserve"><value>Layer mask: click to paint on it, Shift-click to disable, Ctrl-click to load as selection</value></data>
+  <data name="The line is the direction; the dot marks the end the number counts towards" xml:space="preserve"><value>The line is the direction; the dot marks the end the number counts towards</value></data>
+  <data name="The hand points at the light; the shadow falls the other way" xml:space="preserve"><value>The hand points at the light; the shadow falls the other way</value></data>
+  <data name="Drag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°" xml:space="preserve"><value>Drag to turn it · Shift snaps to 15° · Arrow keys or scroll wheel turn by 1°</value></data>
+  <data name="Change" xml:space="preserve"><value>Change</value></data>
+  <data name="Drag left or right" xml:space="preserve"><value>Drag left or right</value></data>
+  <data name="Fine steps" xml:space="preserve"><value>Fine steps</value></data>
+  <data name="Hold Alt while dragging" xml:space="preserve"><value>Hold Alt while dragging</value></data>
+  <data name="Exact value" xml:space="preserve"><value>Exact value</value></data>
+  <data name="Double-click to type" xml:space="preserve"><value>Double-click to type</value></data>
+  <data name="Arrow keys or scroll wheel" xml:space="preserve"><value>Arrow keys or scroll wheel</value></data>
+  <data name="Double-click, then Reset" xml:space="preserve"><value>Double-click, then Reset</value></data>
+  <data name="Older steps are no longer kept" xml:space="preserve"><value>Older steps are no longer kept</value></data>
+  <data name="This layer has no pixels" xml:space="preserve"><value>This layer has no pixels</value></data>
+  <data name="The shape the crop box keeps while you drag it" xml:space="preserve"><value>The shape the crop box keeps while you drag it</value></data>
+  <data name="How the subject is found: a model for any subject or for a person, run on this machine, or the plain backdrop that touches the picture's edges. The same choice drives Select &gt; Subject and Remove Background." xml:space="preserve"><value>How the subject is found: a model for any subject or for a person, run on this machine, or the plain backdrop that touches the picture's edges. The same choice drives Select &gt; Subject and Remove Background.</value></data>
+  <data name="Positive values tighten the detected outline inward; negative values loosen it outward" xml:space="preserve"><value>Positive values tighten the detected outline inward; negative values loosen it outward</value></data>
+  <data name="Text color" xml:space="preserve"><value>Text color</value></data>
+  <data name="Tracking: extra space after every character, in pixels" xml:space="preserve"><value>Tracking: extra space after every character, in pixels</value></data>
+  <data name="Leading: line height baseline to baseline, in pixels. 0 is Auto: 120% of the size" xml:space="preserve"><value>Leading: line height baseline to baseline, in pixels. 0 is Auto: 120% of the size</value></data>
+  <data name="Select a pixel layer or a mask to draw a gradient on." xml:space="preserve"><value>Select a pixel layer or a mask to draw a gradient on.</value></data>
+  <data name="Select a layer with pixels to move." xml:space="preserve"><value>Select a layer with pixels to move.</value></data>
+  <data name="Radial" xml:space="preserve"><value>Radial</value></data>
+  <data name="This adjustment has no settings." xml:space="preserve"><value>This adjustment has no settings.</value></data>
+  <data name="Preview" xml:space="preserve"><value>Preview</value></data>
+  <data name="Monochromatic" xml:space="preserve"><value>Monochromatic</value></data>
+  <data name="Distribution" xml:space="preserve"><value>Distribution</value></data>
+  <data name="Channel" xml:space="preserve"><value>Channel</value></data>
+  <data name="Click to add a point, drag to move it, drag it off the graph to remove it." xml:space="preserve"><value>Click to add a point, drag to move it, drag it off the graph to remove it.</value></data>
+  <data name="Colorize" xml:space="preserve"><value>Colorize</value></data>
+  <data name="Range" xml:space="preserve"><value>Range</value></data>
+  <data name="Tint" xml:space="preserve"><value>Tint</value></data>
+  <data name="Color the result while keeping its tones, for a sepia or a cyanotype" xml:space="preserve"><value>Color the result while keeping its tones, for a sepia or a cyanotype</value></data>
+  <data name="Preserve Luminosity" xml:space="preserve"><value>Preserve Luminosity</value></data>
+  <data name="Put each pixel’s brightness back afterwards, so only the color moves" xml:space="preserve"><value>Put each pixel’s brightness back afterwards, so only the color moves</value></data>
+  <data name="Reverse" xml:space="preserve"><value>Reverse</value></data>
+  <data name="Choose the vignette color" xml:space="preserve"><value>Choose the vignette color</value></data>
+  <data name="Style" xml:space="preserve"><value>Style</value></data>
+  <data name="The characters to draw with, in any order: each spot gets the one whose ink best matches its tone" xml:space="preserve"><value>The characters to draw with, in any order: each spot gets the one whose ink best matches its tone</value></data>
+  <data name="Characters" xml:space="preserve"><value>Characters</value></data>
+  <data name="Colors" xml:space="preserve"><value>Colors</value></data>
+  <data name="Dark" xml:space="preserve"><value>Dark</value></data>
+  <data name="Light" xml:space="preserve"><value>Light</value></data>
+  <data name="Pixel Shape" xml:space="preserve"><value>Pixel Shape</value></data>
+  <data name="Draw each chunky pixel as a solid square, or as a round dot like a dot-matrix screen" xml:space="preserve"><value>Draw each chunky pixel as a solid square, or as a round dot like a dot-matrix screen</value></data>
+  <data name="Light on Dark" xml:space="preserve"><value>Light on Dark</value></data>
+  <data name="Draw the marks for the light tones on the dark color, like a glowing screen" xml:space="preserve"><value>Draw the marks for the light tones on the dark color, like a glowing screen</value></data>
+  <data name="Click a pixel that should be neutral to set the white balance from it" xml:space="preserve"><value>Click a pixel that should be neutral to set the white balance from it</value></data>
+  <data name="R —   G —   B —" xml:space="preserve"><value>R —   G —   B —</value></data>
+  <data name="Switch this group off or on without clearing its sliders" xml:space="preserve"><value>Switch this group off or on without clearing its sliders</value></data>
+  <data name="White Balance" xml:space="preserve"><value>White Balance</value></data>
+  <data name="Auto balances the average color; Custom follows Temperature and Tint. Click the thumbnail to set them from one pixel." xml:space="preserve"><value>Auto balances the average color; Custom follows Temperature and Tint. Click the thumbnail to set them from one pixel.</value></data>
+  <data name="Adjust" xml:space="preserve"><value>Adjust</value></data>
+  <data name="Saves the grade as a .cube lookup table for other editors. Effects, Detail and Optics change pixels by their neighbours or their place and are left out." xml:space="preserve"><value>Saves the grade as a .cube lookup table for other editors. Effects, Detail and Optics change pixels by their neighbours or their place and are left out.</value></data>
+  <data name="Click the image to select that color" xml:space="preserve"><value>Click the image to select that color</value></data>
+  <data name="Click the image to add that color to the selection (or Shift-click with any eyedropper)" xml:space="preserve"><value>Click the image to add that color to the selection (or Shift-click with any eyedropper)</value></data>
+  <data name="Click the image to take that color out of the selection (or Alt-click with any eyedropper)" xml:space="preserve"><value>Click the image to take that color out of the selection (or Alt-click with any eyedropper)</value></data>
+  <data name="How far a color may be from the picked ones and still be selected" xml:space="preserve"><value>How far a color may be from the picked ones and still be selected</value></data>
+  <data name="Select everything except those colors, such as all but a green screen" xml:space="preserve"><value>Select everything except those colors, such as all but a green screen</value></data>
+  <data name="Shift-click adds a color, Alt-click takes one away. {0} pixels selected." xml:space="preserve"><value>Shift-click adds a color, Alt-click takes one away. {0} pixels selected.</value></data>
+  <data name="Click the image to pick the color to select." xml:space="preserve"><value>Click the image to pick the color to select.</value></data>
+  <data name="Before / After" xml:space="preserve"><value>Before / After</value></data>
+  <data name="{0} color" xml:space="preserve"><value>{0} color</value></data>
+  <data name="Position" xml:space="preserve"><value>Position</value></data>
+  <data name="A subdivision every {0} pixels." xml:space="preserve"><value>A subdivision every {0} pixels.</value></data>
+  <data name="Use gridlines every {0}-{1} pixels and {2}-{3} subdivisions, no more than the pixels between gridlines." xml:space="preserve"><value>Use gridlines every {0}-{1} pixels and {2}-{3} subdivisions, no more than the pixels between gridlines.</value></data>
+  <data name="Choose a custom grid color" xml:space="preserve"><value>Choose a custom grid color</value></data>
+  <data name="Grid Color" xml:space="preserve"><value>Grid Color</value></data>
+  <data name="Gridline every" xml:space="preserve"><value>Gridline every</value></data>
+  <data name="pixels" xml:space="preserve"><value>pixels</value></data>
+  <data name="Subdivisions" xml:space="preserve"><value>Subdivisions</value></data>
+  <data name="Grid Settings" xml:space="preserve"><value>Grid Settings</value></data>
+  <data name="…and {0} more." xml:space="preserve"><value>…and {0} more.</value></data>
+  <data name="Composa will convert these {0} features. Nothing is applied until you continue." xml:space="preserve"><value>Composa will convert these {0} features. Nothing is applied until you continue.</value></data>
+  <data name="Open {0}?" xml:space="preserve"><value>Open {0}?</value></data>
+  <data name="Baked into the look, bottom to top:" xml:space="preserve"><value>Baked into the look, bottom to top:</value></data>
+  <data name="Left out, because a look can only change colors:" xml:space="preserve"><value>Left out, because a look can only change colors:</value></data>
+  <data name="{0} points" xml:space="preserve"><value>{0} points</value></data>
+  <data name="Export Look" xml:space="preserve"><value>Export Look</value></data>
+  <data name="{0} × {1} pixels, developed at 16 bits per channel" xml:space="preserve"><value>{0} × {1} pixels, developed at 16 bits per channel</value></data>
+  <data name="Cooler to warmer, and green to magenta, away from the camera’s own white balance." xml:space="preserve"><value>Cooler to warmer, and green to magenta, away from the camera’s own white balance.</value></data>
+  <data name="Develop {0}" xml:space="preserve"><value>Develop {0}</value></data>
+  <data name="Based On" xml:space="preserve"><value>Based On</value></data>
+  <data name="Trim Away" xml:space="preserve"><value>Trim Away</value></data>
+  <data name="Dismiss" xml:space="preserve"><value>Dismiss</value></data>
+  <data name="Or in a terminal:" xml:space="preserve"><value>Or in a terminal:</value></data>
+  <data name="Copy the command, for a software centre that will not install a downloaded package" xml:space="preserve"><value>Copy the command, for a software centre that will not install a downloaded package</value></data>
+  <data name="Composa {0} is available. You are running {1}." xml:space="preserve"><value>Composa {0} is available. You are running {1}.</value></data>
+  <data name="Download it into your Downloads folder, checked against the release’s checksums" xml:space="preserve"><value>Download it into your Downloads folder, checked against the release’s checksums</value></data>
+  <data name="Downloading Composa {0}… {1} of {2} MB" xml:space="preserve"><value>Downloading Composa {0}… {1} of {2} MB</value></data>
+  <data name="Downloading Composa {0}… {1} MB" xml:space="preserve"><value>Downloading Composa {0}… {1} MB</value></data>
+  <data name="Composa {0} is ready in {1}: {2}" xml:space="preserve"><value>Composa {0} is ready in {1}: {2}</value></data>
+  <data name="Copied" xml:space="preserve"><value>Copied</value></data>
+  <data name="Exposure" xml:space="preserve"><value>Exposure</value></data>
+  <data name="Contrast" xml:space="preserve"><value>Contrast</value></data>
+  <data name="Highlights" xml:space="preserve"><value>Highlights</value></data>
+  <data name="Shadows" xml:space="preserve"><value>Shadows</value></data>
+  <data name="Whites" xml:space="preserve"><value>Whites</value></data>
+  <data name="Blacks" xml:space="preserve"><value>Blacks</value></data>
+  <data name="Temperature" xml:space="preserve"><value>Temperature</value></data>
+  <data name="Vibrance" xml:space="preserve"><value>Vibrance</value></data>
+  <data name="Saturation" xml:space="preserve"><value>Saturation</value></data>
+  <data name="Hue" xml:space="preserve"><value>Hue</value></data>
+  <data name="Luminance" xml:space="preserve"><value>Luminance</value></data>
+  <data name="Clarity" xml:space="preserve"><value>Clarity</value></data>
+  <data name="Dehaze" xml:space="preserve"><value>Dehaze</value></data>
+  <data name="Texture" xml:space="preserve"><value>Texture</value></data>
+  <data name="Sharpening" xml:space="preserve"><value>Sharpening</value></data>
+  <data name="Grain" xml:space="preserve"><value>Grain</value></data>
+  <data name="Amount" xml:space="preserve"><value>Amount</value></data>
+  <data name="Roughness" xml:space="preserve"><value>Roughness</value></data>
+  <data name="Distance" xml:space="preserve"><value>Distance</value></data>
+  <data name="Angle" xml:space="preserve"><value>Angle</value></data>
+  <data name="Balance" xml:space="preserve"><value>Balance</value></data>
+  <data name="Blending" xml:space="preserve"><value>Blending</value></data>
+  <data name="Overlap" xml:space="preserve"><value>Overlap</value></data>
+  <data name="Midpoint" xml:space="preserve"><value>Midpoint</value></data>
+  <data name="Masking" xml:space="preserve"><value>Masking</value></data>
+  <data name="Noise Reduction" xml:space="preserve"><value>Noise Reduction</value></data>
+  <data name="Detail" xml:space="preserve"><value>Detail</value></data>
+  <data name="Effects" xml:space="preserve"><value>Effects</value></data>
+  <data name="Optics" xml:space="preserve"><value>Optics</value></data>
+  <data name="Geometry" xml:space="preserve"><value>Geometry</value></data>
+  <data name="Calibration" xml:space="preserve"><value>Calibration</value></data>
+  <data name="Curve" xml:space="preserve"><value>Curve</value></data>
+  <data name="Parametric" xml:space="preserve"><value>Parametric</value></data>
+  <data name="Point" xml:space="preserve"><value>Point</value></data>
+  <data name="Color" xml:space="preserve"><value>Color</value></data>
+  <data name="Color Grading" xml:space="preserve"><value>Color Grading</value></data>
+  <data name="Color Mixer" xml:space="preserve"><value>Color Mixer</value></data>
+  <data name="Lightness" xml:space="preserve"><value>Lightness</value></data>
+  <data name="Darks" xml:space="preserve"><value>Darks</value></data>
+  <data name="Lights" xml:space="preserve"><value>Lights</value></data>
+  <data name="Midtones" xml:space="preserve"><value>Midtones</value></data>
+  <data name="Warmth" xml:space="preserve"><value>Warmth</value></data>
+  <data name="Smoothness" xml:space="preserve"><value>Smoothness</value></data>
+  <data name="Glow" xml:space="preserve"><value>Glow</value></data>
+  <data name="Vignette" xml:space="preserve"><value>Vignette</value></data>
+  <data name="Vignetting" xml:space="preserve"><value>Vignetting</value></data>
+  <data name="Roundness" xml:space="preserve"><value>Roundness</value></data>
+  <data name="Defringe" xml:space="preserve"><value>Defringe</value></data>
+  <data name="Distortion" xml:space="preserve"><value>Distortion</value></data>
+  <data name="Remove Distortion" xml:space="preserve"><value>Remove Distortion</value></data>
+  <data name="Manual" xml:space="preserve"><value>Manual</value></data>
+  <data name="Red Primary" xml:space="preserve"><value>Red Primary</value></data>
+  <data name="Green Primary" xml:space="preserve"><value>Green Primary</value></data>
+  <data name="Blue Primary" xml:space="preserve"><value>Blue Primary</value></data>
+  <data name="Purple Primary" xml:space="preserve"><value>Purple Primary</value></data>
+  <data name="Green Hue Low" xml:space="preserve"><value>Green Hue Low</value></data>
+  <data name="Green Hue High" xml:space="preserve"><value>Green Hue High</value></data>
+  <data name="Purple Hue Low" xml:space="preserve"><value>Purple Hue Low</value></data>
+  <data name="Purple Hue High" xml:space="preserve"><value>Purple Hue High</value></data>
+  <data name="Green Amount" xml:space="preserve"><value>Green Amount</value></data>
+  <data name="Purple Amount" xml:space="preserve"><value>Purple Amount</value></data>
+  <data name="Refine Saturation" xml:space="preserve"><value>Refine Saturation</value></data>
+  <data name="Highlight Priority" xml:space="preserve"><value>Highlight Priority</value></data>
+  <data name="Color Priority" xml:space="preserve"><value>Color Priority</value></data>
+  <data name="Paint Overlay" xml:space="preserve"><value>Paint Overlay</value></data>
+  <data name="Colorist Wash" xml:space="preserve"><value>Colorist Wash</value></data>
+  <data name="Offset" xml:space="preserve"><value>Offset</value></data>
+  <data name="Gamma" xml:space="preserve"><value>Gamma</value></data>
+  <data name="Brightness" xml:space="preserve"><value>Brightness</value></data>
+  <data name="Cells" xml:space="preserve"><value>Cells</value></data>
+  <data name="Cell Size" xml:space="preserve"><value>Cell Size</value></data>
+  <data name="Input black" xml:space="preserve"><value>Input black</value></data>
+  <data name="Input white" xml:space="preserve"><value>Input white</value></data>
+  <data name="Output black" xml:space="preserve"><value>Output black</value></data>
+  <data name="Output white" xml:space="preserve"><value>Output white</value></data>
+  <data name="Auto" xml:space="preserve"><value>Auto</value></data>
+  <data name="Custom" xml:space="preserve"><value>Custom</value></data>
+  <data name="RGB" xml:space="preserve"><value>RGB</value></data>
+  <data name="Red" xml:space="preserve"><value>Red</value></data>
+  <data name="Green" xml:space="preserve"><value>Green</value></data>
+  <data name="Blue" xml:space="preserve"><value>Blue</value></data>
+  <data name="Cyan" xml:space="preserve"><value>Cyan</value></data>
+  <data name="Magenta" xml:space="preserve"><value>Magenta</value></data>
+  <data name="Yellow" xml:space="preserve"><value>Yellow</value></data>
+  <data name="Uniform" xml:space="preserve"><value>Uniform</value></data>
+  <data name="Gaussian" xml:space="preserve"><value>Gaussian</value></data>
+  <data name="Special" xml:space="preserve"><value>Special</value></data>
+  <data name="Use Foreground/Background" xml:space="preserve"><value>Use Foreground/Background</value></data>
+  <data name="Tones" xml:space="preserve"><value>Tones</value></data>
+  <data name="Diffusion" xml:space="preserve"><value>Diffusion</value></data>
+  <data name="Density" xml:space="preserve"><value>Density</value></data>
+  <data name="Pixel Size" xml:space="preserve"><value>Pixel Size</value></data>
+  <data name="Brush Size" xml:space="preserve"><value>Brush Size</value></data>
+  <data name="Text Size" xml:space="preserve"><value>Text Size</value></data>
+  <data name="Passes" xml:space="preserve"><value>Passes</value></data>
+  <data name="Precision" xml:space="preserve"><value>Precision</value></data>
+  <data name="Height" xml:space="preserve"><value>Height</value></data>
+  <data name="Cancel" xml:space="preserve"><value>Cancel</value></data>
+  <data name="OK" xml:space="preserve"><value>OK</value></data>
+  <data name="Close" xml:space="preserve"><value>Close</value></data>
+  <data name="Duplicate" xml:space="preserve"><value>Duplicate</value></data>
+  <data name="Show" xml:space="preserve"><value>Show</value></data>
+  <data name="Hide" xml:space="preserve"><value>Hide</value></data>
+  <data name="Add" xml:space="preserve"><value>Add</value></data>
+  <data name="Remove" xml:space="preserve"><value>Remove</value></data>
+  <data name="Edit" xml:space="preserve"><value>Edit</value></data>
+  <data name="New" xml:space="preserve"><value>New</value></data>
+  <data name="Enable" xml:space="preserve"><value>Enable</value></data>
+  <data name="Disable" xml:space="preserve"><value>Disable</value></data>
+  <data name="Top" xml:space="preserve"><value>Top</value></data>
+  <data name="Bottom" xml:space="preserve"><value>Bottom</value></data>
+  <data name="Left" xml:space="preserve"><value>Left</value></data>
+  <data name="Right" xml:space="preserve"><value>Right</value></data>
+  <data name="Lines" xml:space="preserve"><value>Lines</value></data>
+  <data name="Dashed Lines" xml:space="preserve"><value>Dashed Lines</value></data>
+  <data name="Dots" xml:space="preserve"><value>Dots</value></data>
+  <data name="Black" xml:space="preserve"><value>Black</value></data>
+  <data name="Fuzziness" xml:space="preserve"><value>Fuzziness</value></data>
+  <data name="Invert" xml:space="preserve"><value>Invert</value></data>
+  <data name="Cooler to warmer, and green to magenta, away from the camera's own white balance." xml:space="preserve"><value>Cooler to warmer, and green to magenta, away from the camera's own white balance.</value></data>
+  <data name="Exposure (EV)" xml:space="preserve"><value>Exposure (EV)</value></data>
+  <data name="Import" xml:space="preserve"><value>Import</value></data>
+  <data name="Outside" xml:space="preserve"><value>Outside</value></data>
+  <data name="Inside" xml:space="preserve"><value>Inside</value></data>
+  <data name="Export…" xml:space="preserve"><value>Export…</value></data>
+  <data name="Copy" xml:space="preserve"><value>Copy</value></data>
+  <data name="Download" xml:space="preserve"><value>Download</value></data>
+  <data name="Download it into your Downloads folder, checked against the release's checksums" xml:space="preserve"><value>Download it into your Downloads folder, checked against the release's checksums</value></data>
+  <data name="Release notes" xml:space="preserve"><value>Release notes</value></data>
+  <data name="Skip this version" xml:space="preserve"><value>Skip this version</value></data>
+  <data name="Install" xml:space="preserve"><value>Install</value></data>
+  <data name="Retry" xml:space="preserve"><value>Retry</value></data>
+  <data name="Load File…" xml:space="preserve"><value>Load File…</value></data>
+  <data name="Remove Chromatic Aberration" xml:space="preserve"><value>Remove Chromatic Aberration</value></data>
+  <data name="Enable Lens Profile Corrections" xml:space="preserve"><value>Enable Lens Profile Corrections</value></data>
+  <data name="Save Look…" xml:space="preserve"><value>Save Look…</value></data>
+  <data name="Spread" xml:space="preserve"><value>Spread</value></data>
+  <data name="Spread…" xml:space="preserve"><value>Spread…</value></data>
+  <data name="Shadow Tint" xml:space="preserve"><value>Shadow Tint</value></data>
+  <data name="Levels" xml:space="preserve"><value>Levels</value></data>
+  <data name="Levels…" xml:space="preserve"><value>Levels…</value></data>
+  <data name="Curves" xml:space="preserve"><value>Curves</value></data>
+  <data name="Curves…" xml:space="preserve"><value>Curves…</value></data>
+  <data name="Exposure…" xml:space="preserve"><value>Exposure…</value></data>
+  <data name="Brightness/Contrast" xml:space="preserve"><value>Brightness/Contrast</value></data>
+  <data name="Brightness/Contrast…" xml:space="preserve"><value>Brightness/Contrast…</value></data>
+  <data name="Hue/Saturation" xml:space="preserve"><value>Hue/Saturation</value></data>
+  <data name="Hue/Saturation…" xml:space="preserve"><value>Hue/Saturation…</value></data>
+  <data name="Color Balance" xml:space="preserve"><value>Color Balance</value></data>
+  <data name="Color Balance…" xml:space="preserve"><value>Color Balance…</value></data>
+  <data name="Black &amp; White…" xml:space="preserve"><value>Black &amp; White…</value></data>
+  <data name="Gradient Map" xml:space="preserve"><value>Gradient Map</value></data>
+  <data name="Gradient Map…" xml:space="preserve"><value>Gradient Map…</value></data>
+  <data name="Grain…" xml:space="preserve"><value>Grain…</value></data>
+  <data name="Color Lookup" xml:space="preserve"><value>Color Lookup</value></data>
+  <data name="Color Lookup…" xml:space="preserve"><value>Color Lookup…</value></data>
+  <data name="CLUT" xml:space="preserve"><value>CLUT</value></data>
+  <data name="CLUT…" xml:space="preserve"><value>CLUT…</value></data>
+  <data name="Invert…" xml:space="preserve"><value>Invert…</value></data>
+  <data name="Gaussian Blur…" xml:space="preserve"><value>Gaussian Blur…</value></data>
+  <data name="Motion Blur…" xml:space="preserve"><value>Motion Blur…</value></data>
+  <data name="Add Noise…" xml:space="preserve"><value>Add Noise…</value></data>
+  <data name="Tonal Contrast…" xml:space="preserve"><value>Tonal Contrast…</value></data>
+  <data name="Lens Correction…" xml:space="preserve"><value>Lens Correction…</value></data>
+  <data name="Remove Background…" xml:space="preserve"><value>Remove Background…</value></data>
+  <data name="Camera Raw Filter…" xml:space="preserve"><value>Camera Raw Filter…</value></data>
+  <data name="Painterly…" xml:space="preserve"><value>Painterly…</value></data>
+  <data name="Dither…" xml:space="preserve"><value>Dither…</value></data>
+  <data name="Clip to backdrop" xml:space="preserve"><value>Clip to backdrop</value></data>
+  <data name="Clip to backdrop…" xml:space="preserve"><value>Clip to backdrop…</value></data>
+  <data name="Clip to layer" xml:space="preserve"><value>Clip to layer</value></data>
+  <data name="Clip to layer…" xml:space="preserve"><value>Clip to layer…</value></data>
+  <data name="Intersection" xml:space="preserve"><value>Intersection</value></data>
+  <data name="Intersection…" xml:space="preserve"><value>Intersection…</value></data>
+  <data name="Union" xml:space="preserve"><value>Union</value></data>
+  <data name="Union…" xml:space="preserve"><value>Union…</value></data>
+  <data name="Solid" xml:space="preserve"><value>Solid</value></data>
+  <data name="Solid…" xml:space="preserve"><value>Solid…</value></data>
+  <data name="Dashed Lines…" xml:space="preserve"><value>Dashed Lines…</value></data>
+  <data name="Dots…" xml:space="preserve"><value>Dots…</value></data>
+  <data name="Lines…" xml:space="preserve"><value>Lines…</value></data>
+  <data name="Colorist Wash…" xml:space="preserve"><value>Colorist Wash…</value></data>
+  <data name="Any subject…" xml:space="preserve"><value>Any subject…</value></data>
+  <data name="Person…" xml:space="preserve"><value>Person…</value></data>
+  <data name="Plain backdrop…" xml:space="preserve"><value>Plain backdrop…</value></data>
+  <data name="Transparent Pixels…" xml:space="preserve"><value>Transparent Pixels…</value></data>
+  <data name="Top Left Pixel Color…" xml:space="preserve"><value>Top Left Pixel Color…</value></data>
+  <data name="Bottom Right Pixel Color…" xml:space="preserve"><value>Bottom Right Pixel Color…</value></data>
+  <data name="Light Gray…" xml:space="preserve"><value>Light Gray…</value></data>
+  <data name="Light Blue…" xml:space="preserve"><value>Light Blue…</value></data>
+  <data name="Light Red…" xml:space="preserve"><value>Light Red…</value></data>
+  <data name="Medium Blue…" xml:space="preserve"><value>Medium Blue…</value></data>
+  <data name="Atkinson (Classic Mac)…" xml:space="preserve"><value>Atkinson (Classic Mac)…</value></data>
+  <data name="Floyd-Steinberg…" xml:space="preserve"><value>Floyd-Steinberg…</value></data>
+  <data name="Halftone Dots…" xml:space="preserve"><value>Halftone Dots…</value></data>
+  <data name="Halftone Lines…" xml:space="preserve"><value>Halftone Lines…</value></data>
+  <data name="Halftone Diamonds…" xml:space="preserve"><value>Halftone Diamonds…</value></data>
+  <data name="Mac Patterns…" xml:space="preserve"><value>Mac Patterns…</value></data>
+  <data name="ASCII…" xml:space="preserve"><value>ASCII…</value></data>
+  <data name="Two Colors…" xml:space="preserve"><value>Two Colors…</value></data>
+  <data name="Original…" xml:space="preserve"><value>Original…</value></data>
+  <data name="Color Dodge" xml:space="preserve"><value>Color Dodge</value></data>
+  <data name="Color Dodge…" xml:space="preserve"><value>Color Dodge…</value></data>
+  <data name="Color Burn" xml:space="preserve"><value>Color Burn</value></data>
+  <data name="Color Burn…" xml:space="preserve"><value>Color Burn…</value></data>
+  <data name="Soft Light" xml:space="preserve"><value>Soft Light</value></data>
+  <data name="Soft Light…" xml:space="preserve"><value>Soft Light…</value></data>
+  <data name="Hard Light" xml:space="preserve"><value>Hard Light</value></data>
+  <data name="Hard Light…" xml:space="preserve"><value>Hard Light…</value></data>
+  <data name="Linear Burn" xml:space="preserve"><value>Linear Burn</value></data>
+  <data name="Linear Burn…" xml:space="preserve"><value>Linear Burn…</value></data>
+  <data name="Linear Dodge (Add)" xml:space="preserve"><value>Linear Dodge (Add)</value></data>
+  <data name="Linear Dodge (Add)…" xml:space="preserve"><value>Linear Dodge (Add)…</value></data>
+  <data name="Vivid Light" xml:space="preserve"><value>Vivid Light</value></data>
+  <data name="Vivid Light…" xml:space="preserve"><value>Vivid Light…</value></data>
+  <data name="Linear Light" xml:space="preserve"><value>Linear Light</value></data>
+  <data name="Linear Light…" xml:space="preserve"><value>Linear Light…</value></data>
+  <data name="Pin Light" xml:space="preserve"><value>Pin Light</value></data>
+  <data name="Pin Light…" xml:space="preserve"><value>Pin Light…</value></data>
+  <data name="Hard Mix" xml:space="preserve"><value>Hard Mix</value></data>
+  <data name="Hard Mix…" xml:space="preserve"><value>Hard Mix…</value></data>
+  <data name="Grain Extract" xml:space="preserve"><value>Grain Extract</value></data>
+  <data name="Grain Extract…" xml:space="preserve"><value>Grain Extract…</value></data>
+  <data name="Grain Merge" xml:space="preserve"><value>Grain Merge</value></data>
+  <data name="Grain Merge…" xml:space="preserve"><value>Grain Merge…</value></data>
+  <data name="Normal" xml:space="preserve"><value>Normal</value></data>
+  <data name="Normal…" xml:space="preserve"><value>Normal…</value></data>
+  <data name="Multiply" xml:space="preserve"><value>Multiply</value></data>
+  <data name="Multiply…" xml:space="preserve"><value>Multiply…</value></data>
+  <data name="Screen" xml:space="preserve"><value>Screen</value></data>
+  <data name="Screen…" xml:space="preserve"><value>Screen…</value></data>
+  <data name="Overlay" xml:space="preserve"><value>Overlay</value></data>
+  <data name="Overlay…" xml:space="preserve"><value>Overlay…</value></data>
+  <data name="Darken" xml:space="preserve"><value>Darken</value></data>
+  <data name="Darken…" xml:space="preserve"><value>Darken…</value></data>
+  <data name="Lighten" xml:space="preserve"><value>Lighten</value></data>
+  <data name="Lighten…" xml:space="preserve"><value>Lighten…</value></data>
+  <data name="Difference" xml:space="preserve"><value>Difference</value></data>
+  <data name="Difference…" xml:space="preserve"><value>Difference…</value></data>
+  <data name="Exclusion" xml:space="preserve"><value>Exclusion</value></data>
+  <data name="Exclusion…" xml:space="preserve"><value>Exclusion…</value></data>
+  <data name="Hue…" xml:space="preserve"><value>Hue…</value></data>
+  <data name="Saturation…" xml:space="preserve"><value>Saturation…</value></data>
+  <data name="Color…" xml:space="preserve"><value>Color…</value></data>
+  <data name="Luminosity" xml:space="preserve"><value>Luminosity</value></data>
+  <data name="Luminosity…" xml:space="preserve"><value>Luminosity…</value></data>
+  <data name="Custom…" xml:space="preserve"><value>Custom…</value></data>
+  <data name="Auto…" xml:space="preserve"><value>Auto…</value></data>
+  <data name="RGB…" xml:space="preserve"><value>RGB…</value></data>
+  <data name="Red…" xml:space="preserve"><value>Red…</value></data>
+  <data name="Green…" xml:space="preserve"><value>Green…</value></data>
+  <data name="Blue…" xml:space="preserve"><value>Blue…</value></data>
+  <data name="Light@Camera Raw" xml:space="preserve"><value>Light</value></data>
+  <data name="Process" xml:space="preserve"><value>Process</value></data>
+  <data name="Bloom" xml:space="preserve"><value>Bloom</value></data>
+  <data name="Halation" xml:space="preserve"><value>Halation</value></data>
+  <data name="Version {0}" xml:space="preserve"><value>Version {0}</value></data>
+  <data name="Reds" xml:space="preserve"><value>Reds</value></data>
+  <data name="Oranges" xml:space="preserve"><value>Oranges</value></data>
+  <data name="Yellows" xml:space="preserve"><value>Yellows</value></data>
+  <data name="Greens" xml:space="preserve"><value>Greens</value></data>
+  <data name="Aquas" xml:space="preserve"><value>Aquas</value></data>
+  <data name="Blues" xml:space="preserve"><value>Blues</value></data>
+  <data name="Purples" xml:space="preserve"><value>Purples</value></data>
+  <data name="Magentas" xml:space="preserve"><value>Magentas</value></data>
+  <data name="Cyans" xml:space="preserve"><value>Cyans</value></data>
+  <data name="Master" xml:space="preserve"><value>Master</value></data>
+  <data name="Global" xml:space="preserve"><value>Global</value></data>
+  <data name="Brightens or darkens the whole picture, in stops of light" xml:space="preserve"><value>Brightens or darkens the whole picture, in stops of light</value></data>
+  <data name="Makes light and dark tones more or less different, mostly around the middle" xml:space="preserve"><value>Makes light and dark tones more or less different, mostly around the middle</value></data>
+  <data name="Sets the brightest point" xml:space="preserve"><value>Sets the brightest point</value></data>
+  <data name="Sets the darkest point" xml:space="preserve"><value>Sets the darkest point</value></data>
+  <data name="Shifts the picture from blue to yellow" xml:space="preserve"><value>Shifts the picture from blue to yellow</value></data>
+  <data name="Shifts the picture from green to magenta" xml:space="preserve"><value>Shifts the picture from green to magenta</value></data>
+  <data name="Strengthens quiet colors more than strong ones, and protects skin tones" xml:space="preserve"><value>Strengthens quiet colors more than strong ones, and protects skin tones</value></data>
+  <data name="Around the color wheel" xml:space="preserve"><value>Around the color wheel</value></data>
+  <data name="How strongly the tint takes; 0 leaves this wheel off" xml:space="preserve"><value>How strongly the tint takes; 0 leaves this wheel off</value></data>
+  <data name="How much the three tonal wheels overlap" xml:space="preserve"><value>How much the three tonal wheels overlap</value></data>
+  <data name="Negative favors the shadows, positive the highlights" xml:space="preserve"><value>Negative favors the shadows, positive the highlights</value></data>
+  <data name="Adds or softens small detail" xml:space="preserve"><value>Adds or softens small detail</value></data>
+  <data name="Adds or softens contrast along broader shapes" xml:space="preserve"><value>Adds or softens contrast along broader shapes</value></data>
+  <data name="Clears haze when raised, adds it when lowered" xml:space="preserve"><value>Clears haze when raised, adds it when lowered</value></data>
+  <data name="Spreads a glow from the bright areas" xml:space="preserve"><value>Spreads a glow from the bright areas</value></data>
+  <data name="How bright an area must be to glow; idle until Glow is raised" xml:space="preserve"><value>How bright an area must be to glow; idle until Glow is raised</value></data>
+  <data name="How far the glow reaches; idle until Glow is raised" xml:space="preserve"><value>How far the glow reaches; idle until Glow is raised</value></data>
+  <data name="Cool to warm; Halation stays red" xml:space="preserve"><value>Cool to warm; Halation stays red</value></data>
+  <data name="Darkens or lightens the edges; the center does not change" xml:space="preserve"><value>Darkens or lightens the edges; the center does not change</value></data>
+  <data name="Protects bright edges while the vignette darkens (Highlight Priority)" xml:space="preserve"><value>Protects bright edges while the vignette darkens (Highlight Priority)</value></data>
+  <data name="How much the curve also changes saturation" xml:space="preserve"><value>How much the curve also changes saturation</value></data>
+  <data name="Keeps sharpening to the edges" xml:space="preserve"><value>Keeps sharpening to the edges</value></data>
+  <data name="Profile strength; a rendered layer carries no lens data, so this scales a generic correction" xml:space="preserve"><value>Profile strength; a rendered layer carries no lens data, so this scales a generic correction</value></data>
+  <data name="Positive straightens lines that bow outward, negative lines that bow inward" xml:space="preserve"><value>Positive straightens lines that bow outward, negative lines that bow inward</value></data>
+  <data name="Brightens the corners to counter lens falloff" xml:space="preserve"><value>Brightens the corners to counter lens falloff</value></data>
+  <data name="Green to magenta in the shadows" xml:space="preserve"><value>Green to magenta in the shadows</value></data>
+  <data name="Earliest response. Hue, saturation and shadow tint move about half as far as Version 6." xml:space="preserve"><value>Earliest response. Hue, saturation and shadow tint move about half as far as Version 6.</value></data>
+  <data name="A little stronger than Version 1. The sliders below still fall well short of the current look." xml:space="preserve"><value>A little stronger than Version 1. The sliders below still fall well short of the current look.</value></data>
+  <data name="Firmer color than Version 2. Primary shifts stay gentler than the current process." xml:space="preserve"><value>Firmer color than Version 2. Primary shifts stay gentler than the current process.</value></data>
+  <data name="The 2012 response. Calibration reaches most of the strength used by Version 6." xml:space="preserve"><value>The 2012 response. Calibration reaches most of the strength used by Version 6.</value></data>
+  <data name="Close to the current process, with slightly softer primary and shadow shifts." xml:space="preserve"><value>Close to the current process, with slightly softer primary and shadow shifts.</value></data>
+  <data name="Current default. The calibration sliders below apply at full strength." xml:space="preserve"><value>Current default. The calibration sliders below apply at full strength.</value></data>
+  <data name="Saved {0}" xml:space="preserve"><value>Saved {0}</value></data>
+  <data name="Saved {0} without {1}" xml:space="preserve"><value>Saved {0} without {1}</value></data>
+  <data name="Couldn't save the look" xml:space="preserve"><value>Couldn't save the look</value></data>
+  <data name="Sharpen" xml:space="preserve"><value>Sharpen</value></data>
+  <data name="Cyan / Red" xml:space="preserve"><value>Cyan / Red</value></data>
+  <data name="Magenta / Green" xml:space="preserve"><value>Magenta / Green</value></data>
+  <data name="Yellow / Blue" xml:space="preserve"><value>Yellow / Blue</value></data>
+  <data name="Shadows…" xml:space="preserve"><value>Shadows…</value></data>
+  <data name="Highlights…" xml:space="preserve"><value>Highlights…</value></data>
+  <data name="Square" xml:space="preserve"><value>Square</value></data>
+  <data name="Dot" xml:space="preserve"><value>Dot</value></data>
+  <data name="Impressionist" xml:space="preserve"><value>Impressionist</value></data>
+  <data name="Expressionist" xml:space="preserve"><value>Expressionist</value></data>
+  <data name="Pointillist" xml:space="preserve"><value>Pointillist</value></data>
+  <data name="Bayer 2 × 2" xml:space="preserve"><value>Bayer 2 × 2</value></data>
+  <data name="Bayer 4 × 4" xml:space="preserve"><value>Bayer 4 × 4</value></data>
+  <data name="Bayer 8 × 8" xml:space="preserve"><value>Bayer 8 × 8</value></data>
+  <data name="Fine Mono" xml:space="preserve"><value>Fine Mono</value></data>
+  <data name="Muted Chrome" xml:space="preserve"><value>Muted Chrome</value></data>
+  <data name="Standard Slide" xml:space="preserve"><value>Standard Slide</value></data>
+  <data name="Vivid Slide" xml:space="preserve"><value>Vivid Slide</value></data>
+  <data name="Black and white with smooth, finely graded tones." xml:space="preserve"><value>Black and white with smooth, finely graded tones.</value></data>
+  <data name="Softened color with restrained highlights and a cool cast." xml:space="preserve"><value>Softened color with restrained highlights and a cool cast.</value></data>
+  <data name="Natural, balanced color with a little extra contrast." xml:space="preserve"><value>Natural, balanced color with a little extra contrast.</value></data>
+  <data name="Saturated color and strong contrast, as for landscapes." xml:space="preserve"><value>Saturated color and strong contrast, as for landscapes.</value></data>
+  <data name="Put each pixel's brightness back afterwards, so only the color moves" xml:space="preserve"><value>Put each pixel's brightness back afterwards, so only the color moves</value></data>
+  <data name="Choose the {0} color" xml:space="preserve"><value>Choose the {0} color</value></data>
+  <data name="Vignette Color" xml:space="preserve"><value>Vignette Color</value></data>
+  <data name="Blends the color into the edges while keeping the center. On an empty layer it paints across the whole canvas." xml:space="preserve"><value>Blends the color into the edges while keeping the center. On an empty layer it paints across the whole canvas.</value></data>
+  <data name="Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion)." xml:space="preserve"><value>Positive straightens lines that bow outward (barrel); negative, lines that bow inward (pincushion).</value></data>
+  <data name="Repaints the layer in brush strokes that follow the picture's edges, the largest brush first and each smaller one only where the picture still differs. A brush size of 0 fits the brush to the picture. Gaps between strokes stay transparent." xml:space="preserve"><value>Repaints the layer in brush strokes that follow the picture's edges, the largest brush first and each smaller one only where the picture still differs. A brush size of 0 fits the brush to the picture. Gaps between strokes stay transparent.</value></data>
+  <data name="Turns the layer into dithered pixels. Diffusion and Bayer styles quantize to a number of tones; halftone shapes, Mac patterns and ASCII draw marks that cover as much of each cell as the tone calls for. Pixel Size makes chunky pixels. Density adds or removes ink before dithering." xml:space="preserve"><value>Turns the layer into dithered pixels. Diffusion and Bayer styles quantize to a number of tones; halftone shapes, Mac patterns and ASCII draw marks that cover as much of each cell as the tone calls for. Pixel Size makes chunky pixels. Density adds or removes ink before dithering.</value></data>
+  <data name="Removes the plain backdrop connected to the layer's edges by making it transparent. Raise the tolerance to take more." xml:space="preserve"><value>Removes the plain backdrop connected to the layer's edges by making it transparent. Raise the tolerance to take more.</value></data>
+  <data name="A model run on this machine finds the subject and hides everything else behind a layer mask, so a wrong edge can be painted back." xml:space="preserve"><value>A model run on this machine finds the subject and hides everything else behind a layer mask, so a wrong edge can be painted back.</value></data>
+  <data name="A model for any subject or for a person, or the plain backdrop touching the layer's edges" xml:space="preserve"><value>A model for any subject or for a person, or the plain backdrop touching the layer's edges</value></data>
+  <data name="A mask is edited by erasing, so only the plain backdrop applies" xml:space="preserve"><value>A mask is edited by erasing, so only the plain backdrop applies</value></data>
+  <data name="The subject detection runtime did not load on this machine, so the plain backdrop was used instead." xml:space="preserve"><value>The subject detection runtime did not load on this machine, so the plain backdrop was used instead.</value></data>
+  <data name="{0} could not be read. {1}" xml:space="preserve"><value>{0} could not be read. {1}</value></data>
+  <data name="px" xml:space="preserve"><value>px</value></data>
+  <data name="Composa" xml:space="preserve"><value>Composa</value></data>
+  <data name="Images" xml:space="preserve"><value>Images</value></data>
+  <data name="Camera RAW" xml:space="preserve"><value>Camera RAW</value></data>
+  <data name="Color lookup tables" xml:space="preserve"><value>Color lookup tables</value></data>
+  <data name="Color lookup table" xml:space="preserve"><value>Color lookup table</value></data>
+  <data name="Open" xml:space="preserve"><value>Open</value></data>
+  <data name="Place Images as Layers" xml:space="preserve"><value>Place Images as Layers</value></data>
+  <data name="Save Project" xml:space="preserve"><value>Save Project</value></data>
+  <data name="Save Look" xml:space="preserve"><value>Save Look</value></data>
+  <data name="Load Color Lookup Table" xml:space="preserve"><value>Load Color Lookup Table</value></data>
+  <data name="Export {0}" xml:space="preserve"><value>Export {0}</value></data>
+  <data name="{0} image" xml:space="preserve"><value>{0} image</value></data>
+  <data name="How the pixels are resampled: Automatic for most pictures, Nearest Neighbor for pixel art, Enhance to invent detail with a model while enlarging" xml:space="preserve"><value>How the pixels are resampled: Automatic for most pictures, Nearest Neighbor for pixel art, Enhance to invent detail with a model while enlarging</value></data>
+  <data name="Click a shortcut, then press its new key combination; Escape stops recording and Backspace clears it. Brush size and hardness ([ ] and { }), the opacity digits, Space to pan and the modifier-and-mouse gestures are fixed." xml:space="preserve"><value>Click a shortcut, then press its new key combination; Escape stops recording and Backspace clears it. Brush size and hardness ([ ] and { }), the opacity digits, Space to pan and the modifier-and-mouse gestures are fixed.</value></data>
+  <data name="Click a layer's pixels to select it. Off, a drag moves the current layer from anywhere; Ctrl-click still picks." xml:space="preserve"><value>Click a layer's pixels to select it. Off, a drag moves the current layer from anywhere; Ctrl-click still picks.</value></data>
+  <data name="Preset" xml:space="preserve"><value>Preset</value></data>
+  <data name="Resolution" xml:space="preserve"><value>Resolution</value></data>
+  <data name="Resample" xml:space="preserve"><value>Resample</value></data>
+  <data name="Document Size" xml:space="preserve"><value>Document Size</value></data>
+  <data name="Pixel Dimensions" xml:space="preserve"><value>Pixel Dimensions</value></data>
+  <data name="Unsaved Changes" xml:space="preserve"><value>Unsaved Changes</value></data>
+  <data name="Create" xml:space="preserve"><value>Create</value></data>
+  <data name="Transparent" xml:space="preserve"><value>Transparent</value></data>
+  <data name="White" xml:space="preserve"><value>White</value></data>
+  <data name="Background" xml:space="preserve"><value>Background</value></data>
+  <data name="Current size: {0} × {1} px" xml:space="preserve"><value>Current size: {0} × {1} px</value></data>
+</root>

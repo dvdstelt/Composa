@@ -20,6 +20,7 @@ This guide describes what Composa can do and how to do it. It is written for peo
 - [AI tool reference](ai-tools-reference.md): every tool an agent gets, with its parameters.
 - [Keyboard shortcuts](shortcuts.md): the full list, and how to change them.
 - [Settings and updates](settings-and-updates.md): what Composa remembers, where it keeps its files, and how updates work.
+- [Language](localisation.md): choosing the language the interface is drawn in, and how to add one.
 
 ## Conventions
 

@@ -41,7 +41,8 @@ public sealed partial class MainWindow
 
         MenuItem Top(string header, params object[] items)
         {
-            var top = new MenuItem { Header = header };
+            var top = new MenuItem { Header = Loc.T(header) };
+            localisedHeaders.Add((top, header));
             foreach (var item in items) top.Items.Add(item);
             top.SubmenuOpened += (_, _) => RefreshMenuState();
             menu.Items.Add(top);
@@ -52,8 +53,11 @@ public sealed partial class MainWindow
             var gesture = key == Key.None ? null : new KeyGesture(key, modifiers);
             var guard = needsDocument ? () => HasDocument && (enabled?.Invoke() ?? true) : enabled;
             var command = new Shortcut(id ?? name.TrimEnd('…'), name.TrimEnd('…'), "Menus", gesture, run, guard);
+            // The shortcut keeps its English name: that is what a rebound key is stored under and what the
+            // shortcuts window lists. Only the header the person reads goes through the language.
             commands.Add(command);
-            var item = new MenuItem { Header = name, InputGesture = gesture };
+            var item = new MenuItem { Header = Loc.T(name), InputGesture = gesture };
+            localisedHeaders.Add((item, name));
             item.Click += (_, _) => Execute(command);
             command.Item = item;
             menuItems.Add((item, command));
@@ -61,7 +65,8 @@ public sealed partial class MainWindow
         }
         MenuItem Sub(string header, params object[] items)
         {
-            var sub = new MenuItem { Header = header };
+            var sub = new MenuItem { Header = Loc.T(header) };
+            localisedHeaders.Add((sub, header));
             foreach (var item in items) sub.Items.Add(item);
             return sub;
         }
@@ -184,7 +189,7 @@ public sealed partial class MainWindow
             Item("Flip Layer Horizontal", () => session!.FlipLayers(true)),
             Item("Flip Layer Vertical", () => session!.FlipLayers(false)));
 
-        var grid = new MenuItem { Header = "Pixel Grid (800% and above)", ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
+        var grid = new MenuItem { Header = Loc.T("Pixel Grid (800% and above)"), ToggleType = MenuItemToggleType.CheckBox, IsChecked = canvas.ShowPixelGrid };
         grid.Click += (_, _) => { canvas.ShowPixelGrid = !canvas.ShowPixelGrid; grid.IsChecked = canvas.ShowPixelGrid; canvas.InvalidateVisual(); RememberToolSettings(); };
         // View options are flags on the session, so a checkmark follows the current tab.
         MenuItem ViewToggle(string name, Func<ViewOptions, bool> get, Func<ViewOptions, ViewOptions> flip, Key key = Key.None, KeyModifiers modifiers = KeyModifiers.None, string? id = null)
@@ -231,7 +236,7 @@ public sealed partial class MainWindow
         // A build from a repository leaves updates to its package manager, so there is nothing to switch on there.
         var autoUpdates = new MenuItem
         {
-            Header = "Check for Updates Automatically",
+            Header = Loc.T("Check for Updates Automatically"),
             ToggleType = MenuItemToggleType.CheckBox,
             IsChecked = settings.CheckForUpdates,
             IsEnabled = UpdateCheck.Channel == UpdateChannel.GitHub
@@ -244,8 +249,29 @@ public sealed partial class MainWindow
         };
 
         // The MCP server, through which an AI agent drives the editor. Off until switched on, and remembered.
-        var aiControl = new MenuItem { Header = "Allow AI Control", ToggleType = MenuItemToggleType.CheckBox, IsChecked = settings.AllowAiControl };
+        var aiControl = new MenuItem { Header = Loc.T("Allow AI Control"), ToggleType = MenuItemToggleType.CheckBox, IsChecked = settings.AllowAiControl };
         aiControl.Click += async (_, _) => { await SetAiControl(!AiControl); aiControl.IsChecked = settings.AllowAiControl; };
+
+        // The language the interface is drawn in. Each entry is what that language calls itself, so the
+        // list stays readable whichever language is showing. The choice is remembered and applied at once.
+        var languageMenu = new MenuItem { Header = Loc.T("Language") };
+        localisedHeaders.Add((languageMenu, "Language"));
+        foreach (var (code, name) in Loc.Available)
+        {
+            var choice = code;
+            var shown = name;
+            var item = new MenuItem { Header = Loc.T(shown), ToggleType = MenuItemToggleType.Radio, IsChecked = settings.Language == code };
+            // A language's own name needs no translation and falls back to itself; "the system default"
+            // is a phrase rather than a name, so it is the one entry a resource actually changes.
+            localisedHeaders.Add((item, shown));
+            item.Click += (_, _) =>
+            {
+                SetLanguage(choice);
+                foreach (var child in languageMenu.Items.OfType<MenuItem>()) child.IsChecked = false;
+                item.IsChecked = true;
+            };
+            languageMenu.Items.Add(item);
+        }
 
         MenuItem PanelToggle(string title)
         {
@@ -261,6 +287,8 @@ public sealed partial class MainWindow
             autoUpdates,
             Line(),
             aiControl,
+            Line(),
+            languageMenu,
             Line(),
             Item("About Composa", () => _ = Prompts.Alert(this, "About Composa",
             $"Composa {AppInfo.Version}\n\nA layer-based image editor for compositing and retouching, built with .NET, Avalonia and Skia. " +
@@ -379,10 +407,31 @@ public sealed partial class MainWindow
         foreach (var (item, isChecked) in viewToggles) item.IsChecked = session != null && isChecked(session.View);
         foreach (var (item, section) in panelToggles) item.IsChecked = dock.Section(section).State.Visible;
         if (session == null) return;
-        undoItem!.Header = session.History.CanUndo ? $"Undo {session.History.UndoName}" : "Undo";
-        redoItem!.Header = session.History.CanRedo ? $"Redo {session.History.RedoName}" : "Redo";
-        mergeItem!.Header = session.MergeTitle;
-        clipItem!.Header = session.ActiveLayer?.Clipped == true ? "Release Clipping Mask" : "Create Clipping Mask";
+        // These headers are rewritten on every open, so each goes through the language here too. The step
+        // name inside them stays English: it is what HistoryPanel.IconFor matches the icon on.
+        undoItem!.Header = session.History.CanUndo ? Loc.Format("Undo {0}", Loc.T(session.History.UndoName)) : Loc.T("Undo");
+        redoItem!.Header = session.History.CanRedo ? Loc.Format("Redo {0}", Loc.T(session.History.RedoName)) : Loc.T("Redo");
+        mergeItem!.Header = Loc.T(session.MergeTitle);
+        clipItem!.Header = Loc.T(session.ActiveLayer?.Clipped == true ? "Release Clipping Mask" : "Create Clipping Mask");
+    }
+
+    /// <summary>Every menu header with the English name behind it, so a language change can re-set the text.</summary>
+    private readonly List<(MenuItem Item, string Name)> localisedHeaders = [];
+
+    /// <summary>
+    /// Switches the language the interface is drawn in and remembers it. The menu is built once, so its
+    /// headers are re-set here from the names recorded while it was built; a control that has already
+    /// drawn its text refreshes the next time it is built, which is why lookups happen at draw time
+    /// rather than names being stored translated. The English names underneath never change, so a
+    /// document, a rebound key, a history icon and an agent's call are all untouched.
+    /// </summary>
+    private void SetLanguage(string code)
+    {
+        settings.Language = code;
+        settings.Save();
+        Loc.Apply(code);
+        foreach (var (item, name) in localisedHeaders) item.Header = Loc.T(name);
+        RefreshMenuState();
     }
 
     private void Execute(Shortcut command)
@@ -479,9 +528,9 @@ public sealed partial class MainWindow
 
     private static readonly FilePickerFileType ProjectType = new("Composa project") { Patterns = ["*" + ProjectFile.Extension] };
     private static readonly string[] ImageExtensions = [.. ImageFiles.ImportExtensions, .. RawImporter.Extensions];
-    private static readonly FilePickerFileType ImageType = new("Images") { Patterns = ImageExtensions.Select(e => "*" + e).ToArray() };
-    private static readonly FilePickerFileType RawType = new("Camera RAW") { Patterns = RawImporter.Extensions.Select(e => "*" + e).ToArray() };
-    private static readonly FilePickerFileType LookupType = new("Color lookup tables") { Patterns = ["*.cube", "*.3dl"] };
+    private static FilePickerFileType ImageType => new(Loc.T("Images")) { Patterns = ImageExtensions.Select(e => "*" + e).ToArray() };
+    private static FilePickerFileType RawType => new(Loc.T("Camera RAW")) { Patterns = RawImporter.Extensions.Select(e => "*" + e).ToArray() };
+    private static FilePickerFileType LookupType => new(Loc.T("Color lookup tables")) { Patterns = ["*.cube", "*.3dl"] };
     private static readonly FilePickerFileType AnyOpenable = new("Projects and images") { Patterns = ImageExtensions.Select(e => "*" + e).Append("*" + ProjectFile.Extension).ToArray() };
 
     private async Task NewCanvas()
@@ -492,7 +541,7 @@ public sealed partial class MainWindow
 
     private async Task Open()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Open", AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType, RawType] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = Loc.T("Open"), AllowMultiple = true, FileTypeFilter = [AnyOpenable, ProjectType, ImageType, RawType] });
         await OpenPaths(files.Select(f => f.TryGetLocalPath()).OfType<string>());
     }
 
@@ -550,7 +599,7 @@ public sealed partial class MainWindow
 
     private async Task PlaceImages()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Place Images as Layers", AllowMultiple = true, FileTypeFilter = [ImageType] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = Loc.T("Place Images as Layers"), AllowMultiple = true, FileTypeFilter = [ImageType] });
         await PlacePaths(files.Select(f => f.TryGetLocalPath()).OfType<string>(), null);
     }
 
@@ -655,7 +704,7 @@ public sealed partial class MainWindow
         {
             var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
             {
-                Title = "Save Project", SuggestedFileName = target.Title + ProjectFile.Extension, DefaultExtension = ProjectFile.Extension.TrimStart('.'), FileTypeChoices = [ProjectType]
+                Title = Loc.T("Save Project"), SuggestedFileName = target.Title + ProjectFile.Extension, DefaultExtension = ProjectFile.Extension.TrimStart('.'), FileTypeChoices = [ProjectType]
             });
             path = file?.TryGetLocalPath();
             if (path == null) return false;
@@ -719,8 +768,8 @@ public sealed partial class MainWindow
         var extension = format switch { ExportFormat.Jpeg => "jpg", ExportFormat.Webp => "webp", _ => "png" };
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export " + extension.ToUpperInvariant(), SuggestedFileName = session.Title + "." + extension, DefaultExtension = extension,
-            FileTypeChoices = [new FilePickerFileType(extension.ToUpperInvariant() + " image") { Patterns = ["*." + extension] }]
+            Title = Loc.Format("Export {0}", extension.ToUpperInvariant()), SuggestedFileName = session.Title + "." + extension, DefaultExtension = extension,
+            FileTypeChoices = [new FilePickerFileType(Loc.Format("{0} image", extension.ToUpperInvariant())) { Patterns = ["*." + extension] }]
         });
         if (file?.TryGetLocalPath() is not { } path) return;
         try
@@ -752,8 +801,8 @@ public sealed partial class MainWindow
         lookSize = size;
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Export Look", SuggestedFileName = session.Title + ".cube", DefaultExtension = "cube",
-            FileTypeChoices = [new FilePickerFileType("Color lookup table") { Patterns = ["*.cube"] }]
+            Title = Loc.T("Export Look"), SuggestedFileName = session.Title + ".cube", DefaultExtension = "cube",
+            FileTypeChoices = [new FilePickerFileType(Loc.T("Color lookup table")) { Patterns = ["*.cube"] }]
         });
         if (file?.TryGetLocalPath() is not { } path) return;
         try
@@ -1071,8 +1120,8 @@ public sealed partial class MainWindow
     {
         var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            Title = "Save Look", SuggestedFileName = title + ".cube", DefaultExtension = "cube",
-            FileTypeChoices = [new FilePickerFileType("Color lookup table") { Patterns = ["*.cube"] }]
+            Title = Loc.T("Save Look"), SuggestedFileName = title + ".cube", DefaultExtension = "cube",
+            FileTypeChoices = [new FilePickerFileType(Loc.T("Color lookup table")) { Patterns = ["*.cube"] }]
         });
         return file?.TryGetLocalPath();
     }
@@ -1080,7 +1129,7 @@ public sealed partial class MainWindow
     /// <summary>Asks for a .cube or .3dl for the Color Lookup dialog; null when none was chosen.</summary>
     private async Task<string?> PickLookupFile()
     {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = "Load Color Lookup Table", FileTypeFilter = [LookupType] });
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions { Title = Loc.T("Load Color Lookup Table"), FileTypeFilter = [LookupType] });
         return files.Count > 0 ? files[0].TryGetLocalPath() : null;
     }
 

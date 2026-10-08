@@ -7,6 +7,15 @@
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
   <!--
+    The words a person reads live in Strings.resx and one file per language beside it; the SDK embeds
+    the neutral file and builds a satellite assembly per culture, which dotnet publish copies next to
+    the app. Loc.T looks a name up at the moment it is drawn, so the English name stays the identity
+    everywhere else. Listing the languages keeps a RID build from carrying satellites nobody asked for.
+  -->
+  <PropertyGroup>
+    <SatelliteResourceLanguages>en;zh-CN</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <!--
     ImageMagick is bundled everywhere except Linux. Distributions all ship it and the .deb and .rpm
     recommend it, so a Linux download stays 36 MB smaller and redistributes nothing; Windows and macOS
     have no package manager to lean on. A developer build has no RuntimeIdentifier and bundles it, so

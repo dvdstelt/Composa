@@ -6,7 +6,15 @@ using Avalonia.Media;
 
 namespace Composa.App;
 
-/// <summary>Small builders that keep code-built layouts readable.</summary>
+/// <summary>
+/// Small builders that keep code-built layouts readable.
+///
+/// <see cref="Label"/> deliberately does NOT run its text through <see cref="Loc"/>: callers hand it
+/// layer names, document names and file names, which are the person's own data and must reach the
+/// screen exactly as typed. Text meant for the interface localises at the call site instead.
+/// <see cref="Check"/>, <see cref="TextButton"/> and <see cref="IconButton"/> only ever receive
+/// interface words, so those do localise here.
+/// </summary>
 public static class Ui
 {
     public static TextBlock Label(string text, IBrush? brush = null, double? size = null, FontWeight weight = FontWeight.Normal)
@@ -33,14 +41,14 @@ public static class Ui
     public static Button IconButton(Icons.Icon icon, string tip, Action click, double size = 16)
     {
         var button = new Button { Content = Icons.Create(icon, size), Classes = { "flat" } };
-        ToolTip.SetTip(button, tip);
+        ToolTip.SetTip(button, Loc.T(tip));
         button.Click += (_, _) => click();
         return button;
     }
 
     public static Button TextButton(string text, Action click, bool accent = false)
     {
-        var button = new Button { Content = text, MinWidth = 72, HorizontalContentAlignment = HorizontalAlignment.Center };
+        var button = new Button { Content = Loc.T(text), MinWidth = 72, HorizontalContentAlignment = HorizontalAlignment.Center };
         if (accent) button.Classes.Add("accent");
         button.Click += (_, _) => click();
         return button;
@@ -48,7 +56,7 @@ public static class Ui
 
     public static CheckBox Check(string text, bool value, Action<bool> changed)
     {
-        var box = new CheckBox { Content = text, IsChecked = value };
+        var box = new CheckBox { Content = Loc.T(text), IsChecked = value };
         box.IsCheckedChanged += (_, _) => changed(box.IsChecked == true);
         return box;
     }
@@ -86,7 +94,7 @@ public static class Ui
         label.Cursor = new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.SizeWestEast);
         // Only what a control draws is hit; a label without a background would take the pointer on its glyphs alone.
         if (label is TextBlock { Background: null } text) text.Background = Brushes.Transparent;
-        ToolTip.SetTip(label, "Drag to change the value (Alt: finer)");
+        ToolTip.SetTip(label, Loc.T("Drag to change the value (Alt: finer)"));
         ToolTip.SetShowDelay(label, 450);
         double pressX = 0, lastX = 0, start = 0, travel = 0;
         bool pressed = false, dragging = false;

@@ -9,6 +9,9 @@ public sealed class App : Application
 {
     public override void Initialize()
     {
+        // The language is resolved before any window builds its text, so the first paint is already
+        // in the language the person chose.
+        Loc.Apply(Settings.Load().Language);
         RequestedThemeVariant = ThemeVariant.Dark;
         Styles.Add(new FluentTheme { DensityStyle = DensityStyle.Compact });
         Styles.Add(new Avalonia.Markup.Xaml.Styling.StyleInclude(new Uri("avares://composa/")) { Source = new Uri("avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml") });

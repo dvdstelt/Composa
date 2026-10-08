@@ -39,9 +39,9 @@ public sealed class ColorRangeWindow : DialogWindow
             var button = new ToggleButton { Classes = { "tool" }, Width = 36, Height = 26, Content = Eyedropper(mode) };
             ToolTip.SetTip(button, mode switch
             {
-                ColorRangeSample.Sample => "Click the image to select that color",
-                ColorRangeSample.Add => "Click the image to add that color to the selection (or Shift-click with any eyedropper)",
-                _ => "Click the image to take that color out of the selection (or Alt-click with any eyedropper)"
+                ColorRangeSample.Sample => Loc.T("Click the image to select that color"),
+                ColorRangeSample.Add => Loc.T("Click the image to add that color to the selection (or Shift-click with any eyedropper)"),
+                _ => Loc.T("Click the image to take that color out of the selection (or Alt-click with any eyedropper)")
             });
             button.Click += (_, _) => session.SetColorRangeSampleMode(mode);
             buttons.Add((mode, button));
@@ -55,9 +55,9 @@ public sealed class ColorRangeWindow : DialogWindow
         var hint = new TextBlock { Foreground = Palette.Secondary, FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxWidth = ColorRange.PreviewWidth };
         var fuzziness = Ui.SliderField("Fuzziness", ColorRange.DefaultFuzziness, ColorRange.MinFuzziness, ColorRange.MaxFuzziness,
             v => session.SetColorRangeFuzziness((int)v), width: ColorRange.PreviewWidth, reset: ColorRange.DefaultFuzziness);
-        ToolTip.SetTip(fuzziness, "How far a color may be from the picked ones and still be selected");
+        ToolTip.SetTip(fuzziness, Loc.T("How far a color may be from the picked ones and still be selected"));
         var invert = Ui.Check("Invert", false, v => session.SetColorRangeInvert(v));
-        ToolTip.SetTip(invert, "Select everything except those colors, such as all but a green screen");
+        ToolTip.SetTip(invert, Loc.T("Select everything except those colors, such as all but a green screen"));
         var body = Ui.Column(12, Ui.Row(6, buttons.Select(b => (Control)b.Button).ToArray()), frame, hint, fuzziness, invert);
 
         void Refresh()
@@ -66,8 +66,8 @@ public sealed class ColorRangeWindow : DialogWindow
             foreach (var (mode, button) in buttons) button.IsChecked = mode == edit.SampleMode;
             preview.Source = edit.Preview == null ? null : Ui.ToAvaloniaBitmap(edit.Preview, ColorRange.PreviewWidth * 2);
             hint.Text = edit.HasColors
-                ? $"Shift-click adds a color, Alt-click takes one away. {edit.Count:N0} pixels selected."
-                : "Click the image to pick the color to select.";
+                ? Loc.Format("Shift-click adds a color, Alt-click takes one away. {0} pixels selected.", edit.Count.ToString("N0"))
+                : Loc.T("Click the image to pick the color to select.");
             fuzziness.Value = edit.Fuzziness;
             invert.IsChecked = edit.Invert;
         }

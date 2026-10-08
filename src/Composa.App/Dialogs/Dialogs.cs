@@ -18,7 +18,7 @@ public class DialogWindow : Window
 
     public DialogWindow(string title, Control body, string okText = "OK", bool cancellable = true)
     {
-        Title = title;
+        Title = Loc.T(title);
         SizeToContent = SizeToContent.WidthAndHeight;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -64,7 +64,7 @@ public static class Prompts
     /// <summary>Save / Don't Save / Cancel. Returns null for cancel.</summary>
     public static async Task<bool?> SaveChanges(Window owner, string name)
     {
-        var dialog = new DialogWindow("Unsaved Changes", new TextBlock { Text = $"Save changes to \"{name}\" before closing?", MaxWidth = 420, TextWrapping = TextWrapping.Wrap }, "Save");
+        var dialog = new DialogWindow("Unsaved Changes", new TextBlock { Text = Loc.Format("Save changes to \"{0}\" before closing?", name), MaxWidth = 420, TextWrapping = TextWrapping.Wrap }, "Save");
         bool? result = null;
         var discard = Ui.TextButton("Don't Save", () => { result = false; dialog.Close(false); });
         ((StackPanel)((StackPanel)dialog.Content!).Children[1]).Children.Insert(0, discard);
@@ -76,7 +76,7 @@ public static class Prompts
     {
         var result = value;
         var box = Ui.Number(value, min, max, v => result = v, width: 120);
-        var dialog = new DialogWindow(title, Ui.Row(10, Ui.Scrub(Ui.Label(label), box), box, Ui.Label(unit, Palette.Secondary)));
+        var dialog = new DialogWindow(title, Ui.Row(10, Ui.Scrub(Ui.Label(Loc.T(label)), box), box, Ui.Label(unit, Palette.Secondary)));
         dialog.Opened += (_, _) => box.Focus();
         return await dialog.Ask(owner) ? result : null;
     }
@@ -96,7 +96,7 @@ public static class Prompts
         var swatches = Ui.Row(0,
             new Border { Width = 60, Height = 28, Background = new SolidColorBrush(initial.ToAvalonia()) },
             new Border { Width = 60, Height = 28, [!Border.BackgroundProperty] = view.GetObservable(ColorView.ColorProperty).Select(c => (IBrush)new SolidColorBrush(c)).ToBinding() });
-        var body = Ui.Column(10, view, Ui.Row(10, Ui.Label("Before / After", Palette.Secondary), swatches));
+        var body = Ui.Column(10, view, Ui.Row(10, Ui.Label(Loc.T("Before / After"), Palette.Secondary), swatches));
         return await new DialogWindow(title, body).Ask(owner) ? view.Color.ToSkia().WithAlpha(255) : null;
     }
 
@@ -168,8 +168,8 @@ public static class CanvasDialogs
         }
         widthBox.ValueChanged += FollowSize;
         heightBox.ValueChanged += FollowSize;
-        var background = Ui.Combo(new[] { "Transparent", "White", "Background color" }, "Transparent", s => s, s => fill = s == "White" ? 1 : s == "Transparent" ? 0 : 2, 220);
-        var grid = Form(("Preset", preset), ("Width", Ui.Row(6, widthBox, Ui.Label("px", Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label("px", Palette.Secondary))), ("Background", background));
+        var background = Ui.Combo(new[] { "Transparent", "White", "Background color" }, "Transparent", Loc.T, s => fill = s == "White" ? 1 : s == "Transparent" ? 0 : 2, 220);
+        var grid = Form(("Preset", preset), ("Width", Ui.Row(6, widthBox, Ui.Label(Loc.T("px"), Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label(Loc.T("px"), Palette.Secondary))), ("Background", background));
         if (!await new DialogWindow("New Canvas", grid, "Create").Ask(owner)) return null;
         return new NewCanvasResult(width, height, fill == 0 ? null : fill == 1 ? SKColors.White : backgroundColor);
     }
@@ -202,7 +202,7 @@ public static class CanvasDialogs
         }
         var body = Ui.Column(12,
             Ui.Label($"Current size: {currentWidth} × {currentHeight} px", Palette.Secondary),
-            Form(("Width", Ui.Row(6, widthBox, Ui.Label("px", Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label("px", Palette.Secondary))), ("", relativeBox), ("Anchor", anchors)));
+            Form(("Width", Ui.Row(6, widthBox, Ui.Label(Loc.T("px"), Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label(Loc.T("px"), Palette.Secondary))), ("", relativeBox), ("Anchor", anchors)));
         if (!await new DialogWindow("Canvas Size", body).Ask(owner)) return null;
         if (relative) { width += currentWidth; height += currentHeight; }
         return (Math.Clamp(width, 1, DocumentLimits.MaxSide), Math.Clamp(height, 1, DocumentLimits.MaxSide), anchor);
@@ -252,12 +252,12 @@ public static class CanvasDialogs
         }, width: 120);
         var resolutionBox = Ui.Number(resolution, 1, 9600, v => resolution = v, width: 120);
         var modes = Ui.Combo(ResampleModes, mode, ResampleName, v => { mode = v; Describe(); }, 160);
-        ToolTip.SetTip(modes, "How the pixels are resampled: Automatic for most pictures, Nearest Neighbor for pixel art, Enhance to invent detail with a model while enlarging");
+        ToolTip.SetTip(modes, Loc.T("How the pixels are resampled: Automatic for most pictures, Nearest Neighbor for pixel art, Enhance to invent detail with a model while enlarging"));
         Describe();
         var body = Ui.Column(12,
             Ui.Label($"Current size: {currentWidth} × {currentHeight} px", Palette.Secondary),
-            Form(("Width", Ui.Row(6, widthBox, Ui.Label("px", Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label("px", Palette.Secondary))),
-                ("", Ui.Check("Constrain proportions", true, v => constrain = v)), ("Resolution", Ui.Row(6, resolutionBox, Ui.Label("pixels/inch", Palette.Secondary))),
+            Form(("Width", Ui.Row(6, widthBox, Ui.Label(Loc.T("px"), Palette.Secondary))), ("Height", Ui.Row(6, heightBox, Ui.Label(Loc.T("px"), Palette.Secondary))),
+                ("", Ui.Check("Constrain proportions", true, v => constrain = v)), ("Resolution", Ui.Row(6, resolutionBox, Ui.Label(Loc.T("pixels/inch"), Palette.Secondary))),
                 ("Resample", modes)),
             note);
         if (!await new DialogWindow("Image Size", body).Ask(owner)) return null;
@@ -269,7 +269,7 @@ public static class CanvasDialogs
     {
         var quality = initial;
         var preview = new Image { Width = 520, Height = 340, Stretch = Stretch.Uniform };
-        var info = Ui.Label("Measuring…", Palette.Secondary);
+        var info = Ui.Label(Loc.T("Measuring…"), Palette.Secondary);
         var generation = 0;
         var closed = false;
         Task inFlight = Task.CompletedTask;
@@ -280,7 +280,7 @@ public static class CanvasDialogs
             timer.Stop();
             var mine = ++generation;
             var q = quality;
-            info.Text = "Measuring…";
+            info.Text = Loc.T("Measuring…");
             // Encoding a large photo takes a moment, so it runs off the UI thread; a newer request supersedes this one.
             var work = Task.Run(() =>
             {
@@ -308,14 +308,18 @@ public static class CanvasDialogs
         return accepted ? quality : null;
     }
 
-    /// <summary>Labelled rows. The label of a number field, or of a row that starts with one, drags the field's value.</summary>
+    /// <summary>
+    /// Labelled rows. The label of a number field, or of a row that starts with one, drags the field's
+    /// value. Every label is a word the application chose, so the translation happens here once rather
+    /// than at each call.
+    /// </summary>
     public static Grid Form(params (string Label, Control Field)[] rows)
     {
         var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,12,*") };
         for (var i = 0; i < rows.Length; i++)
         {
             grid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
-            var label = Ui.Label(rows[i].Label, Palette.Secondary);
+            var label = Ui.Label(Loc.T(rows[i].Label), Palette.Secondary);
             if ((rows[i].Field as NumericUpDown ?? (rows[i].Field as Panel)?.Children.FirstOrDefault() as NumericUpDown) is { } number) Ui.Scrub(label, number);
             label.Margin = new Thickness(0, 6);
             Grid.SetRow(label, i);

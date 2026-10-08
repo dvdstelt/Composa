@@ -268,7 +268,7 @@ public sealed partial class CanvasView
                     }
                 }
                 SettleGradient(keep: true);
-                if (session.EditableLayer is not { } target) { Problem?.Invoke("Select a pixel layer or a mask to draw a gradient on."); break; }
+                if (session.EditableLayer is not { } target) { Problem?.Invoke(Loc.T("Select a pixel layer or a mask to draw a gradient on.")); break; }
                 gradientMovesStart = false;
                 gradientFrom = gradientTo = pressDocument;
                 gradientOriginal = session.BeginGradient(target);
@@ -792,7 +792,7 @@ public sealed partial class CanvasView
             session.SelectLayer(hit.Id, extend: false);
         if (session.BeginTransform("Move") == null)
         {
-            Problem?.Invoke("Select a layer with pixels to move.");
+            Problem?.Invoke(Loc.T("Select a layer with pixels to move."));
             return;
         }
         temporaryMove = true;
@@ -824,7 +824,7 @@ public sealed partial class CanvasView
         }
         if (session.BeginTransform(handle == TransformHandle.Move ? "Move" : handle == TransformHandle.Rotate ? "Rotate" : distortCorner >= 0 ? "Distort" : "Scale") == null)
         {
-            Problem?.Invoke("Select a layer with pixels to move.");
+            Problem?.Invoke(Loc.T("Select a layer with pixels to move."));
             return;
         }
         drag = Drag.Transform;

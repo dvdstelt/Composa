@@ -43,24 +43,25 @@ public static class GridSettingsDialog
             updating = false;
             swatch.Background = new SolidColorBrush(a.Color.ToAvalonia());
             note.Text = g.IsValid
-                ? $"A subdivision every {g.Step:0.##} pixels."
-                : $"Use gridlines every {LayoutGrid.MinSpacing}-{LayoutGrid.MaxSpacing} pixels and {LayoutGrid.MinSubdivisions}-{LayoutGrid.MaxSubdivisions} subdivisions, no more than the pixels between gridlines.";
+                ? Loc.Format("A subdivision every {0} pixels.", g.Step.ToString("0.##"))
+                : Loc.Format("Use gridlines every {0}-{1} pixels and {2}-{3} subdivisions, no more than the pixels between gridlines.",
+                    LayoutGrid.MinSpacing, LayoutGrid.MaxSpacing, LayoutGrid.MinSubdivisions, LayoutGrid.MaxSubdivisions);
             note.Foreground = g.IsValid ? Palette.Secondary : Warning;
             dialog.CanAccept = g.IsValid;
             if (g.IsValid) preview(g, a);
         }
 
-        presetBox = Ui.Combo(presets, appearance.Preset, GridAppearance.DisplayName, p => { if (!updating) Change(appearance with { Preset = p }, grid); }, 150);
-        ToolTip.SetTip(swatch, "Choose a custom grid color");
+        presetBox = Ui.Combo(presets, appearance.Preset, p => Loc.T(GridAppearance.DisplayName(p)), p => { if (!updating) Change(appearance with { Preset = p }, grid); }, 150);
+        ToolTip.SetTip(swatch, Loc.T("Choose a custom grid color"));
         swatch.PointerPressed += async (_, _) =>
         {
             // The picker shows on the canvas as it goes; a color other than the one in use becomes the Custom color.
             var before = appearance;
             GridAppearance Custom(SKColor color) => before with { Preset = GridColorPreset.Custom, CustomColor = (uint)color | 0xFF000000 };
-            var picked = await Prompts.Color(dialog, "Grid Color", before.Color, color => Change(Custom(color), grid));
+            var picked = await Prompts.Color(dialog, Loc.T("Grid Color"), before.Color, color => Change(Custom(color), grid));
             Change(picked is { } color && color != before.Color ? Custom(color) : before, grid);
         };
-        styleBox = Ui.Combo(styles, appearance.Style, GridAppearance.DisplayName, s => { if (!updating) Change(appearance with { Style = s }, grid); }, 150);
+        styleBox = Ui.Combo(styles, appearance.Style, s => Loc.T(GridAppearance.DisplayName(s)), s => { if (!updating) Change(appearance with { Style = s }, grid); }, 150);
         opacityField = Ui.SliderField("Opacity", appearance.Opacity, GridAppearance.MinOpacity, GridAppearance.MaxOpacity,
             v => Change(appearance with { Opacity = (int)v }, grid), width: 204, reset: GridAppearance.DefaultOpacity);
         spacingBox = Ui.Number(grid.Spacing, LayoutGrid.MinSpacing, LayoutGrid.MaxSpacing, v => { if (!updating) Change(appearance, grid with { Spacing = (int)v }); }, width: 120);
@@ -69,11 +70,11 @@ public static class GridSettingsDialog
         var restore = Ui.TextButton("Restore Defaults", () => Change(new GridAppearance { CustomColor = appearance.CustomColor }, new LayoutGrid()));
 
         var form = CanvasDialogs.Form(
-            ("Color", Ui.Row(8, presetBox, swatch)),
-            ("Style", styleBox),
-            ("Opacity", opacityField),
-            ("Gridline every", Ui.Row(6, spacingBox, Ui.Label("pixels", Palette.Secondary))),
-            ("Subdivisions", subdivisionsBox));
+            (Loc.T("Color"), Ui.Row(8, presetBox, swatch)),
+            (Loc.T("Style"), styleBox),
+            (Loc.T("Opacity"), opacityField),
+            (Loc.T("Gridline every"), Ui.Row(6, spacingBox, Ui.Label(Loc.T("pixels"), Palette.Secondary))),
+            (Loc.T("Subdivisions"), subdivisionsBox));
         dialog = new DialogWindow("Grid Settings", Ui.Column(12, form, note, restore));
         Change(appearance, grid);
         return await dialog.Ask(owner) ? (grid, appearance) : null;
